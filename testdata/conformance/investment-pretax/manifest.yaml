@@ -1,0 +1,4 @@
+description: "Investment funded outside the cash ledger (pre-tax payroll style), untaxed growth."
+normative: true
+optimize: false
+tolerance: 0.01

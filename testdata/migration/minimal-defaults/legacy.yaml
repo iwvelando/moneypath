@@ -1,0 +1,26 @@
+---
+# Legacy (v1) config exercising default-behavior edges: a scenario without
+# `active` (v1 treated it as inactive) and a schedule with frequency: 0
+# (v1 defaulted it to monthly for investment schedules).
+common:
+  startingValue: 500.00
+  deathDate: 2030-01
+  events:
+    - name: Fee
+      amount: -5.00
+      frequency: 6
+scenarios:
+  - name: drift
+    events:
+      - name: Income
+        amount: 100.00
+        frequency: 1
+  - name: live
+    active: true
+    investments:
+      - name: Savings
+        startingValue: 1000.00
+        annualReturnRate: 2.0
+        contributions:
+          - amount: 50.00
+            frequency: 0

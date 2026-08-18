@@ -1,0 +1,51 @@
+version: 2
+simulation:
+  startDate: 2025-06
+  endDate: 2090-01
+  startingCash: 30000.00
+recommendations:
+  emergencyFundMonths: 6
+common:
+  events:
+    - name: Social security
+      amount: 1000.00
+      frequency: 1
+      startDate: 2050-01
+  loans:
+    - name: Auto loan
+      principal: 30000.00
+      downPayment: 5000.00
+      interestRate: 3.1
+      term: 72
+      startDate: 2020-01
+  investments:
+    - name: Brokerage account
+      startingValue: 25000.00
+      annualReturnRate: 6.5
+      taxRate: 15.0
+      withdrawalTaxRate: 15.0
+      contributions:
+        - amount: 500.00
+          frequency: 1
+          startDate: 2025-01
+      withdrawals:
+        - amount: 2000.00
+          frequency: 12
+          startDate: 2035-12
+          endDate: 2065-12
+scenarios:
+  - name: current path
+    active: true
+    events:
+      - name: Income
+        amount: 1234.56
+        frequency: 1
+        endDate: 2050-01
+      - name: Transition income
+        amount: 2000.00
+        frequency: 1
+        startDate: 2050-02
+        optimize:
+          field: startDate
+          minDate: 2049-10
+          maxDate: 2050-06

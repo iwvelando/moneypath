@@ -1,0 +1,26 @@
+version: 2
+simulation:
+  startDate: 2025-06
+  endDate: 2028-12
+  startingCash: 40000.00
+scenarios:
+  - name: aggressive payoff
+    events:
+      - name: Income
+        amount: 3000.00
+      - name: Spending
+        amount: -800.00
+    loans:
+      - name: Personal loan
+        principal: 25000.00
+        interestRate: 5.4
+        term: 36
+        startDate: 2025-07
+        extraPrincipalPayments:
+          - name: monthly extra
+            amount: 100.00
+            startDate: 2025-07
+          - name: windfall
+            amount: 5000.00
+            startDate: 2026-06
+            endDate: 2026-06

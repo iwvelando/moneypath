@@ -1,0 +1,4 @@
+description: Mortgage insurance charged while remaining/original principal exceeds the cutoff (deviation 1).
+normative: true
+optimize: false
+tolerance: 0.01

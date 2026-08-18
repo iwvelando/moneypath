@@ -1,0 +1,35 @@
+version: 2
+simulation:
+  startDate: 2025-06
+  endDate: 2028-12
+  startingCash: 10000.00
+common:
+  events:
+    - name: Subscription
+      amount: -25.00
+scenarios:
+  - name: steady
+    events:
+      - name: Income
+        amount: 3000.00
+      - name: Rent
+        amount: -1500.00
+      - name: Insurance
+        amount: -300.00
+        frequency: 3
+        startDate: 2025-07
+      - name: Bonus
+        amount: 2000.00
+        startDate: 2026-03
+        endDate: 2026-03
+  - name: sabbatical
+    events:
+      - name: Income
+        amount: 3000.00
+        endDate: 2026-06
+      - name: Rent
+        amount: -1500.00
+      - name: Travel
+        amount: -800.00
+        startDate: 2026-07
+        endDate: 2027-06

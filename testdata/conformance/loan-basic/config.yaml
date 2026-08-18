@@ -1,0 +1,19 @@
+version: 2
+simulation:
+  startDate: 2025-06
+  endDate: 2028-12
+  startingCash: 40000.00
+scenarios:
+  - name: car
+    events:
+      - name: Income
+        amount: 2500.00
+      - name: Spending
+        amount: -1000.00
+    loans:
+      - name: Auto loan
+        principal: 30000.00
+        downPayment: 5000.00
+        interestRate: 4.8
+        term: 24
+        startDate: 2025-08

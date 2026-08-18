@@ -1,0 +1,23 @@
+description: "Recurring and one-time cash-flow events across two scenarios; no loans or investments."
+normative: true
+optimize: false
+tolerance: 0.01
+expectedMetrics:
+  - scenario: steady
+    emergencyFund:
+      targetMonths: 6.00
+      averageMonthlyExpenses: 1625.00
+      targetAmount: 9750.00
+      initialLiquid: 10000.00
+      fundedMonths: 6.1538
+      shortfall: 0.00
+      surplus: 250.00
+  - scenario: sabbatical
+    emergencyFund:
+      targetMonths: 6.00
+      averageMonthlyExpenses: 1525.00
+      targetAmount: 9150.00
+      initialLiquid: 10000.00
+      fundedMonths: 6.5574
+      shortfall: 0.00
+      surplus: 850.00

@@ -1,0 +1,24 @@
+version: 2
+simulation:
+  startDate: 2025-06
+  endDate: 2028-12
+  startingCash: 20000.00
+scenarios:
+  - name: sell the house
+    events:
+      - name: Income
+        amount: 4000.00
+      - name: Spending
+        amount: -1500.00
+    loans:
+      - name: Mortgage
+        principal: 180000.00
+        downPayment: 20000.00
+        interestRate: 4.00
+        term: 360
+        startDate: 2022-03
+        escrow: 350.00
+        earlyPayoffDate: 2026-09
+        sellProperty: true
+        sellPrice: 210000.00
+        sellCostsNet: 12000.00

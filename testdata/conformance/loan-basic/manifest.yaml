@@ -1,0 +1,4 @@
+description: Single amortizing loan (no escrow/MI) running to natural maturity in-window.
+normative: true
+optimize: false
+tolerance: 0.01

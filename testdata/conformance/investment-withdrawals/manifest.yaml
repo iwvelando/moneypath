@@ -1,0 +1,4 @@
+description: "Fixed-amount withdrawals with withdrawal tax on growth, plus percentage-style withdrawals."
+normative: true
+optimize: false
+tolerance: 0.01

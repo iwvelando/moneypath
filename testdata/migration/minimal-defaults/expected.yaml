@@ -1,0 +1,27 @@
+version: 2
+simulation:
+  endDate: 2030-01
+  startingCash: 500.00
+common:
+  events:
+    - name: Fee
+      amount: -5.00
+      frequency: 6
+scenarios:
+  # v1 treated a missing `active` as inactive; v2 defaults to active,
+  # so migration makes the v1 meaning explicit.
+  - name: drift
+    active: false
+    events:
+      - name: Income
+        amount: 100.00
+        frequency: 1
+  - name: live
+    active: true
+    investments:
+      - name: Savings
+        startingValue: 1000.00
+        annualReturnRate: 2.0
+        contributions:
+          # frequency: 0 dropped; v2's default (1) matches v1's behavior
+          - amount: 50.00

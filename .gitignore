@@ -1,0 +1,15 @@
+# Build artifacts
+/build/
+/dist/
+moneypath
+*.wasm
+
+# Node / frontend
+node_modules/
+
+# Editor/OS noise
+.DS_Store
+
+# Claude Code runtime state
+.claude/scheduled_tasks.lock
+.claude/settings.local.json

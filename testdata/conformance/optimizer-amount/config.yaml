@@ -1,0 +1,21 @@
+version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2026-12
+  startingCash: 5000.00
+recommendations:
+  emergencyFundMonths: 3
+scenarios:
+  - name: base plan
+    events:
+      - name: Income
+        amount: 2000.00
+      - name: Rent
+        amount: -1800.00
+      - name: New expense
+        amount: -500.00
+        startDate: 2025-07
+        optimize:
+          field: amount
+          min: -500
+          max: 0

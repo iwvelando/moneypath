@@ -1,0 +1,158 @@
+# moneypath example configuration (format v2)
+# Copy and adapt. Field-by-field reference: spec/03-config-v2.md
+version: 2
+
+simulation:
+  # Optional; when omitted the simulation starts at the current month.
+  startDate: 2025-06
+  # Required; the simulation runs through this month, inclusive.
+  endDate: 2090-01
+  # Required; cash balance as of the end of the month before startDate.
+  startingCash: 30000.00
+
+recommendations:
+  # Months of average expenses to target for the emergency-fund
+  # recommendation. 0 disables it. Default: 6.
+  emergencyFundMonths: 6
+
+# Everything under `common` is shared by every scenario.
+common:
+  events:
+    # Positive amounts are income, negative amounts are spending.
+    - name: Social security
+      amount: 1000.00
+      frequency: 1        # every month (default)
+      startDate: 2050-01  # begins here; defaults to the simulation start
+    - name: Service quarterly bill
+      amount: -10.00
+      frequency: 3        # every 3 months
+    - name: Streaming subscription
+      amount: -35.00      # monthly (frequency defaults to 1)
+  loans:
+    - name: Auto loan
+      principal: 30000.00     # original principal before the down payment
+      downPayment: 5000.00    # paid at startDate
+      interestRate: 3.1       # annual percent
+      term: 72                # months
+      startDate: 2020-01      # may predate the simulation window
+  investments:
+    - name: Brokerage account
+      startingValue: 25000.00
+      annualReturnRate: 6.5   # annual percent, compounded monthly
+      taxRate: 15.0           # percent of positive monthly growth (tax drag)
+      withdrawalTaxRate: 15.0 # percent of the growth portion of withdrawals
+      contributions:
+        - amount: 500.00
+          frequency: 1
+          startDate: 2025-07
+      withdrawals:
+        # Withdrawals use a fixed amount OR a percentage of the balance —
+        # one style per investment.
+        - amount: 2000.00
+          frequency: 12
+          startDate: 2035-12
+          endDate: 2065-12
+    - name: Retirement drawdown
+      startingValue: 500000.00
+      annualReturnRate: 5.0
+      withdrawals:
+        - percentage: 4.0     # percent of the post-growth balance
+          frequency: 12
+          startDate: 2035-01
+          endDate: 2065-12
+
+scenarios:
+  - name: current path
+    active: true              # default true; set false to skip a scenario
+    events:
+      - name: Income
+        amount: 1234.56
+        endDate: 2050-01      # defaults to the simulation end when omitted
+      - name: Transition income
+        amount: 2000.00
+        startDate: 2050-02
+        # Optional optimizer directive: with --optimize (or the web UI
+        # toggle) this field is adjusted to keep cash above the
+        # emergency-fund floor. See spec/04-engine-semantics.md §7.
+        optimize:
+          field: startDate
+          minDate: 2049-10
+          maxDate: 2050-06
+      - name: Bonus
+        amount: 7891.23
+        # startDate == endDate makes this a one-time event.
+        startDate: 2025-12
+        endDate: 2025-12
+    loans:
+      - name: 1234 Street Address
+        principal: 150000.00
+        downPayment: 10000.00
+        interestRate: 3.75
+        term: 360
+        startDate: 2018-01
+        # Monthly escrow added to each payment. If the loan ends without the
+        # property being sold, 12x escrow is paid every December afterward
+        # (property costs continue after payoff).
+        escrow: 500.00
+        # Monthly mortgage insurance, charged while remaining/original
+        # principal exceeds the cutoff percentage.
+        mortgageInsurance: 50.00
+        mortgageInsuranceCutoff: 78.0
+        # Pay the loan off early in the month the running cash balance
+        # exceeds the remaining principal by at least this amount.
+        earlyPayoffThreshold: 5000.00
+    investments:
+      - name: Retirement savings
+        startingValue: 15000.00
+        annualReturnRate: 7.0
+        # true: contributions come out of simulated cash (post-tax money,
+        # e.g. Roth/brokerage). false/omitted: funded outside the simulation
+        # (e.g. pre-tax payroll deduction).
+        contributionsFromCash: true
+        contributions:
+          - amount: 750.00
+            startDate: 2025-07
+
+  - name: sell and downsize
+    events:
+      - name: Income
+        amount: 1234.56
+        endDate: 2050-01
+    loans:
+      - name: 1234 Street Address
+        principal: 150000.00
+        downPayment: 10000.00
+        interestRate: 3.75
+        term: 360
+        startDate: 2018-01
+        escrow: 500.00
+        mortgageInsurance: 50.00
+        mortgageInsuranceCutoff: 78.0
+        # Pay off at a fixed date and sell the property.
+        earlyPayoffDate: 2026-06
+        sellProperty: true
+        sellPrice: 195000.00    # defaults to `principal` when omitted
+        sellCostsNet: 9500.00   # positive = closing costs paid at sale
+      - name: 5678 Street Address
+        principal: 200000.00
+        downPayment: 40000.00
+        interestRate: 2.75
+        term: 360
+        startDate: 2026-06
+        escrow: 600.00
+        earlyPayoffThreshold: 5000.00
+        # Extra principal payments accept the full event shape.
+        extraPrincipalPayments:
+          - amount: 100.00            # monthly extra principal
+          - name: large one-off payment
+            amount: 19000.00
+            startDate: 2027-06
+            endDate: 2027-06
+    investments:
+      - name: Retirement savings
+        startingValue: 15000.00
+        annualReturnRate: 7.0
+        contributionsFromCash: true
+        contributions:
+          - amount: 750.00
+            startDate: 2025-07

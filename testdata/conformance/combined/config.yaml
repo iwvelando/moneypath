@@ -1,0 +1,58 @@
+version: 2
+simulation:
+  startDate: 2025-06
+  endDate: 2030-12
+  startingCash: 25000.00
+common:
+  events:
+    - name: Utilities
+      amount: -50.00
+  investments:
+    - name: Shared brokerage
+      startingValue: 15000.00
+      annualReturnRate: 5.00
+      taxRate: 15.00
+      contributionsFromCash: true
+      contributions:
+        - amount: 250.00
+          startDate: 2025-07
+scenarios:
+  - name: finance the car
+    events:
+      - name: Income
+        amount: 4500.00
+      - name: Groceries
+        amount: -1200.00
+    loans:
+      - name: Auto loan
+        principal: 28000.00
+        downPayment: 3000.00
+        interestRate: 4.8
+        term: 60
+        startDate: 2025-09
+    investments:
+      - name: Roth IRA
+        startingValue: 12000.00
+        annualReturnRate: 6.5
+        contributionsFromCash: true
+        contributions:
+          - amount: 300.00
+            startDate: 2025-07
+  - name: pay cash for the car
+    events:
+      - name: Income
+        amount: 4500.00
+      - name: Groceries
+        amount: -1200.00
+      - name: Car purchase
+        amount: -25000.00
+        startDate: 2025-09
+        endDate: 2025-09
+    investments:
+      - name: Roth IRA
+        startingValue: 12000.00
+        annualReturnRate: 6.5
+        contributionsFromCash: true
+        contributions:
+          - amount: 300.00
+            startDate: 2025-07

@@ -1,0 +1,51 @@
+---
+# Legacy (v1) config exercising the full loan surface (sale, extra principal,
+# threshold) and percentage withdrawals. No top-level startDate.
+common:
+  startingValue: 12000.00
+  deathDate: 2060-12
+scenarios:
+  - name: sell and rebuy
+    active: true
+    events:
+      - name: Income
+        amount: 4000.00
+        frequency: 1
+    loans:
+      - name: Old house
+        principal: 150000.00
+        downPayment: 10000.00
+        interestRate: 3.75
+        term: 360
+        startDate: 2018-01
+        escrow: 500.00
+        mortgageInsurance: 50.00
+        mortgageInsuranceCutoff: 78.00
+        earlyPayoffDate: 2026-06
+        sellProperty: true
+        sellPrice: 195000.00
+        sellCostsNet: 9500.00
+      - name: New house
+        principal: 200000.00
+        downPayment: 40000.00
+        interestRate: 2.75
+        term: 360
+        startDate: 2026-06
+        escrow: 600.00
+        earlyPayoffThreshold: 5000.00
+        extraPrincipalPayments:
+          - amount: 100.00
+            frequency: 1
+          - name: windfall
+            amount: 19000.00
+            frequency: 1
+            startDate: 2027-06
+            endDate: 2027-06
+    investments:
+      - name: Drawdown
+        startingValue: 400000.00
+        annualReturnRate: 5.0
+        withdrawals:
+          - percentage: 4.0
+            frequency: 12
+            startDate: 2040-01

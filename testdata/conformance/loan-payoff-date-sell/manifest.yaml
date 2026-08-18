@@ -1,0 +1,4 @@
+description: Early payoff at a fixed date with property sale (escrow active until sale).
+normative: true
+optimize: false
+tolerance: 0.01

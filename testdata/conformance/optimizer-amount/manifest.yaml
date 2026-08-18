@@ -1,0 +1,26 @@
+description: Optimizer adjusts an expense amount to the smallest feasible adjustment against the emergency-fund floor.
+normative: true
+optimize: true
+tolerance: 0.01
+expectedMetrics:
+  - scenario: base plan
+    emergencyFund:
+      targetMonths: 3.00
+      averageMonthlyExpenses: 1907.7506
+      targetAmount: 5723.2517
+      initialLiquid: 5000.00
+      fundedMonths: 2.6209
+      shortfall: 723.2517
+      surplus: 0.00
+    optimizations:
+      - targetName: New expense
+        field: amount
+        original: -500.00
+        value: -184.7153
+        originalDisplay: "-$500.00"
+        valueDisplay: "-$184.72"
+        floor: 6275.00
+        minimumCash: 6275.1251
+        headroom: 0.1251
+        iterations: 16
+        converged: true
