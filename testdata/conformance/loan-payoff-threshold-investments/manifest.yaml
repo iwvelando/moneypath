@@ -1,0 +1,4 @@
+description: "Threshold payoff counted against and funded by a fundLoanPayoffs taxable account (deviation 4); an unflagged account is excluded."
+normative: true
+optimize: false
+tolerance: 0.01

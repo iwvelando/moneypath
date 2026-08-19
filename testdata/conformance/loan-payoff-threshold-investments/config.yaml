@@ -1,0 +1,32 @@
+version: 2
+simulation:
+  startDate: 2025-06
+  endDate: 2031-12
+  startingCash: 6000.00
+scenarios:
+  - name: brokerage payoff
+    events:
+      - name: Income
+        amount: 3200.00
+      - name: Spending
+        amount: -2600.00
+    loans:
+      - name: House loan
+        principal: 60000.00
+        interestRate: 4.00
+        term: 180
+        startDate: 2023-01
+        escrow: 150.00
+        earlyPayoffThreshold: 5000.00
+    investments:
+      - name: Brokerage
+        startingValue: 45000.00
+        annualReturnRate: 6.00
+        withdrawalTaxRate: 15.00
+        fundLoanPayoffs: true
+        contributions:
+          - amount: 800.00
+            startDate: 2025-07
+      - name: 401k
+        startingValue: 50000.00
+        annualReturnRate: 6.00

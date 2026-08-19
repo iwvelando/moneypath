@@ -41,6 +41,8 @@ common:
       annualReturnRate: 6.5   # annual percent, compounded monthly
       taxRate: 15.0           # percent of positive monthly growth (tax drag)
       withdrawalTaxRate: 15.0 # percent of the growth portion of withdrawals
+      fundLoanPayoffs: true   # let this account's after-tax value count toward (and
+                              # fund) early-payoff thresholds; taxable accounts only
       contributions:
         - amount: 500.00
           frequency: 1
@@ -56,7 +58,7 @@ common:
       startingValue: 500000.00
       annualReturnRate: 5.0
       withdrawals:
-        - percentage: 4.0     # percent of the post-growth balance
+        - percentage: 4.0     # percent of the current balance (after monthly growth)
           frequency: 12
           startDate: 2035-01
           endDate: 2065-12

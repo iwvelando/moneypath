@@ -123,9 +123,20 @@ mechanism is a warning (it has no effect). `mortgageInsurance > 0` with no
                               # deducted from simulated cash (post-tax contributions);
                               # when false they come from outside the simulation
                               # (e.g. payroll deduction)
+  fundLoanPayoffs: true      # optional; default false; when true, this account's
+                             # after-tax liquidation value counts toward loan
+                             # early-payoff threshold checks and the account is
+                             # liquidated to cover what cash cannot (chapter 04
+                             # §Early payoff). Intended for taxable accounts —
+                             # do not flag retirement accounts (the engine applies
+                             # only withdrawalTaxRate, no penalties)
   contributions: []          # optional; list of Events (amount > 0)
   withdrawals: []            # optional; list of Events (amount XOR percentage)
 ```
+
+Validation: `taxRate` and `withdrawalTaxRate` must be in `[0, 100)` (the payoff-funding
+gross-up in chapter 04 divides by `1 − withdrawalTaxRate/100`); `annualReturnRate` may
+be negative; `startingValue ≥ 0`.
 
 ## Optimizer block (events in scenarios only)
 

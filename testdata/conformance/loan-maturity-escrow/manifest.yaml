@@ -1,0 +1,4 @@
+description: "Escrowed loan reaching natural maturity mid-year: year escrow accrual (final month included) refunded, December 12x billing starts at the end month's year (deviation 3)."
+normative: true
+optimize: false
+tolerance: 0.01

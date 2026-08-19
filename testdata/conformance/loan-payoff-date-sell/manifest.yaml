@@ -1,4 +1,4 @@
-description: Early payoff at a fixed date with property sale (escrow active until sale).
+description: "Early payoff at a fixed date with property sale; the year's escrow accrual is refunded at sale (deviation 3)."
 normative: true
 optimize: false
 tolerance: 0.01

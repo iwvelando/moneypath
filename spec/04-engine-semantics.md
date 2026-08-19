@@ -34,7 +34,11 @@ For each **active** scenario, independently:
   3. **Threshold payoff check** (§3.5): for each loan (scenario loans in config order,
      then common loans), check against
      `projectedLiquid = cash + eventDelta − cashContributions + withdrawalCash`.
-     A triggered payoff rewrites that loan's schedule at `m` and emits a note.
+     A triggered payoff rewrites that loan's schedule at `m`, emits a note, and — when
+     `fundLoanPayoffs` investments cover a cash shortfall — performs their withdrawals
+     (the proceeds and value changes join `withdrawalCash` and `investmentDelta` for
+     steps 5–6). Before the next loan's check, `projectedLiquid` is updated by the
+     fired payoff's net cash effect (liquidation proceeds minus the payoff payment).
   4. **Loans**: `loanDelta` = −Σ of every loan's scheduled payment amount at `m`
      (a schedule is a sparse date→payment map; months without entries contribute 0).
   5. **Update cash**:
@@ -75,9 +79,11 @@ when a January is generated).
 
 **First month (loan startDate):**
 - `extra` = extra-principal occurrences (§2) at startDate, capped per §3.3.
-- `interest = F·r`; `principalPaid = M − interest + extra`.
-- `payment = M + escrow + downPayment + extra + MI(§3.4)`.
+- `interest = F·r`; `principalPaid = min(M − interest + extra, F)`.
+- `payment = interest + principalPaid + escrow + downPayment + MI(§3.4)`.
 - `remaining = F − principalPaid`.
+- Apply the **end check** below with `monthIndex = 1` — a one-month term or a large
+  first extra payment ends the loan immediately.
 
 **Each subsequent month, `monthIndex` = 2 … term** (stop early on payoff/maturity/endDate):
 - If the month equals `earlyPayoffDate` → §3.5 payoff, then stop.
@@ -85,10 +91,16 @@ when a January is generated).
   `principalPaid = min(M − interest + extra, remaining)`.
 - `payment = interest + principalPaid + escrow + MI(§3.4)`.
 - `remaining −= principalPaid`.
-- If `round2(remaining) == 0` **or** `monthIndex == term` (maturity): `remaining = 0`;
-  this is the final regular payment — note that because `principalPaid` is capped, the
-  final payment is exactly what is owed, not a full `M`. Then apply §3.6 post-loan
-  escrow and stop.
+- **End check**: if `round2(remaining) ≤ 0` **or** `monthIndex == term` (maturity):
+  `remaining = 0`; this is the final regular payment — because `principalPaid` is
+  capped, it charges exactly what is owed, not a full `M`. Subtract the §3.6 escrow
+  refund from this payment, apply §3.6 post-loan escrow, and stop.
+
+**Invariant**: the `principalPaid` caps make a negative `remaining` arithmetically
+impossible; the `≤` in the end check is defense in depth so that even a defective
+state terminates the loan rather than generating payments forever. Implementations
+SHOULD treat `round2(remaining) < 0` as an internal error worth surfacing
+(assertion/logged error), never as an amount to keep billing.
 
 Payments dated before `simulation.startDate` exist in the schedule but are never billed
 (the loop only reads simulated months). The down payment is cash-out only if the loan
@@ -116,44 +128,91 @@ Two mechanisms; whichever fires first wins (a payoff removes the loan's future p
 
 **By date** (`earlyPayoffDate`, evaluated during schedule generation): at that month,
 instead of a regular payment:
-- With `sellProperty: true`: `payment = remaining − sellPrice + sellCostsNet`
-  (`sellPrice` defaults to `principal`; a negative payment is cash **in**). The asset is
-  gone: no further payments, no escrow anything.
-- Without sale: `payment = remaining − escrowPaidThisYear` (the year's escrow is
-  refunded). Then §3.6 post-loan escrow applies.
+- With `sellProperty: true`: `payment = remaining − sellPrice + sellCostsNet − refund`
+  (§3.6 escrow refund; `sellPrice` defaults to `principal`; a negative payment is cash
+  **in**). The asset is gone: no further payments, no post-sale escrow.
+- Without sale: `payment = remaining − refund` (§3.6). Then §3.6 post-loan escrow
+  applies.
 
 **By threshold** (`earlyPayoffThreshold` T > 0, evaluated inside the simulation loop —
-step 3 of §1 — because it depends on the running balance): in month `m`, if the loan
-started before `m`, still has `round2(remaining) > 0` as of the end of `m−1`, and
-`round2(projectedLiquid − remaining_{m−1}) ≥ T`, the loan is paid off at `m`:
-the scheduled payment at `m` (if any) is replaced by the same payoff payment as the
+step 3 of §1 — because it depends on the running balances): let
+
+`eligible = projectedLiquid + Σ netLiquidationValue(i)`
+
+summed over investments `i` (scenario and common) with `fundLoanPayoffs: true`, using
+investment state after step 2 of §1 for month `m`. An investment's
+`netLiquidationValue` is its current `value` minus the withdrawal tax a full
+liquidation would incur per §4 step 4:
+`value − withdrawalTaxRate/100 · min(value, growthBalance)`.
+
+In month `m`, if the loan started before `m`, still has `round2(remaining) > 0` as of
+the end of `m−1`, and `round2(eligible − remaining_{m−1}) ≥ T`, the loan is paid off at
+`m`: the scheduled payment at `m` (if any) is replaced by the same payoff payment as the
 by-date rule (sale and no-sale variants identical), all later scheduled payments are
-removed, §3.6 applies when not selling, and a note is emitted (§6). A threshold MUST
-fire at most once and MUST NOT fire once the loan has already ended.
+removed, §3.6 applies (refund always; post-loan escrow when not selling), and a note is
+emitted (§6). A threshold MUST fire at most once and MUST NOT fire once the loan has
+already ended.
 
-### 3.6 Post-loan escrow ("you still own the asset")
+**Funding the payoff**: with payoff payment `P`, the cash shortfall is
+`S = max(0, P − projectedLiquid)`. Walk the `fundLoanPayoffs` investments in processing
+order (scenario list order, then common) and withdraw from each until net proceeds
+cover `S`: for an investment with available growth `g = min(value, growthBalance)` and
+tax fraction `t = withdrawalTaxRate/100`, the gross withdrawal that nets `n` is
+`n / (1 − t)` when `n ≤ g·(1 − t)`, else `n + t·g`; cap at the full `value` (which nets
+its `netLiquidationValue`) and carry the remainder to the next flagged investment. Each
+such withdrawal applies §4 steps 3–4 mechanics (growth-first, withdrawal tax on the
+growth portion), adds its net proceeds to the month's `withdrawalCash` and its value
+change to `investmentDelta`, and emits a note (§6). The fire condition guarantees the
+flagged accounts can cover `S`; a funded payoff leaves the threshold margin `T` inside
+cash and the flagged accounts combined (when `S > 0`, the payoff itself zeroes
+projected cash and the margin sits in the accounts). With no flagged investments,
+`eligible` is plain `projectedLiquid` and `S` is charged to cash like any other
+payment.
 
-When a loan with `escrow` > 0 ends **without a sale** — natural maturity or either early
-payoff — the ongoing cost that escrow represents (taxes, insurance) continues: for every
-December strictly after the loan's final payment month, up to `simulation.endDate`, add a
-schedule entry of `payment = 12 · escrow`. When the asset is sold, nothing continues.
+`fundLoanPayoffs` exists so that someone sweeping all spare cash into a taxable
+brokerage can still model an automatic payoff (the engine applies only
+`withdrawalTaxRate` — accounts with early-withdrawal penalties or deferred income tax,
+i.e. retirement accounts, should not be flagged). Users hedging changing market
+expectations should lower `annualReturnRate` rather than expect the engine to model
+return regimes.
 
-There is **no** escrow refund at natural maturity (refunds happen only in the no-sale
-early-payoff cases, covering escrow paid earlier in that calendar year).
+### 3.6 Loan end: escrow settlement ("the escrow account closes")
+
+When a loan with `escrow` > 0 ends in month `m` — natural maturity, either early
+payoff, with or without a sale — the escrow account closes and its current-year accrual
+is **refunded**: subtract from the final payment the sum of escrow included in this
+loan's payments during `m`'s calendar year (payoff payments contain no escrow of their
+own, so for them this is the January–`m−1` accrual; a natural-maturity payment does
+include escrow, and that month's escrow is part of the refund).
+
+When the asset is **kept** (any no-sale ending), the cost escrow represents (taxes,
+insurance) continues: for every December from `m` **inclusive** through
+`simulation.endDate`, add `12 · escrow` to that month's schedule entry. Together with
+the refund, every kept-property calendar year costs exactly `12 · escrow` no matter
+when the loan ends (an end month that is itself a December both refunds the year's
+accrual and bills that December's `12 · escrow`). When the asset is **sold**, nothing
+continues — the refund still applies.
+
+Real-world closing mechanics (prorated property-tax settlement between buyer and
+seller, insurer premium refunds) are deliberately out of scope; model them with
+`sellCostsNet` if they matter.
 
 ## 4. Investments
 
 Each investment carries state: `value` (starts at `startingValue`), `basis` (starts at
 `startingValue`), `growthBalance` (starts 0). For month `m`, in this exact order:
 
-1. **Contribution** `c` = Σ contribution occurrences (§2) at `m`:
+1. **Growth**: `g = value · r` (`r` from `annualReturnRate`), computed on the balance
+   **before** this month's contribution — new money starts compounding the following
+   month. If `g > 0` and `taxRate > 0`: `tax = g · taxRate/100`, else `tax = 0`.
+   `afterTax = g − tax`; `value += afterTax`; `growthBalance += afterTax`. If
+   `growthBalance` goes negative, shift the deficit to `basis` (reduce basis by the
+   deficit, floor both at 0).
+2. **Contribution** `c` = Σ contribution occurrences (§2) at `m`:
    `value += c`; `basis += c` (floor basis at 0).
-2. **Growth**: `g = value · r` (`r` from `annualReturnRate`). If `g > 0` and
-   `taxRate > 0`: `tax = g · taxRate/100`, else `tax = 0`. `afterTax = g − tax`;
-   `value += afterTax`; `growthBalance += afterTax`. If `growthBalance` goes negative,
-   shift the deficit to `basis` (reduce basis by the deficit, floor both at 0).
 3. **Withdrawal** `w`: fixed = Σ amount occurrences at `m`; percentage-style adds
-   `value · percentage/100` per occurrence (percentage of the post-growth balance).
+   `value · percentage/100` per occurrence (percentage of the current balance, after
+   growth and contribution).
    Clamp `w` to `[0, value]`. Take from growth first:
    `fromGrowth = min(w, growthBalance)`, `fromBasis = w − fromGrowth`; decrement the
    balances accordingly (floor at 0); `value −= w`.
@@ -190,6 +249,10 @@ normative (conformance fixtures include them in CSV):
 - Threshold payoff with sale:
   `paying off asset <name> for <remaining:%.2f> and selling for <sellPrice:%.2f> with <sellCostsNet:%.2f> selling costs`
   (`<remaining>` is the balance being retired, i.e. end of `m−1`.)
+- Payoff-funding withdrawal (§3.5), one per tapped investment, immediately after its
+  payoff note: `<scope> <name>: loan payoff withdrawal %+.2f` (the gross withdrawal)
+  with the same ` (basis %+.2f, growth %+.2f)` suffix rule as regular withdrawals,
+  then `, withdrawal tax %.2f` when nonzero.
 - Investment activity: one note per investment per month with any nonzero part:
   `<scope> <name>: <parts joined by ", ">` where `<scope>` is `scenario` or `common`
   and parts, in order, are (skipping zero-valued ones):
@@ -263,13 +326,21 @@ numbers in these areas:
    the remaining principal negative and keep billing (or crediting) phantom amounts
    indefinitely. §3.2 caps `principalPaid` at the remaining balance, so the loan ends
    cleanly with a final payment of exactly what is owed.
-3. **No escrow refund at natural maturity.** The predecessor refunded accrued escrow at
-   maturity when the final month wasn't December. §3.6 refunds only on no-sale early
-   payoffs.
-4. **Threshold payoffs measure cash.** The predecessor compared the threshold against
-   projected *total* net worth (cash + investments), so illiquid money could trigger a
-   "payoff". §3.5 uses projected liquid cash, and never fires on already-ended loans
-   (the predecessor could fire spuriously after maturity).
+3. **Escrow settles uniformly at loan end.** The predecessor's refund depended on
+   which code path ended the loan (maturity refunded except when it fell in December,
+   threshold payoffs refunded, sales did not), so the ending year could be billed
+   anywhere from 0 to 18 months of escrow cost. §3.6 refunds the current-year accrual
+   on **every** ending — including sales, which in reality return the escrow balance
+   to the seller — and starts December `12·escrow` billing at the end month inclusive,
+   so every kept-property year costs exactly `12·escrow`. Closing-time proration is
+   out of scope (`sellCostsNet`).
+4. **Threshold payoffs measure what could actually pay.** The predecessor compared the
+   threshold against projected *total* net worth (cash + all investments) and then paid
+   entirely from cash, so illiquid money could trigger a "payoff" the cash couldn't
+   cover; it could also fire spuriously after maturity. §3.5 measures projected cash
+   plus the after-tax liquidation value of investments explicitly opted in via
+   `fundLoanPayoffs`, actually liquidates them to cover the cash shortfall, and never
+   fires on an ended loan.
 5. **Emergency-fund expenses are gross and near-term.** The predecessor averaged
    *netted* monthly outflows (income in the same bucket canceled expenses) over the
    entire simulation, retirement decades included. §5 counts expense occurrences
@@ -283,3 +354,6 @@ numbers in these areas:
 8. **The end month is simulated fully.** The predecessor skipped loan payments falling
    exactly on the simulation end month; v2 loans bill through `simulation.endDate`
    inclusive, like every other ledger component.
+9. **Growth compounds before the month's contribution.** The predecessor added the
+   contribution first, granting new money a full month of growth on arrival; §4 grows
+   the prior balance first, so contributions start compounding the following month.

@@ -1,0 +1,19 @@
+version: 2
+simulation:
+  startDate: 2025-06
+  endDate: 2028-12
+  startingCash: 30000.00
+scenarios:
+  - name: keep the cabin
+    events:
+      - name: Income
+        amount: 2800.00
+      - name: Spending
+        amount: -1100.00
+    loans:
+      - name: Cabin note
+        principal: 24000.00
+        interestRate: 5.00
+        term: 24
+        startDate: 2025-08
+        escrow: 100.00
