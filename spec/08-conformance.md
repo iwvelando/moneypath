@@ -46,7 +46,12 @@ stop and flag it — do not "fix" fixtures to match your code).
    at minimum, run the same engine entry through both build tags in CI.)
 4. **Round-trip**: `migrate` output for each migration case, fed to the forecast engine,
    runs without hard errors.
-5. **Unit tests you write yourself** for the engine internals (amortization math, event
+5. **Static bundle**: the web build produces a standalone `dist/` that runs from a plain
+   file host at a non-root path, and the tree embedded in the binary is identical to it
+   (chapter 02). A cheap CI form: build `dist/`, assert `index.html` and a
+   content-hashed `.wasm` exist, then assert the embedded filesystem walks to the same
+   file list with the same content hashes.
+6. **Unit tests you write yourself** for the engine internals (amortization math, event
    scheduling, investment ordering, optimizer bisection) — the fixtures are integration
    nets, not a substitute for unit coverage. Follow red/green/refactor: write the failing
    test, watch it fail, make it pass, then clean up.

@@ -43,6 +43,8 @@ required conformance checks, including CLI↔WASM output parity.
 - Go for all calculation and CLI logic. The browser runs the same Go engine via WebAssembly —
   there is exactly one implementation of the finance math.
 - The web app is a static site: no backend compute, no persistent storage, no network calls
-  at runtime (beyond fetching its own static assets). It must be deployable by copying
-  `dist/` to any static file host.
+  at runtime (beyond fetching its own static assets). The build MUST emit a standalone
+  `dist/` tree that deploys by copying it to any static file host; the binary's embedded
+  copy of `dist/` powers `moneypath serve` and never replaces producing the tree itself
+  (chapter 02, "Build artifacts").
 - Deterministic output: the same config produces byte-identical CSV everywhere.

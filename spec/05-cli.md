@@ -38,7 +38,9 @@ Converts a legacy (v1) config to v2 (chapter 07). Output to stdout by default, o
 moneypath serve [--addr :8080]
 ```
 
-Serves the embedded static web app. Static assets only; no computation endpoints.
+Serves the embedded static web app. Static assets only; no computation endpoints. The
+embedded tree is a copy of the `dist/` build artifact (chapter 02): `serve` is a local
+convenience, and the same `dist/` deploys to any static file host unchanged.
 
 ### `moneypath version`
 

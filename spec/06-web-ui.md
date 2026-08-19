@@ -81,6 +81,12 @@ The app MUST work when served from any path prefix without configuration: relati
 for all assets including the WASM binary. (`moneypath serve` hosts at `/`, but a static
 bucket may not.)
 
+The app is a single page with no client-side routing: the tabs and sections above are
+in-page state, never URL routes, and no view needs to be deep-linkable. A host therefore
+needs only to serve `index.html` for the deploy root — no rewrite rules, no history API.
+See chapter 02, "Build artifacts", for the asset-naming and wasm-loading rules that go
+with this.
+
 ## Persistence summary (all localStorage, all optional-to-the-engine)
 
 - editor state (versioned key), theme choice, optimizer toggle.

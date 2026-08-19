@@ -103,11 +103,54 @@ no value for. Numbers are raw float64 values; formatting is the consumer's job.
   acceptable; TinyGo is optional). Load it once, show a loading state, and let HTTP
   caching do its job.
 
+## Build artifacts (normative)
+
+One source tree produces two artifacts:
+
+- **`dist/`** — the complete static site: `index.html`, hashed JS/CSS, and
+  `moneypath.wasm`, with no other runtime dependency. This is the shippable artifact.
+  Publishing MUST be nothing more than copying the tree to a static file host (object
+  storage behind a CDN, a plain web server, a local directory). No build step, rewrite
+  rule, or server configuration may be required to make it work.
+- **The native binary**, which embeds a copy of that same `dist/` tree via `go:embed` to
+  back `moneypath serve`.
+
+Setting up any particular host stays out of scope (chapter 01), but these properties of
+the build are not — they are what keep that option open:
+
+- **Build order.** Three stages: (1) compile the engine wasm (`GOOS=js GOARCH=wasm`);
+  (2) run the bundler with that wasm as a *bundler input* — imported as a hashed asset
+  (e.g. `new URL('./moneypath.wasm', import.meta.url)` or equivalent), never dropped into
+  a verbatim-copied `public/` directory — producing `dist/`; (3) the native Go build
+  embeds `dist/`. Both artifacts of a given release build MUST come from the same `dist/`
+  tree, so `moneypath serve` and a published copy serve byte-identical files. The embed is
+  a copy of the artifact, never a substitute for producing it: a *release* build that
+  yields only a binary is incomplete. During development a placeholder `dist/` MAY be
+  embedded so engine work doesn't depend on the frontend toolchain; the chapter 08
+  embedded-tree identity check keeps a stub or stale tree out of any release.
+- **Content hashing.** Every asset the app fetches at runtime — JS, CSS,
+  `moneypath.wasm`, and the Go wasm glue (`wasm_exec.js`, bundled like any other module) —
+  MUST have a content-derived filename. This guarantees a fetched `index.html` always
+  references matching assets: a stale cache can never mix old and new files — at worst it
+  serves a coherent old version. (Whether `index.html` itself is cached fresh is
+  cache-header territory, i.e. host configuration, and stays out of scope.) Bundlers hash
+  JS/CSS by default but typically copy files out of `public/` verbatim; the wasm MUST NOT
+  be left unhashed. `index.html` is the only unhashed entry point.
+- **Wasm content type.** The app MUST NOT assume the host serves `.wasm` as
+  `application/wasm` — several object stores do not. Use
+  `WebAssembly.instantiateStreaming` where it works and fall back to
+  `WebAssembly.instantiate(await response.arrayBuffer())` when it rejects on content
+  type, rather than surfacing a failure the user cannot act on.
+- **No routing.** The app is a single page: `index.html` at the root of `dist/`. Tabs and
+  sections are in-page state, not URL routes. The app MUST NOT require deep-linkable
+  URLs, history rewriting, or a host-side 404-to-`index.html` rewrite. The only path a
+  host must resolve is the deploy root, serving `index.html`.
+
 ## `moneypath serve`
 
 Serves the embedded `dist/` (via `go:embed`) on a configurable address. Static files
 only; no other routes. It exists so CLI users can open the web UI locally without
-installing anything else.
+installing anything else — it is a convenience, not the deployment path.
 
 ## Logging
 
