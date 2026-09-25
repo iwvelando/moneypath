@@ -1,8 +1,14 @@
 # Build artifacts
 /build/
+/bin/
 /dist/
-moneypath
+/moneypath
 *.wasm
+# The embedded web tree: only the development-placeholder index.html is
+# tracked; `make dist` overwrites it locally with the real build and drops
+# the rest of the built site (assets, icons) alongside it.
+internal/webembed/dist/*
+!internal/webembed/dist/index.html
 
 # Node / frontend
 node_modules/

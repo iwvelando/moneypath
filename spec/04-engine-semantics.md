@@ -1,5 +1,9 @@
 # 04 — Engine semantics (normative)
 
+*Status: **Contract** — this chapter is the record of which money behaviors are
+deliberate. Change it before the code, alongside the fixtures that pin the new numbers,
+and say so in the commit message. See SPEC.md.*
+
 This chapter defines exactly what the simulator computes. `testdata/conformance/`
 fixtures encode these rules numerically; when prose and fixture disagree, treat it as a
 spec bug and flag it rather than silently choosing one.
@@ -277,9 +281,16 @@ Setup:
 - Run the baseline forecast (original config). For each scenario containing targets, the
   **floor** = that scenario's baseline `emergencyFund.targetAmount`. If the
   recommendation is disabled or the floor ≤ 0, optimization fails with an error.
-- Field value spaces: `amount` — continuous; `frequency` — integers ≥ 1; `startDate` /
-  `endDate` — month index (`year·12 + month − 1`). Discrete fields snap candidate values
-  by rounding, and every candidate is clamped to `[min, max]`.
+- Field value spaces: `amount` — whole cents; `frequency` — integers ≥ 1; `startDate` /
+  `endDate` — month index (`year·12 + month − 1`). Every candidate is snapped to its
+  field's space and then clamped to `[min, max]`. `frequency` and the date fields snap by
+  rounding to the nearest integer; `amount` snaps **upward** to the next cent,
+  `ceilCents(x) = math.Ceil(x*100)/100` with a value already within `1e-9` of a cent
+  taken as that cent (so the snap is idempotent). Amount snaps up rather than to nearest
+  because cash rises with an event's amount: rounding up can only add headroom, so a
+  chosen amount always satisfies the floor reported alongside it. A bound that is not
+  itself a whole cent is used as written, and a `tolerance` below one cent buys no extra
+  precision.
 
 Feasibility of a candidate value `v`: write `v` into the event's field, run the full
 forecast, and in the target scenario find the first month where `liquid ≥ floor`.
@@ -312,48 +323,3 @@ reflects them), the final forecast runs on the adjusted config, and each target 
 summary attached to its scenario's metrics: target event name, field, original and chosen
 values (raw numeric and display-formatted — currency for amounts, integer for frequency,
 `YYYY-MM` for dates), floor, minCash, headroom, iterations, converged, notes.
-
-## Appendix — deviations from the predecessor (finance-forecast)
-
-Documented intentional differences; migrated configs may produce slightly different
-numbers in these areas:
-
-1. **Mortgage insurance actually charges.** The predecessor never added MI to payments
-   and instead *subtracted* it after the cutoff was reached (a sign bug). §3.4 charges
-   MI while above the cutoff.
-2. **Final loan payment is exact.** The predecessor billed a full `M` in the final month
-   even when less was owed, and when extra principal overshot the balance it could drive
-   the remaining principal negative and keep billing (or crediting) phantom amounts
-   indefinitely. §3.2 caps `principalPaid` at the remaining balance, so the loan ends
-   cleanly with a final payment of exactly what is owed.
-3. **Escrow settles uniformly at loan end.** The predecessor's refund depended on
-   which code path ended the loan (maturity refunded except when it fell in December,
-   threshold payoffs refunded, sales did not), so the ending year could be billed
-   anywhere from 0 to 18 months of escrow cost. §3.6 refunds the current-year accrual
-   on **every** ending — including sales, which in reality return the escrow balance
-   to the seller — and starts December `12·escrow` billing at the end month inclusive,
-   so every kept-property year costs exactly `12·escrow`. Closing-time proration is
-   out of scope (`sellCostsNet`).
-4. **Threshold payoffs measure what could actually pay.** The predecessor compared the
-   threshold against projected *total* net worth (cash + all investments) and then paid
-   entirely from cash, so illiquid money could trigger a "payoff" the cash couldn't
-   cover; it could also fire spuriously after maturity. §3.5 measures projected cash
-   plus the after-tax liquidation value of investments explicitly opted in via
-   `fundLoanPayoffs`, actually liquidates them to cover the cash shortfall, and never
-   fires on an ended loan.
-5. **Emergency-fund expenses are gross and near-term.** The predecessor averaged
-   *netted* monthly outflows (income in the same bucket canceled expenses) over the
-   entire simulation, retirement decades included. §5 counts expense occurrences
-   without netting and averages over the first 12 months.
-6. **Optimizer selection simplified.** The predecessor had special-case preference rules
-   (e.g. for negative-amount events) and applied an out-of-bounds "chased" value on
-   failure. §7 always minimizes |adjustment|, and keeps the original value when
-   optimization fails.
-7. **Dropped config blocks.** `logging`/`output` are CLI concerns now (chapter 03/05);
-   optimizer `kind`/`target` keys are gone.
-8. **The end month is simulated fully.** The predecessor skipped loan payments falling
-   exactly on the simulation end month; v2 loans bill through `simulation.endDate`
-   inclusive, like every other ledger component.
-9. **Growth compounds before the month's contribution.** The predecessor added the
-   contribution first, granting new money a full month of growth on arrival; §4 grows
-   the prior balance first, so contributions start compounding the following month.

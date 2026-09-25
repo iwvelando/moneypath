@@ -1,5 +1,7 @@
 # 01 — Product
 
+*Status: **Contract** — see SPEC.md, "How these chapters are maintained".*
+
 ## Purpose
 
 moneypath helps a person make financial decisions by simulating how their money evolves
@@ -32,7 +34,7 @@ Two front doors, same engine:
    browser** via the Go engine compiled to WebAssembly. Nothing the user enters ever
    leaves their machine.
 
-## v1 scope
+## Scope
 
 In scope:
 
@@ -41,7 +43,7 @@ In scope:
 - `moneypath serve`: a convenience subcommand that serves the embedded static web app
   locally. It hosts files only — it MUST NOT expose any computation or upload API.
 
-Out of scope for v1 (design must not preclude them, but build none of them):
+Out of scope (design must not preclude them, but build none of them):
 
 - Cloud hosting, CDN setup, IaC, CI/CD pipelines.
 - Accounts, authentication, server-side persistence, telemetry.
@@ -49,9 +51,9 @@ Out of scope for v1 (design must not preclude them, but build none of them):
 
 ## Why the architecture looks like this
 
-The predecessor tool ran forecast computation on a web server. If ever exposed publicly,
-that couples cost and scale to user traffic. These calculations are small (a few thousand
+Running forecast computation on a server couples cost and scale to user traffic the
+moment the app is exposed publicly. These calculations are small (a few thousand
 floating-point operations per scenario) and belong on the client. moneypath is therefore
 shaped so the entire web experience can someday be served from a static bucket + CDN for
-pennies: static assets, client-side compute, zero backend. Local use is the v1 target,
-but nothing in the design may reintroduce a compute backend.
+pennies: static assets, client-side compute, zero backend. Local use is the current
+target, but nothing in the design may reintroduce a compute backend.

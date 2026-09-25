@@ -1,5 +1,8 @@
 # 02 — Architecture
 
+*Status: **Mixed** — the sections marked normative (Results JSON, Determinism,
+Build artifacts) are Contract; the rest is descriptive. See SPEC.md.*
+
 ## Shape
 
 One Go module, `github.com/iwvelando/moneypath`, built into two artifacts plus a frontend:
@@ -64,7 +67,9 @@ The WASM module exposes to JavaScript (names normative):
                        "targetAmount": 0.0, "initialLiquid": 0.0,
                        "fundedMonths": 0.0, "shortfall": 0.0, "surplus": 0.0},
      "optimizations": [
-       {"targetName": "…", "field": "…", "originalDisplay": "…", "valueDisplay": "…",
+       {"targetName": "…", "field": "…",
+        "original": 0.0, "value": 0.0,
+        "originalDisplay": "…", "valueDisplay": "…",
         "floor": 0.0, "minimumCash": 0.0, "headroom": 0.0,
         "iterations": 0, "converged": true, "notes": ["…"]}
      ]}
@@ -77,6 +82,13 @@ The WASM module exposes to JavaScript (names normative):
 `rows` is sorted ascending by date; `values` and `metrics` are index-aligned with
 `scenarios`. `liquid`/`total` are omitted (JSON `null` or absent) for dates a scenario has
 no value for. Numbers are raw float64 values; formatting is the consumer's job.
+
+In `optimizations`, `original` and `value` are the raw numbers the optimizer searched over
+— currency for `amount`, a count for `frequency`, a month index (`year·12 + month − 1`)
+for `startDate`/`endDate` — and the `…Display` strings are those same numbers formatted
+for a reader (`YYYY-MM` for the date fields). A consumer that needs to write a chosen
+value back into a config reads `value` for `amount` and `frequency`, and `valueDisplay`
+for the date fields.
 
 ## Determinism (normative)
 

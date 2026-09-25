@@ -1,5 +1,8 @@
 # 03 — Configuration format (v2)
 
+*Status: **Contract** — this format is a promise to YAML files users already have.
+Change this chapter before the code. See SPEC.md.*
+
 A moneypath config is a single YAML document. This chapter is normative. See
 `examples/example.yaml` for a commented example.
 
@@ -10,6 +13,11 @@ A moneypath config is a single YAML document. This chapter is normative. See
 - **Money** values are decimal numbers in one currency (the tool is currency-agnostic).
   For **events**, positive = income (increases cash), negative = expense. Loan and
   investment monetary fields are positive magnitudes unless stated otherwise.
+- **Money amounts are post-tax.** The engine models no income tax, so every amount the
+  user enters is what actually lands in (or leaves) their account: income should be net
+  of withholding. A $1,000 grant at a 25 % marginal rate is entered as `750.00`. The only
+  tax the engine applies is on investment growth and withdrawals (`taxRate`,
+  `withdrawalTaxRate`), and any user-facing help for an amount field SHOULD say so.
 - **Rates** are percentages (e.g. `6.5` means 6.5 % per year), never fractions.
 - Unknown top-level or nested keys SHOULD produce a validation warning naming the key
   (catches typos), but MUST NOT be a hard error.
@@ -70,7 +78,8 @@ regardless of `frequency`.
 
 Per-context rules:
 
-- **Cash-flow events** (`common.events`, scenario `events`): `amount` is signed.
+- **Cash-flow events** (`common.events`, scenario `events`): `amount` is signed, and
+  post-tax like every other amount (see Conventions).
 - **Extra principal payments** (in loans): `amount` must be > 0; it is money paid toward
   loan principal (cash out).
 - **Investment contributions**: `amount` must be > 0. `percentage` is not allowed.

@@ -1,4 +1,4 @@
-description: Optimizer adjusts an expense amount to the smallest feasible adjustment against the emergency-fund floor.
+description: Optimizer adjusts an expense amount to the smallest feasible adjustment against the emergency-fund floor. The chosen amount lands on a whole cent, snapped up so the reported headroom is the headroom the plan actually has.
 normative: true
 optimize: true
 tolerance: 0.01
@@ -16,11 +16,11 @@ expectedMetrics:
       - targetName: New expense
         field: amount
         original: -500.00
-        value: -184.7153
+        value: -184.72
         originalDisplay: "-$500.00"
         valueDisplay: "-$184.72"
         floor: 6275.00
-        minimumCash: 6275.1251
-        headroom: 0.1251
+        minimumCash: 6275.04
+        headroom: 0.04
         iterations: 16
         converged: true

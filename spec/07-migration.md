@@ -1,5 +1,9 @@
 # 07 — Legacy format (v1) and the `migrate` command
 
+*Status: **Frozen** — the v1 format can no longer change, so neither can this chapter.
+Edit only to correct an error. This is also the one chapter where naming the legacy tool
+is warranted: it is what the format came from. See SPEC.md.*
+
 moneypath's predecessor ("finance-forecast") used a YAML config with no version field.
 `moneypath migrate` converts such files to v2. This chapter fully specifies the legacy
 format (as a data format — implement from these tables) and the conversion rules.
@@ -127,9 +131,42 @@ key order and comments are not significant).
 
 ## Semantics changes migrating users should know
 
-Chapter 04's appendix lists behavioral deviations (mortgage insurance now charges, final
-loan payments are exact, threshold payoffs measure cash, emergency-fund averaging window
-changed, optimizer selection simplified). `migrate` SHOULD print a pointer to that
-appendix as a final notice when the input uses any affected feature
-(`mortgageInsurance`, `escrow` with loans maturing in-window, `earlyPayoffThreshold`,
-`optimize`).
+v2 deliberately differs from finance-forecast in the areas below, so a faithfully
+migrated config can still produce different numbers. Each rule is stated normatively in
+chapter 04; this list exists for the person doing the migrating.
+
+1. **Mortgage insurance actually charges.** finance-forecast never added MI to a payment
+   and instead *subtracted* it once the cutoff was reached (a sign bug). v2 charges MI
+   for as long as the loan sits above the cutoff (§3.4).
+2. **The final loan payment is exact.** finance-forecast billed a full monthly payment in
+   the last month even when less was owed, and extra principal that overshot the balance
+   could drive it negative and keep billing phantom amounts. v2 caps principal at what
+   remains, so the loan ends with a payment of exactly what is owed (§3.2).
+3. **Escrow settles the same way on every ending.** In finance-forecast the refund
+   depended on which code path ended the loan — maturity refunded unless it fell in
+   December, threshold payoffs refunded, sales did not — so the final year could cost
+   anywhere from 0 to 18 months of escrow. v2 refunds the current-year accrual on every
+   ending, sales included, and every kept-property year costs exactly `12·escrow` (§3.6).
+4. **Threshold payoffs measure money that could actually pay.** finance-forecast compared
+   the threshold against total net worth and then paid from cash alone, so illiquid money
+   could trigger a payoff the cash could not cover. v2 counts cash plus the after-tax
+   liquidation value of accounts explicitly flagged `fundLoanPayoffs`, and actually
+   liquidates them (§3.5).
+5. **Emergency-fund expenses are gross and near-term.** finance-forecast averaged netted
+   outflows — income canceled expenses — across the whole simulation, retirement decades
+   included. v2 counts expense occurrences without netting and averages the first 12
+   months (§5).
+6. **Optimizer selection is simpler.** finance-forecast had special-case preference rules
+   and could apply an out-of-bounds value on failure. v2 always minimizes the size of the
+   adjustment and keeps the original value when no feasible one exists (§7).
+7. **The end month is simulated fully.** finance-forecast skipped loan payments falling
+   exactly on the end month; v2 bills through `simulation.endDate` inclusive, like every
+   other ledger component.
+8. **Growth compounds before the month's contribution.** finance-forecast added the
+   contribution first, granting new money a full month of growth on arrival. v2 grows the
+   prior balance first, so contributions start compounding the following month (§4).
+
+`migrate` SHOULD emit a final notice when the input uses any affected feature
+(`mortgageInsurance`, `escrow` with loans maturing in-window, `earlyPayoffThreshold`, or
+`optimize`). That notice is user-facing, so it MUST name the changed behaviors in plain
+language and MUST NOT point at a spec chapter or file (AGENTS.md, "User-facing text").

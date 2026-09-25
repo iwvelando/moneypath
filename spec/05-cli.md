@@ -1,5 +1,8 @@
 # 05 — CLI
 
+*Status: **Descriptive** — the CSV format below is the exception: it is byte-pinned by
+conformance fixtures and by CLI↔WASM parity, so treat it as Contract. See SPEC.md.*
+
 Binary name: `moneypath`. Subcommand style. Results go to stdout; diagnostics/logs to
 stderr. Exit codes: `0` success, `1` runtime/config error, `2` usage error.
 
@@ -9,7 +12,8 @@ stderr. Exit codes: `0` success, `1` runtime/config error, `2` usage error.
 
 ```
 moneypath forecast --config plan.yaml [--output-format pretty|csv]
-                   [--optimize] [--emergency-months N] [--now YYYY-MM] [--log-level L]
+                   [--optimize] [--write-config FILE]
+                   [--emergency-months N] [--now YYYY-MM] [--log-level L]
 ```
 
 - `--config` (required): path to a v2 YAML config. A v1 config (detected by a missing
@@ -17,6 +21,12 @@ moneypath forecast --config plan.yaml [--output-format pretty|csv]
   `moneypath migrate`.
 - `--output-format`: `pretty` (default) or `csv`.
 - `--optimize`: run the optimizer (chapter 04 §7) before forecasting.
+- `--write-config FILE`: write the config as run to `FILE` — the same YAML the WASM
+  results carry as `configYaml`, so with `--optimize` it holds the optimizer's chosen
+  values. Without `--optimize` it is simply the config re-serialized in canonical form.
+  `--config` is never modified unless `FILE` names it. A target the optimizer could not
+  improve is still written (the values are then the originals). Errors writing the file
+  are runtime errors (exit 1), reported after the forecast has printed.
 - `--emergency-months N`: override `recommendations.emergencyFundMonths` (0 disables).
 - `--now YYYY-MM`: override the "current month" used when `simulation.startDate` is
   absent (primarily for reproducible runs and testing).

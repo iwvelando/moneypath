@@ -1,0 +1,49 @@
+#!/bin/sh
+# Pre-commit guards:
+#   1. the embedded-web placeholder must not be committed
+#   2. staged Go files must be gofmt-clean
+set -eu
+
+# --- 1. embedded web placeholder ------------------------------------------
+#
+# The committed file must stay the development placeholder; the real tree
+# is a build artifact whose hashed assets are gitignored, so committing a
+# built index.html would reference files that don't exist in the repo
+# (see DEVELOPMENT.md, "The embedded web tree").
+#
+# Deliberately updating the placeholder itself:
+#   ALLOW_EMBED_COMMIT=1 git commit ...
+
+guarded="internal/webembed/dist/index.html"
+if [ "${ALLOW_EMBED_COMMIT:-0}" != "1" ] &&
+   git diff --cached --name-only | grep -qx "$guarded"; then
+    echo "pre-commit: refusing to commit $guarded" >&2
+    echo "  This file is overwritten locally by 'make dist'; the committed copy" >&2
+    echo "  must remain the development placeholder (DEVELOPMENT.md explains)." >&2
+    echo "  Unstage it:            git restore --staged $guarded" >&2
+    echo "  Hide future noise:     ./scripts/dev-setup.sh" >&2
+    echo "  Placeholder update:    ALLOW_EMBED_COMMIT=1 git commit ..." >&2
+    exit 1
+fi
+
+# --- 2. gofmt -------------------------------------------------------------
+#
+# Checks the *staged* content, so a partially staged file is judged by what
+# is actually being committed. Skipped entirely when Go isn't installed, so
+# frontend-only contributors aren't blocked.
+
+if command -v gofmt >/dev/null 2>&1; then
+    unformatted=""
+    for f in $(git diff --cached --name-only --diff-filter=ACMR | grep '\.go$' || true); do
+        if [ -n "$(git show ":$f" | gofmt -l)" ]; then
+            unformatted="$unformatted  $f
+"
+        fi
+    done
+    if [ -n "$unformatted" ]; then
+        echo "pre-commit: these staged Go files are not gofmt-clean:" >&2
+        printf '%s' "$unformatted" >&2
+        echo "  Fix and restage:  make fmt && git add -u" >&2
+        exit 1
+    fi
+fi

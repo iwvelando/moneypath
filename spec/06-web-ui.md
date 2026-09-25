@@ -1,93 +1,76 @@
 # 06 — Web UI
 
-A single-page static app. All computation runs in-browser through the WASM engine
-(chapter 02). No network calls at runtime beyond loading the app's own assets. This
-chapter is normative for behavior; visual design is yours (keep it clean, uncluttered,
-and accessible — semantic roles, keyboard operability, `aria-*` on tabs/tooltips/status
-regions).
+*Status: **Descriptive** — this chapter states what the app is for and the constraints it
+must never break. Interaction detail deliberately lives in the code and its vitest suite,
+which move faster than prose can follow. See SPEC.md.*
 
-## Layout
+## What it is
 
-A single workspace with two tabs:
+A single-page static app that is the second front door to the same engine: a structured
+editor for a v2 config, and a reader for the results of running it. The user should be
+able to plan without ever learning the YAML format, and to leave with the YAML if they
+want it.
 
-1. **Planning Workspace** (default) — the config editor.
-2. **Results** — disabled until a forecast has run.
+It is not a separate product from the CLI. Anything it computes, it computes by calling
+the engine — the frontend edits configs and renders results, and holds no finance math of
+its own (chapter 02).
 
-A footer shows the build version (from `moneypathVersion()`).
+## Constraints (normative)
 
-## Planning Workspace
+These are the properties that must survive any redesign:
 
-Toolbar actions:
+- **All computation is in-browser**, through the WASM engine. No backend, no compute
+  endpoint, no upload API — including in `moneypath serve`, which is a file server.
+- **Nothing the user enters leaves their machine.** No network calls at runtime beyond
+  the app's own assets. Uploaded configs are read locally. No telemetry, no analytics,
+  no external fonts or CDNs.
+- **Persistence is localStorage only**, and always optional to the engine: editor state
+  under a versioned key, theme choice, optimizer toggle. Corrupt or version-mismatched
+  state falls back to the starter config rather than failing. No cookies, no external
+  storage.
+- **It must work from any path prefix** with no configuration: relative URLs for every
+  asset including the WASM binary. A host serves `index.html` for the deploy root and
+  needs no rewrite rules — the app is a single page with no client-side routing, and no
+  view needs to be deep-linkable (chapter 02, "Build artifacts").
+- **Accessible by construction**: semantic roles, keyboard operability, `aria-*` on tabs,
+  tooltips and status regions. This is a floor, not an aspiration.
+- **Engine warnings never block a run.** Validation warnings are shown prominently;
+  only hard config errors stop a forecast, and they surface inline without losing
+  editor state.
 
-- **Upload Config** — file picker (`.yaml`/`.yml`), read locally (never uploaded
-  anywhere). v2 configs load into the editor. A legacy v1 config is auto-migrated via
-  `moneypathMigrate` with the notices shown to the user.
-- **Run Forecast** — runs the engine on the current editor state; on success, switch to
-  Results. Show a busy indicator while running; surface engine errors inline without
-  losing editor state.
-- **Run optimizer** toggle — when on, forecasts run with `optimize: true`. Persisted in
-  localStorage.
-- **Download Config** — downloads the current editor state as v2 YAML (engine-serialized
-  via the bridge so key ordering is canonical). After an optimizer run, offer the
-  adjusted config (`configYaml` from the results).
-- **Reset Config** — restores the built-in starter config (a small sensible example)
-  after confirmation.
-- **Theme** — System / Light / Dark, persisted in localStorage, default System.
+## Capabilities
 
-The editor is a structured form (not a YAML textarea), organized in sections:
+The app covers, at a coarse grain:
 
-- **Simulation** — startDate, endDate, startingCash, emergencyFundMonths.
-- **Common settings** — shared events / loans / investments.
-- **Scenarios** — add/remove/rename scenarios, per-scenario active toggle and
-  events / loans / investments.
+- A **config editor** — simulation settings, common events / loans / investments, and
+  scenarios with their own events / loans / investments and per-event optimizer blocks.
+  Every field carries a help affordance explaining its semantics; where a field has
+  meaning defined in chapter 03, the help says what that chapter says.
+- **Running forecasts**, with a busy indicator and errors that appear where the run was
+  started, never by moving the reader somewhere else. The editor is long and a tweak is
+  usually followed by a run, so the run action stays reachable from any scroll position
+  rather than only from the top of the page.
+- **Working with the optimizer** — one place to switch it on, to see how many events
+  carry an optimizer directive, and to jump to each of them, so the switch is never
+  blind. Editing is where a run is shaped and started; reading results is not.
+  A run reports what the optimizer chose but never edits the plan itself: each adjustment
+  is applied to the plan only when the reader asks, and the results say plainly that the
+  plan still holds their own values until then. (The CLI's `--write-config` is the same
+  step by another route.) Any download that would carry unapplied adjustments says so,
+  so the plan on screen and the file that leaves the app never disagree in silence.
+- **Results** — per-scenario summary (emergency fund, optimizer adjustments), a chart of
+  liquid and total over time, and the full month-by-month table. Editing the config
+  marks them as describing an earlier version of the plan; they stay readable, being the
+  baseline the next run will be compared against.
+- **Getting data in and out** — uploading a config (v2 directly, v1 auto-migrated with
+  its notices shown), downloading the engine-serialized v2 YAML, and downloading the
+  engine-rendered CSV, which is byte-for-byte what the CLI produces.
+- **Resetting** to a built-in starter config, and a System / Light / Dark theme.
 
-Section behaviors:
+## User-facing text
 
-- A **section navigation** bar (sticky or top-anchored) jumps between sections, with
-  previous/next controls; jumping briefly highlights the target section.
-- Lists (events, loans, investments, contributions, withdrawals, extra principal
-  payments) support add / remove / duplicate-friendly editing.
-- Every field has a help affordance (tooltip/popover) explaining its semantics in the
-  words of chapter 03.
-- Month fields validate `YYYY-MM` as you type; numeric fields support arrow-key stepping
-  (larger steps with a modifier).
-- An event's **optimize** sub-form appears on demand (field picker with per-field bound
-  inputs per chapter 03, defaults prefilled).
-- Editor state autosaves to localStorage (debounced), restored on load; corrupt or
-  version-mismatched saved state falls back to the starter config.
-
-Validation warnings returned by the engine are displayed prominently but never block a
-run (they are warnings). Hard config errors show inline near the run action.
-
-## Results
-
-- **Scenario tabs** — one per active scenario.
-- **Summary panel** — per selected scenario: emergency-fund recommendation (target,
-  average expenses, coverage, shortfall/surplus) and optimizer adjustment summaries when
-  present (original → chosen value, converged status, notes).
-- **Chart** — inline SVG line chart of the selected scenario over time, two series:
-  Liquid and Total. Requirements: legend; hover/focus tooltip showing date and both
-  values (currency-formatted); date-axis and value-axis ticks; visually distinguish
-  spans where a series is negative (e.g. tinted region) so danger zones stand out;
-  responsive resize; a "no data" empty state.
-- **Table** — all months for the selected scenario: date, liquid, total, notes.
-- **Download CSV** — saves the engine-rendered CSV (all scenarios, exactly the CLI's
-  bytes).
-- Run duration display (informational).
-
-## Sub-path hosting
-
-The app MUST work when served from any path prefix without configuration: relative URLs
-for all assets including the WASM binary. (`moneypath serve` hosts at `/`, but a static
-bucket may not.)
-
-The app is a single page with no client-side routing: the tabs and sections above are
-in-page state, never URL routes, and no view needs to be deep-linkable. A host therefore
-needs only to serve `index.html` for the deploy root — no rewrite rules, no history API.
-See chapter 02, "Build artifacts", for the asset-naming and wasm-loading rules that go
-with this.
-
-## Persistence summary (all localStorage, all optional-to-the-engine)
-
-- editor state (versioned key), theme choice, optimizer toggle.
-No cookies, no external storage, no analytics.
+The UI is a user-facing surface, so it follows the project's rules for one: no spec
+paths, chapter numbers, or other internal references in anything a user can read, and
+plain language in place of notation an average person would have to decode (AGENTS.md,
+"User-facing text"). Field help may quote chapter 03's *meaning*; it may not cite
+chapter 03.

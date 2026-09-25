@@ -1,8 +1,9 @@
-# 08 — Conformance and workflow
+# 08 — Fixtures and conformance checks
 
-## What's in `testdata/`
+*Status: **Reference** — describes the `testdata/` formats and the checks that consume
+them. Update it when those change. See SPEC.md.*
 
-### `testdata/conformance/<case>/`
+## `testdata/conformance/<case>/`
 
 - `config.yaml` — a v2 config. Every conformance config pins `simulation.startDate`, so
   runs are reproducible without `--now`.
@@ -24,53 +25,37 @@ expectedMetrics: […]     # optional: per-scenario emergency-fund and optimizat
 
 A case passes when every numeric cell matches within `tolerance` (compare parsed values,
 not strings, to stay robust to `-0.00`), and all dates, headers, and note strings match
-exactly. Cases marked `normative: true` MUST pass; treat a failure as your bug first, a
-fixture bug second (if you become convinced the fixture contradicts chapters 03–05,
-stop and flag it — do not "fix" fixtures to match your code).
+exactly. Tolerances absorb float64 formatting edge cases, not semantic slack.
 
-### `testdata/migration/<case>/`
+## `testdata/migration/<case>/`
 
 - `legacy.yaml` — a v1 input.
-- `expected.yaml` — the v2 translation. Compare **semantically**: parse both YAML
-  documents and require equal structures (key order/comments/formatting are free).
+- `expected.yaml` — the v2 translation. Compared **semantically**: both documents are
+  parsed and their structures must be equal (key order, comments and formatting are free).
 
-## Required checks (wire these into `go test` early — they are your red tests)
+## Changing a fixture
 
-1. **Conformance**: for each normative case, run the engine on `config.yaml` (with
-   optimizer per manifest) and diff against `expected.csv` under the manifest rules.
-2. **Migration**: for each case, run the converter on `legacy.yaml` and compare
-   semantically to `expected.yaml`. Also assert the output validates as v2.
-3. **CLI ↔ WASM parity**: for every conformance config, the CSV from the native binary
-   and from the WASM build MUST be byte-identical. (Practical approach: run the WASM
-   module under `GOOS=js GOARCH=wasm go test` with Node, or via `wasmbrowsertest`;
-   at minimum, run the same engine entry through both build tags in CI.)
-4. **Round-trip**: `migrate` output for each migration case, fed to the forecast engine,
-   runs without hard errors.
-5. **Static bundle**: the web build produces a standalone `dist/` that runs from a plain
-   file host at a non-root path, and the tree embedded in the binary is identical to it
-   (chapter 02). A cheap CI form: build `dist/`, assert `index.html` and a
-   content-hashed `.wasm` exist, then assert the embedded filesystem walks to the same
-   file list with the same content hashes.
-6. **Unit tests you write yourself** for the engine internals (amortization math, event
-   scheduling, investment ordering, optimizer bisection) — the fixtures are integration
-   nets, not a substitute for unit coverage. Follow red/green/refactor: write the failing
-   test, watch it fail, make it pass, then clean up.
+Fixtures are the enforcement mechanism for chapters 03–05, so a failing one is your bug
+until proven otherwise. Never edit a fixture to make failing code pass.
 
-## Suggested implementation order
+Changing one is legitimate in exactly one situation: a **deliberate change to specified
+behavior**. That is a spec change, and it lands as one — the chapter edit and the fixture
+edit in the same commit, called out in the commit message. If a fixture instead looks
+like it contradicts chapters 03–05 as written, stop and raise it rather than picking a
+side.
 
-1. Config v2 parse + validate (chapter 03) → fixture configs all load.
-2. Event scheduling + the simulation loop with events only → `events-only` case green.
-3. Loans (§3 in order: amortization → extra principal → MI → early payoff → escrow).
-4. Investments.
-5. Emergency fund, notes, CSV/pretty rendering → remaining non-optimizer cases green.
-6. Optimizer.
-7. Migration (chapter 07).
-8. WASM bridge + parity check.
-9. Web UI (chapter 06), starter config, `serve`.
+## The checks
 
-## Provenance note
+| Check | Where | What it asserts |
+|---|---|---|
+| Conformance | `TestConformance` (`conformance/`) | Each normative case reproduces `expected.csv` under its manifest rules. |
+| Migration | `TestMigrationFixtures` (`legacy/`) | Each case converts to `expected.yaml` semantically, and the output validates as v2. |
+| Round-trip | `TestMigrationFixtures` (`legacy/`) | Every migrated config then runs through the forecast engine without hard errors. |
+| Rejections | `TestMigrateRejects` (`legacy/`) | Chapter 07's required failure modes still fail. |
+| CLI ↔ WASM parity | `TestCLIWASMParity` (`conformance/`) | For every conformance config, native and WASM CSV are byte-identical. Runs the wasm module under Node; self-skips when `node` is absent. |
+| Static bundle | `TestStaticBundle` (`conformance/`) | The web build produces a standalone `dist/`, and the tree embedded in the binary is identical to it (chapter 02). |
 
-Expected outputs were produced from an independent reference implementation of chapters
-03–05 and cross-checked against the predecessor tool everywhere the appendix in chapter
-04 does not declare a deviation. Tolerances exist only to absorb float64 formatting
-edge cases, not semantic slack.
+The fixtures are integration nets, not a substitute for unit coverage: engine internals
+(amortization, event scheduling, investment ordering, optimizer bisection) carry their
+own tests, and new engine behavior starts with a failing one that cites the chapter 04
+section it encodes.
