@@ -6,7 +6,7 @@ which move faster than prose can follow. See SPEC.md.*
 
 ## What it is
 
-A single-page static app that is the second front door to the same engine: a structured
+A single-page static app that is the primary interface to the same engine: a structured
 editor for a v2 config, and a reader for the results of running it. The user should be
 able to plan without ever learning the YAML format, and to leave with the YAML if they
 want it.
@@ -59,13 +59,35 @@ The app covers, at a coarse grain:
   step by another route.) Any download that would carry unapplied adjustments says so,
   so the plan on screen and the file that leaves the app never disagree in silence.
 - **Results** — per-scenario summary (emergency fund, optimizer adjustments), a chart of
-  liquid and total over time, and the full month-by-month table. Editing the config
+  liquid and total over time, and the full month-by-month table. The table initially
+  shows Date, Liquid, and Total. Months with notes have an arrow and a disclosure
+  button; clicking or tapping anywhere on that summary row, or activating its button
+  with the keyboard, reveals the engine's notes as a list below it. Several months
+  can stay open. Months without notes have no disclosure; switching scenarios or
+  running a new forecast closes the details. CSV exports still contain all notes.
+  Editing the config
   marks them as describing an earlier version of the plan; they stay readable, being the
   baseline the next run will be compared against.
 - **Getting data in and out** — uploading a config (v2 directly, v1 auto-migrated with
   its notices shown), downloading the engine-serialized v2 YAML, and downloading the
   engine-rendered CSV, which is byte-for-byte what the CLI produces.
 - **Resetting** to a built-in starter config, and a System / Light / Dark theme.
+
+## Presentation
+
+The interface uses warm paper surfaces, evergreen accents, and system serif headings
+with sans-serif controls. On wide screens, each editor section has an introduction
+beside its fields. This introduction stays pinned below the navigation bar while
+its section scrolls, then leaves with the section. On smaller screens introductions
+stack above the fields and scroll normally to preserve working space. A pinned
+navigation and run bar stays reachable while the plan scrolls. Its jump links have
+no active-section highlight; Previous/Next still follow the section on screen.
+Introductions and jump targets allow for the bar's height as it wraps or shows errors. Results use the same palette, with distinct
+liquid and total series and separate headings for the chart and monthly table.
+System, Light, and Dark themes share this layout. All fonts and illustrations remain
+local, with no additional runtime requests. The branching-path illustration is the
+project logo; a simplified square version serves the masthead and favicons. On
+desktop, the chart title sits inside its card, aligned with the summary card headings.
 
 ## User-facing text
 

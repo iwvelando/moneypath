@@ -3,6 +3,7 @@ import type { Adjustment, AdjustmentStatus } from '../config/adjustments';
 import type { ForecastResults, ScenarioMetrics } from '../engine/types';
 import { formatDuration, formatMoney, formatMonths } from '../util/format';
 import { Chart } from './Chart';
+import { MonthlyTable, type MonthlyRow } from './MonthlyTable';
 import { EmergencyFundGauge } from './Gauge';
 import { Sparkline } from './Sparkline';
 
@@ -181,7 +182,7 @@ export function ResultsView({
     const d: string[] = [];
     const l: (number | null)[] = [];
     const t: (number | null)[] = [];
-    const r: { date: string; liquid: number | null; total: number | null; notes: string[] }[] = [];
+    const r: MonthlyRow[] = [];
     for (const row of results.rows) {
       const value = row.values[index] ?? null;
       d.push(row.date);
@@ -239,49 +240,26 @@ export function ResultsView({
       </div>
 
       <div id="scenario-panel" role="tabpanel" aria-labelledby={`scenario-tab-${index}`} tabIndex={0}>
-        <SummaryPanel
-          metrics={results.metrics[index]}
-          scenarioName={scenarioName}
-          statusOf={statusOf}
-          onApply={onApply}
-        />
-
-        <Chart dates={dates} liquid={liquid} total={total} scenarioName={scenarioName} />
-
-        <div class="table-wrap">
-          <table class="results-table">
-            <caption class="visually-hidden">
-              {`Monthly liquid and total net worth for ${scenarioName}`}
-            </caption>
-            <thead>
-              <tr>
-                <th scope="col">Date</th>
-                <th scope="col" class="numeric">
-                  Liquid
-                </th>
-                <th scope="col" class="numeric">
-                  Total
-                </th>
-                <th scope="col">Notes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((row) => (
-                <tr key={row.date}>
-                  <th scope="row">{row.date}</th>
-                  <td class={row.liquid !== null && row.liquid < 0 ? 'numeric is-negative' : 'numeric'}>
-                    {row.liquid === null ? '' : formatMoney(row.liquid)}
-                  </td>
-                  <td class={row.total !== null && row.total < 0 ? 'numeric is-negative' : 'numeric'}>
-                    {row.total === null ? '' : formatMoney(row.total)}
-                  </td>
-                  <td class="notes">{row.notes.join(', ')}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {rows.length === 0 ? <p class="empty">This scenario produced no rows.</p> : null}
+        <div class="results__overview">
+          <div class="results__projection">
+            <div class="results__section-heading">
+              <h3>Net worth over time</h3>
+            </div>
+            <Chart dates={dates} liquid={liquid} total={total} scenarioName={scenarioName} />
+          </div>
+          <SummaryPanel
+            metrics={results.metrics[index]}
+            scenarioName={scenarioName}
+            statusOf={statusOf}
+            onApply={onApply}
+          />
         </div>
+
+        <div class="results__section-heading">
+          <h3>Month by month</h3>
+          <p>The numbers behind your path.</p>
+        </div>
+        <MonthlyTable key={scenarioName} rows={rows} scenarioName={scenarioName} />
       </div>
     </div>
   );

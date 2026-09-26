@@ -1,5 +1,4 @@
 import type { ComponentChildren } from 'preact';
-import { useId } from 'preact/hooks';
 
 /**
  * Hand-rolled inline SVG icons: 16px grid, stroked with currentColor so they
@@ -102,13 +101,10 @@ export function IconGrowth() {
   );
 }
 
-/**
- * The moneypath mark: waypoints on an ascending path, on an accent tile.
- * Matches the favicon so the tab and the page read as the same thing.
+/** Compact version of the branching-path logo, simplified for small sizes.
+ * Keep its geometry in sync with public/favicon.svg and make-favicons.sh.
  */
 export function BrandMark({ size = 34 }: { size?: number }) {
-  // Per instance: two marks on one page must not share a gradient id.
-  const gradientId = `${useId()}-brand-tile`;
   return (
     <svg
       class="brandmark"
@@ -116,28 +112,34 @@ export function BrandMark({ size = 34 }: { size?: number }) {
       width={size}
       height={size}
       aria-hidden="true"
-      role="presentation"
+      fill="none"
+      stroke-linecap="round"
+      stroke-linejoin="round"
     >
-      <defs>
-        <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0" stop-color="var(--brand-tile-a)" />
-          <stop offset="1" stop-color="var(--brand-tile-b)" />
-        </linearGradient>
-      </defs>
-      <rect x="1" y="1" width="30" height="30" rx="8" fill={`url(#${gradientId})`} />
-      <path
-        d="M7 23 L13 16.5 L18 19 L25 9.5"
-        fill="none"
-        stroke="var(--brand-stroke)"
-        stroke-width="2.4"
-        stroke-linecap="round"
-        stroke-linejoin="round"
-      />
-      <circle cx="7" cy="23" r="1.7" fill="var(--brand-stroke)" />
-      <circle cx="13" cy="16.5" r="1.7" fill="var(--brand-stroke)" />
-      <circle cx="18" cy="19" r="1.7" fill="var(--brand-stroke)" />
-      <circle cx="25" cy="9.5" r="2.6" fill="var(--brand-stroke)" />
-      <circle cx="25" cy="9.5" r="1.1" fill="var(--brand-tile-b)" />
+      <path d="M12 19C18 24 23 17 28 17" stroke="var(--series-liquid)" stroke-width="1.7" />
+      <path d="M4 25C8 25 8 18 12 19S20 10 28 6" stroke="var(--accent)" stroke-width="2" />
+      <g fill="var(--bg)" stroke="var(--accent)" stroke-width="1.6">
+        <circle cx="4" cy="25" r="1.8" />
+        <circle cx="12" cy="19" r="1.8" />
+        <circle cx="28" cy="6" r="1.8" />
+      </g>
+    </svg>
+  );
+}
+
+/** Full logo: one shared beginning, several possible futures.
+ * The standalone README asset is public/moneypath.svg.
+ */
+export function PathSketch() {
+  return (
+    <svg class="path-sketch" viewBox="0 0 260 100" fill="none" aria-hidden="true">
+      <path class="path-sketch__guide" d="M8 85H250M8 50H250M8 15H250" />
+      <path class="path-sketch__alternative" d="M10 78C48 78 50 52 87 58S140 70 173 49S212 48 247 35" />
+      <path class="path-sketch__main" d="M10 78C48 78 50 52 87 58S130 40 163 34S211 28 247 10" />
+      <circle cx="10" cy="78" r="4" />
+      <circle cx="87" cy="58" r="4" />
+      <circle cx="163" cy="34" r="4" />
+      <circle cx="247" cy="10" r="4" />
     </svg>
   );
 }

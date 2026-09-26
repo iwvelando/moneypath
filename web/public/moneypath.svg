@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 100" fill="none">
+  <title>moneypath — one beginning, several possible futures</title>
+  <!-- Full logo. Matches PathSketch in web/src/components/icons.tsx. -->
+  <path d="M8 85H250M8 50H250M8 15H250" stroke="#81978a" stroke-opacity=".3" stroke-width=".7"/>
+  <path d="M10 78C48 78 50 52 87 58S140 70 173 49S212 48 247 35" stroke="#bd8c58" stroke-width="1.3" stroke-dasharray="4 5"/>
+  <path d="M10 78C48 78 50 52 87 58S130 40 163 34S211 28 247 10" stroke="#598f7a" stroke-width="1.8"/>
+  <g fill="#f5f3ed" stroke="#598f7a" stroke-width="1.5">
+    <circle cx="10" cy="78" r="4"/>
+    <circle cx="87" cy="58" r="4"/>
+    <circle cx="163" cy="34" r="4"/>
+    <circle cx="247" cy="10" r="4"/>
+  </g>
+</svg>

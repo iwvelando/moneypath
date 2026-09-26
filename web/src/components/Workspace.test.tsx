@@ -334,6 +334,13 @@ describe('the section navigation', () => {
     expect(step('Previous').getAttribute('aria-label')).toBe('Previous section: Simulation');
   });
 
+  it('keeps the jump links neutral before and after a jump', async () => {
+    await mount(makeConfig([], [emptyScenario('plan a')]));
+    expect(container.querySelector('.sectionnav__link.is-current, .sectionnav__link[aria-current]')).toBeNull();
+    await click('plan a');
+    expect(container.querySelector('.sectionnav__link.is-current, .sectionnav__link[aria-current]')).toBeNull();
+  });
+
   it('groups both steppers together ahead of the section links', async () => {
     await mount(makeConfig([], [emptyScenario('plan a')]));
 
@@ -448,8 +455,8 @@ describe('the section navigation while scrolling', () => {
     });
   }
 
-  function current(): string | null {
-    return container.querySelector('.sectionnav__link[aria-current="true"]')?.textContent ?? null;
+  function previous(): string | null {
+    return container.querySelector('[aria-label^="Previous section"]')?.getAttribute('aria-label') ?? null;
   }
 
   beforeEach(() => {
@@ -472,18 +479,18 @@ describe('the section navigation while scrolling', () => {
     return Object.fromEntries(ids.map((id, index) => [id, 70 + (index - at) * 400]));
   }
 
-  it('follows the section on screen as the reader scrolls', async () => {
+  it('keeps previous and next relative to the section on screen', async () => {
     const config = makeConfig([], [emptyScenario('plan a'), emptyScenario('plan b')]);
     await mount(config);
-    expect(current()).toBe('Simulation');
+    expect(previous()).toBe('Previous section');
 
     layout(tops(config.scenarios, 4));
     await scroll();
-    expect(current()).toBe('plan b');
+    expect(previous()).toBe('Previous section: plan a');
 
     layout(tops(config.scenarios, 3));
     await scroll();
-    expect(current()).toBe('plan a');
+    expect(previous()).toBe('Previous section: Scenarios');
   });
 
   it('holds a jumped-to section while the jump scrolls past the others', async () => {
@@ -494,7 +501,7 @@ describe('the section navigation while scrolling', () => {
     // Mid-way through a smooth scroll, plan a is passing under the bar.
     layout(tops(config.scenarios, 3));
     await scroll();
-    expect(current()).toBe('plan b');
+    expect(previous()).toBe('Previous section: plan a');
 
     // Once the jump has settled, the reader's own scrolling takes over.
     await act(async () => {
@@ -502,7 +509,7 @@ describe('the section navigation while scrolling', () => {
     });
     layout(tops(config.scenarios, 0));
     await scroll();
-    expect(current()).toBe('Simulation');
+    expect(previous()).toBe('Previous section');
   });
 });
 

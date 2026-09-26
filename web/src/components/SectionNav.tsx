@@ -67,8 +67,7 @@ export function SectionNav({ sections, currentId, onJump }: SectionNavProps) {
             <li key={section.id}>
               <button
                 type="button"
-                class={section.id === currentId ? 'sectionnav__link is-current' : 'sectionnav__link'}
-                aria-current={section.id === currentId ? 'true' : undefined}
+                class="sectionnav__link"
                 onClick={() => onJump(section.id)}
               >
                 {section.label}

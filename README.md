@@ -1,5 +1,7 @@
 # moneypath
 
+<img src="web/public/moneypath.svg" alt="Curving paths branching into possible futures, marked by waypoints" width="260" height="100" />
+
 Personal-finance scenario simulator: describe your financial life — income, expenses,
 loans, investments — in one YAML file, sketch alternative futures as scenarios, and see
 month-by-month projections of cash and net worth for each. One Go engine, two doors: a
