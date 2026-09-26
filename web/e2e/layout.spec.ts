@@ -116,3 +116,38 @@ scenarios:
     }
   });
 }
+
+test('monthly events expand by keyboard or row and reset for another forecast', async ({ page }, testInfo) => {
+  await openApp(page);
+  await runForecast(page);
+  const table = page.locator('.results-table');
+  await expect(table.locator('thead th')).toHaveText(['Date', 'Liquid', 'Total']);
+  await expect(table.locator('.month-row').first().getByRole('button')).toHaveCount(0);
+  const toggle = table.getByRole('button').first();
+  await toggle.scrollIntoViewIfNeeded();
+  await expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await toggle.press('Enter');
+  await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  const detailId = await toggle.getAttribute('aria-controls');
+  const details = page.locator(`[id="${detailId}"]`);
+  await expect(details).toBeVisible();
+  await expect(details.getByRole('listitem').first()).toContainText('Brokerage');
+  expect(await overflow(page), 'expanded monthly events').toBeLessThanOrEqual(0);
+  expect(await page.locator('.table-wrap').evaluate((el) => el.scrollWidth - el.clientWidth), 'three-column table').toBeLessThanOrEqual(1);
+  await toggle.press('Space');
+  await expect(details).toBeHidden();
+  await expect(toggle).toBeFocused();
+  const value = table.locator('.month-row.is-expandable').first().locator('td').first();
+  if (testInfo.project.name === 'phone') await value.tap();
+  else await value.click();
+  await expect(details).toBeVisible();
+
+  const scenarios = page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab');
+  await scenarios.nth(1).click();
+  await expect(table.locator('button[aria-expanded="true"]')).toHaveCount(0);
+  await table.getByRole('button').first().click();
+  await expect(table.locator('button[aria-expanded="true"]')).toHaveCount(1);
+  await page.getByRole('tab', { name: 'Planning Workspace' }).click();
+  await runForecast(page);
+  await expect(table.locator('button[aria-expanded="true"]')).toHaveCount(0);
+});

@@ -1550,10 +1550,85 @@ p {
   text-align: right;
 }
 
-.results-table .notes {
+.monthly-hint {
+  margin: -4px 0 14px;
   color: var(--text-muted);
   font-size: 0.8rem;
-  min-width: 240px;
+}
+
+.month-row.is-expandable {
+  cursor: pointer;
+}
+
+.month-row.is-expanded,
+.month-row:focus-within {
+  background: var(--accent-soft);
+}
+
+.month-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.month-toggle__arrow {
+  flex: none;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.month-toggle[aria-expanded='true'] .month-toggle__arrow {
+  transform: rotate(90deg);
+}
+
+.month-date {
+  padding-left: 20px;
+}
+
+.results-table .month-row th,
+.results-table .month-row td {
+  vertical-align: middle;
+}
+
+.results-table .month-details:hover {
+  background: transparent;
+}
+
+.month-details__content {
+  border-left: 2px solid var(--border-strong);
+  padding: 4px 0 4px 18px;
+  margin: 4px 0 6px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.month-details__heading {
+  color: var(--accent);
+  font-size: 0.75rem;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.month-details ul {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--text-muted);
+  font-size: 0.83rem;
+  line-height: 1.7;
+}
+
+.month-details li + li {
+  margin-top: 6px;
 }
 
 /* ---------------------------------------------------------------- footer */
@@ -1833,7 +1908,7 @@ input[type='checkbox'], input[type='radio'] {
 
 }
 
-.results-table tbody tr:hover {
+.results-table .month-row.is-expandable:hover {
   background: var(--accent-soft);
 }
 
@@ -2042,7 +2117,19 @@ input[type='checkbox'], input[type='radio'] {
   }
 
   .results-table th, .results-table td {
-    padding: 10px 12px;
+    padding: 12px 8px;
+  }
+
+  .month-toggle {
+    gap: 5px;
+  }
+
+  .month-date {
+    padding-left: 17px;
+  }
+
+  .month-details__content {
+    padding-left: 10px;
   }
 
   .confirm__actions {
