@@ -207,7 +207,7 @@ describe('the app', () => {
     expect(toolbar.querySelector('.optctl')).toBeNull();
     expect(toolbar.querySelector('.switch')).toBeNull();
     expect(toolbar.querySelector('.toolbar__error')).toBeNull();
-    expect(container.querySelector('.workbar .optctl__switch input')).not.toBeNull();
+    expect(container.querySelector('.workbar .optctl__list')).not.toBeNull();
   });
 
   it('marks the Results tab outdated once the config changes, without locking it', async () => {

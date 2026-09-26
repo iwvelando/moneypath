@@ -7,6 +7,14 @@ test('an iPhone loads the engine, runs a forecast, and never scrolls sideways', 
   const found = problems(page);
   await openApp(page);
   expect(await overflow(page), 'workspace').toBeLessThanOrEqual(0);
+  await page.getByRole('button', { name: 'Jump to section' }).tap();
+  await page.getByRole('button', { name: 'Common settings', exact: true }).tap();
+  await expect(page.locator('#section-common')).toBeFocused();
+  const optimizer = page.getByRole('button', { name: /^Optimizer:/ });
+  await optimizer.tap();
+  await expect(page.getByRole('checkbox', { name: 'Run the optimizer' })).toBeVisible();
+  expect(await overflow(page), 'optimizer panel').toBeLessThanOrEqual(0);
+  await optimizer.tap();
   await runForecast(page);
   expect(await overflow(page), 'results').toBeLessThanOrEqual(0);
   await page.locator('.results-table').scrollIntoViewIfNeeded();
@@ -19,4 +27,23 @@ test('an iPhone loads the engine, runs a forecast, and never scrolls sideways', 
   await month.tap();
   await expect(month).toHaveAttribute('aria-expanded', 'false');
   expect(found).toEqual([]);
+});
+
+
+test('a pointer selection works after keyboard focus in the workbar', async ({ page }) => {
+  await openApp(page);
+  const jump = page.getByRole('button', { name: 'Jump to section' });
+  await jump.focus();
+  await jump.press('Enter');
+  await page.getByRole('button', { name: 'Common settings', exact: true }).click();
+  await expect(page.locator('#section-common')).toBeFocused();
+  const optimizer = page.getByRole('button', { name: /^Optimizer:/ });
+  await optimizer.focus();
+  await optimizer.press('Enter');
+  const toggle = page.getByRole('checkbox', { name: 'Run the optimizer' });
+  await toggle.setChecked(true);
+  await expect(toggle).toBeChecked();
+  await jump.click();
+  await expect(jump).toHaveAttribute('aria-expanded', 'true');
+  await expect(optimizer).toHaveAttribute('aria-expanded', 'false');
 });

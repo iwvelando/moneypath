@@ -50,7 +50,7 @@ The app covers, at a coarse grain:
   started, never by moving the reader somewhere else. The editor is long and a tweak is
   usually followed by a run, so the run action stays reachable from any scroll position
   rather than only from the top of the page.
-- **Working with the optimizer** — one place to switch it on, to see how many events
+- **Working with the optimizer** — one place to switch it on, to see which events
   carry an optimizer directive, and to jump to each of them, so the switch is never
   blind. Editing is where a run is shaped and started; reading results is not.
   A run reports what the optimizer chose but never edits the plan itself: each adjustment
@@ -80,8 +80,12 @@ with sans-serif controls. On wide screens, each editor section has an introducti
 beside its fields. This introduction stays pinned below the navigation bar while
 its section scrolls, then leaves with the section. On smaller screens introductions
 stack above the fields and scroll normally to preserve working space. A pinned
-navigation and run bar stays reachable while the plan scrolls. Its jump links have
-no active-section highlight; Previous/Next still follow the section on screen.
+navigation and run bar stays reachable while the plan scrolls. A “Jump to section”
+dropdown includes Simulation, Common settings, and Scenarios, with individual scenarios
+nested beneath Scenarios. The destinations have no active-section highlight. An optimizer
+status button shows only On or Off and opens its enable switch and event jump list, or setup guidance when the list
+is empty. Only one panel opens at a time; Escape closes it and returns focus to its trigger.
+Run Forecast remains directly accessible, including while either panel is open.
 Introductions and jump targets allow for the bar's height as it wraps or shows errors. Results use the same palette, with distinct
 liquid and total series and separate headings for the chart and monthly table.
 System, Light, and Dark themes share this layout. All fonts and illustrations remain

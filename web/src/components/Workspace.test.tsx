@@ -235,18 +235,21 @@ describe('finding optimized events', () => {
 
   it('reports that nothing uses the optimizer', async () => {
     await mount(makeConfig([], [{ ...emptyScenario('plan a'), events: [event('Rent')] }]));
-    expect(finderButton().textContent).toBe('Optimizer (0)');
-    expect(finderButton().disabled).toBe(true);
+    expect(finderButton().textContent).toBe('Optimizer: Off');
+    expect(finderButton().disabled).toBe(false);
+    await click('Optimizer: Off');
+    expect(container.querySelector('.optctl__panel')?.textContent).toContain('No events are set up');
+    expect(container.querySelector('.optctl__panel')?.textContent).toContain('Add optimizer');
   });
 
-  it('counts the optimized events and lists them on demand', async () => {
+  it('lists all optimized events on demand', async () => {
     const savings = optimized('Savings', 'amount');
     const trip = optimized('Trip', 'startDate');
     const a = { ...emptyScenario('plan a'), events: [event('Rent'), savings] };
     const b = { ...emptyScenario('plan b'), events: [trip] };
     await mount(makeConfig([], [a, b]), { optimizerEnabled: true });
 
-    expect(finderButton().textContent).toBe('Optimizer (2)');
+    expect(finderButton().textContent).toBe('Optimizer: On');
     expect(finderButton().getAttribute('aria-expanded')).toBe('false');
     expect(container.querySelector('.optctl__panel')).toBeNull();
 
@@ -305,117 +308,129 @@ describe('finding optimized events', () => {
 });
 
 describe('the section navigation', () => {
-  function step(direction: 'Previous' | 'Next'): HTMLButtonElement {
-    const found = container.querySelector<HTMLButtonElement>(`[aria-label^="${direction} section"]`);
-    if (!found) throw new Error(`no ${direction} step button`);
-    return found;
-  }
-
-  it('links Simulation and each scenario, but spends no width on common settings', async () => {
+  it('opens a complete table of contents with scenarios nested beneath Scenarios', async () => {
     await mount(makeConfig([], [emptyScenario('plan a'), emptyScenario('plan b')]));
-
-    const links = Array.from(container.querySelectorAll('.sectionnav__link')).map((element) =>
-      element.textContent?.trim(),
-    );
-    expect(links).toEqual(['Simulation', 'Scenarios', 'plan a', 'plan b']);
-    // The section itself is still there — only its nav link is gone.
-    expect(container.querySelector('#section-common')).not.toBeNull();
+    expect(container.querySelector('.sectionnav__panel')).toBeNull();
+    await click('Jump to section');
+    const links = Array.from(container.querySelectorAll('.sectionnav__link')).map((el) => el.textContent);
+    expect(links).toEqual(['Simulation', 'Common settings', 'Scenarios', 'plan a', 'plan b']);
+    expect(container.querySelector('.sectionnav__children')?.closest('li')?.textContent)
+      .toBe('Scenariosplan aplan b');
   });
 
-  it('still steps through common settings, which has no link of its own', async () => {
+  it('jumps directly to common settings, focuses the section, and closes', async () => {
     await mount(makeConfig([], [emptyScenario('plan a')]));
+    await click('Jump to section');
+    await click('Common settings');
+    expect(document.activeElement).toBe(container.querySelector('#section-common'));
+    expect(container.querySelector('.sectionnav__panel')).toBeNull();
+  });
 
-    expect(step('Next').getAttribute('aria-label')).toBe('Next section: Common settings');
+  it('includes inactive and unnamed scenarios and jumps by identity', async () => {
+    const scenario = { ...emptyScenario(''), active: false };
+    await mount(makeConfig([], [scenario]));
+    await click('Jump to section');
+    await click('Scenario 1');
+    expect(document.activeElement).toBe(container.querySelector(`#section-scenario-${scenario.id}`));
+  });
+
+  it('dismisses with Escape and returns focus to the trigger', async () => {
+    await mount(makeConfig([], []));
+    await click('Jump to section');
     await act(async () => {
-      step('Next').click();
+      buttons('Common settings')[0]!.focus();
+      document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     });
-    // Landed on common: stepping on reaches Scenarios, and back reaches Simulation.
-    expect(step('Next').getAttribute('aria-label')).toBe('Next section: Scenarios');
-    expect(step('Previous').getAttribute('aria-label')).toBe('Previous section: Simulation');
+    expect(container.querySelector('.sectionnav__panel')).toBeNull();
+    expect(document.activeElement).toBe(buttons('Jump to section')[0]);
   });
 
-  it('keeps the jump links neutral before and after a jump', async () => {
-    await mount(makeConfig([], [emptyScenario('plan a')]));
-    expect(container.querySelector('.sectionnav__link.is-current, .sectionnav__link[aria-current]')).toBeNull();
-    await click('plan a');
-    expect(container.querySelector('.sectionnav__link.is-current, .sectionnav__link[aria-current]')).toBeNull();
+  it('handles Escape when pointer activation leaves focus outside the trigger', async () => {
+    await mount(makeConfig([], []));
+    await click('Jump to section');
+    await act(async () => {
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    });
+    expect(container.querySelector('.sectionnav__panel')).toBeNull();
+    expect(document.activeElement).toBe(buttons('Jump to section')[0]);
   });
 
-  it('groups both steppers together ahead of the section links', async () => {
-    await mount(makeConfig([], [emptyScenario('plan a')]));
-
-    const steps = container.querySelector('.sectionnav__steps');
-    expect(steps).not.toBeNull();
-    expect(steps!.querySelectorAll('.sectionnav__step')).toHaveLength(2);
-    // A lone forward arrow beside a scrolling list reads as "scroll right";
-    // the pair reads as a stepper.
-    const list = container.querySelector('.sectionnav__list')!;
-    expect(steps!.compareDocumentPosition(list) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  it('dismisses on outside pointer interaction and when focus leaves', async () => {
+    await mount(makeConfig([], []));
+    await click('Jump to section');
+    await act(async () => { document.body.dispatchEvent(new Event('pointerdown', { bubbles: true })); });
+    expect(container.querySelector('.sectionnav__panel')).toBeNull();
+    await click('Jump to section');
+    await act(async () => { buttons('Simulation')[0]!.focus(); });
+    await act(async () => { buttons('Run Forecast')[0]!.focus(); });
+    expect(container.querySelector('.sectionnav__panel')).toBeNull();
   });
 
-  it('names the step buttons for their target rather than spending width on text', async () => {
-    await mount(makeConfig([], [emptyScenario('plan a')]));
+  it('does not interrupt a click when the browser briefly clears focus', async () => {
+    await mount(makeConfig([], []));
+    await click('Jump to section');
+    await act(async () => {
+      buttons('Jump to section')[0]!.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
+    });
+    await click('Common settings');
+    expect(document.activeElement).toBe(container.querySelector('#section-common'));
+    expect(container.querySelector('.sectionnav__panel')).toBeNull();
+  });
 
-    expect(step('Next').textContent).not.toContain('Next');
-    expect(step('Previous').textContent).not.toContain('Previous');
-    // Nothing to go back to from the first section.
-    expect(step('Previous').disabled).toBe(true);
-    expect(step('Previous').getAttribute('aria-label')).toBe('Previous section');
+  it('shows only one workbar panel at a time', async () => {
+    await mount(makeConfig([], []));
+    await click('Jump to section');
+    await click('Optimizer: Off');
+    expect(container.querySelector('.sectionnav__panel')).toBeNull();
+    expect(container.querySelector('.optctl__panel')).not.toBeNull();
+    await click('Jump to section');
+    expect(container.querySelector('.optctl__panel')).toBeNull();
+    expect(container.querySelector('.sectionnav__panel')).not.toBeNull();
   });
 });
 
-describe('the optimizer cluster', () => {
+describe('the optimizer panel', () => {
   function toggle(): HTMLInputElement {
-    const found = container.querySelector<HTMLInputElement>('.optctl__switch input');
-    if (!found) throw new Error('no optimizer switch');
-    return found;
+    return container.querySelector<HTMLInputElement>('.optctl__switch input')!;
   }
 
-  it('keeps the switch, the count and the list together in the pinned bar', async () => {
+  it('shows only the state in its trigger, with the switch and events inside its panel', async () => {
     const a = { ...emptyScenario('plan a'), events: [optimized('Savings', 'amount')] };
     await mount(makeConfig([], [a]), { optimizerEnabled: true });
-
-    const cluster = container.querySelector('.workbar .optctl');
-    expect(cluster).not.toBeNull();
-    expect(cluster!.querySelector('.optctl__switch input')).not.toBeNull();
-    expect(cluster!.querySelector('.optctl__list')?.textContent).toBe('Optimizer (1)');
+    expect(toggle()).toBeNull();
+    await click('Optimizer: On');
     expect(toggle().checked).toBe(true);
+    expect(toggle().closest('.optctl__panel')).not.toBeNull();
   });
 
-  it('reports switching the optimizer on and off', async () => {
-    const a = { ...emptyScenario('plan a'), events: [optimized('Savings', 'amount')] };
-    await mount(makeConfig([], [a]), { optimizerEnabled: false });
-
-    expect(toggle().checked).toBe(false);
-    await act(async () => {
-      toggle().click();
-    });
+  it('changes the existing preference without changing the plan or starting a run', async () => {
+    const config = makeConfig([], [{ ...emptyScenario('plan a'), events: [optimized('Savings', 'amount')] }]);
+    await mount(config);
+    await click('Optimizer: Off');
+    await act(async () => { toggle().click(); });
     expect(optimizerToggles).toEqual([true]);
     expect(toggle().checked).toBe(true);
+    expect(buttons('Optimizer: On')).toHaveLength(1);
+    await act(async () => { toggle().click(); });
+    expect(optimizerToggles).toEqual([true, false]);
+    expect(latest).toEqual(config);
+    expect(runs).toBe(0);
   });
 
-  it('names the switch for assistive tech, since the visible label is shared', async () => {
-    await mount(makeConfig([], [emptyScenario('plan a')]));
-    expect(toggle().getAttribute('aria-label')).toBeTruthy();
-  });
-
-  it('leaves the switch usable when no event carries an optimizer yet', async () => {
-    await mount(makeConfig([], [emptyScenario('plan a')]));
-    // The preference is expressible before the events exist; only the list is empty.
+  it('allows setting the preference before any event is configured', async () => {
+    await mount(makeConfig([], []));
+    await click('Optimizer: Off');
     expect(toggle().disabled).toBe(false);
-    expect(container.querySelector<HTMLButtonElement>('.optctl__list')?.disabled).toBe(true);
+    await act(async () => { toggle().click(); });
+    expect(buttons('Optimizer: On')).toHaveLength(1);
+    expect(container.querySelector('.optctl__panel')?.textContent).toContain('No events are set up');
   });
 
-  it('no longer tells the reader to look at the top of the page', async () => {
-    const a = { ...emptyScenario('plan a'), events: [optimized('Savings', 'amount')] };
-    await mount(makeConfig([], [a]), { optimizerEnabled: false });
-
-    await act(async () => {
-      container.querySelector<HTMLButtonElement>('.optctl__list')!.click();
-    });
-    const panel = container.querySelector('.optctl__panel')!;
-    expect(panel.textContent).toMatch(/switched off/i);
-    expect(panel.textContent).not.toMatch(/top of the page/i);
+  it('disables the preference while running, but still allows inspecting events', async () => {
+    await mount(makeConfig([], [{ ...emptyScenario('plan a'), events: [optimized('Savings', 'amount')] }]), { running: true });
+    await click('Optimizer: Off');
+    expect(toggle().disabled).toBe(true);
+    expect(container.querySelector('.optctl__entry')).not.toBeNull();
   });
 });
 
@@ -434,82 +449,6 @@ describe('run errors', () => {
   it('shows nothing when the last run was fine', async () => {
     await mount(makeConfig([], [emptyScenario('plan a')]));
     expect(container.querySelector('.workbar__error')).toBeNull();
-  });
-});
-
-describe('the section navigation while scrolling', () => {
-  /** Lay the sections out as if scrolled, top edge by element id. */
-  function layout(tops: Record<string, number>): void {
-    for (const [id, top] of Object.entries(tops)) {
-      const element = document.getElementById(id);
-      if (!element) throw new Error(`no element #${id}`);
-      element.getBoundingClientRect = () => ({ top, bottom: top + 300 }) as DOMRect;
-    }
-    const bar = container.querySelector('.workbar') as HTMLElement;
-    bar.getBoundingClientRect = () => ({ top: 0, bottom: 56 }) as DOMRect;
-  }
-
-  async function scroll(): Promise<void> {
-    await act(async () => {
-      window.dispatchEvent(new Event('scroll'));
-    });
-  }
-
-  function previous(): string | null {
-    return container.querySelector('[aria-label^="Previous section"]')?.getAttribute('aria-label') ?? null;
-  }
-
-  beforeEach(() => {
-    // jsdom lays nothing out, so without this every page is "at the bottom".
-    Object.defineProperty(document.documentElement, 'scrollHeight', { value: 10000, configurable: true });
-  });
-
-  afterEach(() => {
-    delete (document.documentElement as { scrollHeight?: number }).scrollHeight;
-  });
-
-  function tops(scenarios: ConfigModel['scenarios'], at: number): Record<string, number> {
-    // Everything above the section at index `at` has scrolled past the bar.
-    const ids = [
-      'section-simulation',
-      'section-common',
-      'section-scenarios',
-      ...scenarios.map((scenario) => `section-scenario-${scenario.id}`),
-    ];
-    return Object.fromEntries(ids.map((id, index) => [id, 70 + (index - at) * 400]));
-  }
-
-  it('keeps previous and next relative to the section on screen', async () => {
-    const config = makeConfig([], [emptyScenario('plan a'), emptyScenario('plan b')]);
-    await mount(config);
-    expect(previous()).toBe('Previous section');
-
-    layout(tops(config.scenarios, 4));
-    await scroll();
-    expect(previous()).toBe('Previous section: plan a');
-
-    layout(tops(config.scenarios, 3));
-    await scroll();
-    expect(previous()).toBe('Previous section: Scenarios');
-  });
-
-  it('holds a jumped-to section while the jump scrolls past the others', async () => {
-    const config = makeConfig([], [emptyScenario('plan a'), emptyScenario('plan b')]);
-    await mount(config);
-
-    await click('plan b');
-    // Mid-way through a smooth scroll, plan a is passing under the bar.
-    layout(tops(config.scenarios, 3));
-    await scroll();
-    expect(previous()).toBe('Previous section: plan a');
-
-    // Once the jump has settled, the reader's own scrolling takes over.
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 250));
-    });
-    layout(tops(config.scenarios, 0));
-    await scroll();
-    expect(previous()).toBe('Previous section');
   });
 });
 

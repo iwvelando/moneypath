@@ -101,7 +101,9 @@ scenarios:
           max: 2000
 `),
     });
+    await page.getByRole('button', { name: /^Optimizer:/ }).click();
     await page.getByRole('checkbox', { name: 'Run the optimizer', exact: true }).setChecked(optimize);
+    await page.getByRole('button', { name: /^Optimizer:/ }).click();
     await runForecast(page);
     await expect(page.getByRole('heading', { name: 'Optimizer adjustments', exact: true })).toHaveCount(optimize ? 1 : 0);
     for (const width of [1092, 1440]) {
@@ -173,6 +175,7 @@ test('desktop section introductions stay below the bar and stop at their section
       await common.getByRole('heading', { name, exact: true }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
       await checkPinned();
     }
+    await page.getByRole('button', { name: 'Jump to section' }).click();
     await page.getByRole('button', { name: 'Scenarios', exact: true }).click();
     await expect(page.locator('#section-scenarios')).toBeFocused();
     const section = await common.boundingBox();
@@ -181,6 +184,7 @@ test('desktop section introductions stay below the bar and stop at their section
     expect(await overflow(page)).toBeLessThanOrEqual(0);
   }
   // A run error makes the pinned bar taller; it must not cover the introduction.
+  await page.getByRole('button', { name: 'Jump to section' }).click();
   await page.getByRole('button', { name: 'Simulation', exact: true }).click();
   const end = page.locator('#section-simulation').getByRole('textbox', { name: 'End month', exact: true });
   await end.fill('1900-01');
@@ -199,7 +203,113 @@ test('phone introductions scroll away while jump and run controls stay available
   const intro = await common.locator('.section__intro').boundingBox();
   expect(intro!.y + intro!.height).toBeLessThan(0);
   await expect(page.getByRole('button', { name: 'Run Forecast', exact: true })).toBeInViewport();
+  await page.getByRole('button', { name: 'Jump to section' }).click();
   await page.getByRole('button', { name: 'Simulation', exact: true }).click();
   await expect(page.locator('#section-simulation')).toBeFocused();
   expect(await overflow(page)).toBeLessThanOrEqual(0);
+});
+
+test('workbar disclosures support keyboard navigation and direct common-settings jumps', async ({ page }) => {
+  await openApp(page);
+  const jump = page.getByRole('button', { name: 'Jump to section' });
+  await jump.focus();
+  await jump.press('Enter');
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Simulation', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  const common = page.getByRole('button', { name: 'Common settings', exact: true });
+  await expect(common).toBeFocused();
+  await common.press('Escape');
+  await expect(jump).toBeFocused();
+  await expect(jump).toHaveAttribute('aria-expanded', 'false');
+  await jump.press('Space');
+  await common.click();
+  await expect(page.locator('#section-common')).toBeFocused();
+  await expect(jump).toHaveAttribute('aria-expanded', 'false');
+
+  const optimizer = page.getByRole('button', { name: /^Optimizer:/ });
+  await optimizer.click();
+  const toggle = page.getByRole('checkbox', { name: 'Run the optimizer' });
+  await toggle.focus();
+  await toggle.press('Escape');
+  await expect(optimizer).toBeFocused();
+  await optimizer.press('Enter');
+  await page.keyboard.press('Tab');
+  await expect(toggle).toBeFocused();
+  // The starter has no optimized events: tabbing beyond the switch closes the panel.
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Run Forecast', exact: true })).toBeFocused();
+  await expect(optimizer).toHaveAttribute('aria-expanded', 'false');
+});
+
+test('long section lists and optimizer panels fit the viewport and remain usable', async ({ page }, testInfo) => {
+  await openApp(page);
+  const names = Array.from({ length: 18 }, (_, i) => `Path ${i + 1}: a longer scenario name for a complex financial plan`);
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'many-scenarios.yaml', mimeType: 'application/yaml',
+    buffer: Buffer.from(`version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2027-01
+  startingCash: 25000
+common:
+  events:
+    - name: Expenses
+      amount: -100
+scenarios:
+${names.map((name) => `  - name: "${name}"
+    events:
+      - name: Extra savings
+        amount: 100
+        optimize:
+          field: amount
+          min: 0
+          max: 200`).join('\n')}
+`),
+  });
+  const activate = async (locator: ReturnType<typeof page.getByRole>) => {
+    if (testInfo.project.name === 'phone') await locator.tap();
+    else await locator.click();
+  };
+  const jump = page.getByRole('button', { name: 'Jump to section' });
+  await activate(jump);
+  const panel = page.locator('.sectionnav__panel');
+  expect(await panel.evaluate((el) => el.scrollHeight > el.clientHeight)).toBe(true);
+  expect(await overflow(page), 'long navigation').toBeLessThanOrEqual(0);
+  const initialBox = await panel.boundingBox();
+  expect(initialBox!.y).toBeGreaterThanOrEqual(0);
+  expect(initialBox!.y + initialBox!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  if (testInfo.project.name === 'chromium') {
+    // A resize can change the anchor from the trigger to the full workbar.
+    for (const width of [360, 800, 1440]) {
+      await page.setViewportSize({ width, height: 760 });
+      await expect.poll(async () => {
+        const bounds = await panel.boundingBox();
+        return bounds!.y >= 0 && bounds!.y + bounds!.height <= 760 &&
+          bounds!.x >= 0 && bounds!.x + bounds!.width <= width;
+      }).toBe(true);
+    }
+  }
+  await activate(panel.getByRole('button', { name: names[17], exact: true }));
+  await expect(page.locator('section').filter({ has: page.getByRole('heading', { name: names[17], exact: true }) })).toBeFocused();
+  await expect(jump).toHaveAttribute('aria-expanded', 'false');
+  await activate(page.getByRole('button', { name: /^Optimizer:/ }));
+  await page.getByRole('checkbox', { name: 'Run the optimizer' }).check();
+  const optimizer = page.getByRole('button', { name: 'Optimizer: On' });
+  await expect(optimizer).toBeVisible();
+  const optimizerHeight = (await optimizer.boundingBox())!.height;
+  expect(optimizerHeight, 'status button stays one line even with many events').toBeLessThanOrEqual(48);
+  expect(await overflow(page), 'optimizer with many events').toBeLessThanOrEqual(0);
+  const box = await page.locator('.optctl__panel').boundingBox();
+  expect(box!.x).toBeGreaterThanOrEqual(0);
+  expect(box!.x + box!.width).toBeLessThanOrEqual(page.viewportSize()!.width);
+  expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
+  await activate(page.locator('.optctl__entry').last());
+  await expect(page.locator('.row-card:focus')).toContainText('Extra savings');
+  await activate(optimizer);
+  await activate(jump);
+  await expect(optimizer).toHaveAttribute('aria-expanded', 'false');
+  await activate(page.getByRole('button', { name: 'Run Forecast', exact: true }));
+  await expect(page.locator('.workbar__error')).toHaveCount(0);
+  await expect(page.getByRole('tab', { name: 'Results' })).toHaveAttribute('aria-selected', 'true');
 });
