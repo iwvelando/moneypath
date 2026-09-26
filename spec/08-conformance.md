@@ -54,6 +54,8 @@ side.
 | Rejections | `TestMigrateRejects` (`legacy/`) | Chapter 07's required failure modes still fail. |
 | CLI ↔ WASM parity | `TestCLIWASMParity` (`conformance/`) | For every conformance config, native and WASM CSV are byte-identical. Runs the wasm module under Node; self-skips when `node` is absent. |
 | Static bundle | `TestStaticBundle` (`conformance/`) | The web build produces a standalone `dist/`, and the tree embedded in the binary is identical to it (chapter 02). |
+| Distribution | `web/scripts/check-dist.mjs` (`make dist`) | `dist/` holds the real engine, the icons and link-preview card, the 404 page, and the license notices. |
+| Browser | `web/e2e/` (Playwright; `make test-browser`, `make test-webkit`) | The production build, under the production CSP, loads the real engine, runs a forecast and both downloads, survives denied storage, and never scrolls sideways on a 360 px phone or an iPhone. Tests tagged `@smoke` also run against the live site after each deploy. |
 
 The fixtures are integration nets, not a substitute for unit coverage: engine internals
 (amortization, event scheduling, investment ordering, optimizer bisection) carry their
