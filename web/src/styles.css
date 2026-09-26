@@ -1523,6 +1523,8 @@ p {
 .results-table tbody th {
   font-weight: 600;
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  /* A month split across two lines ("2026-" / "09") reads as two values. */
+  white-space: nowrap;
 }
 
 .results-table .numeric {

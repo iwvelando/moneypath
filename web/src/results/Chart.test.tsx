@@ -1,4 +1,5 @@
 import { render } from 'preact';
+import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { Chart } from './Chart';
 
@@ -68,5 +69,22 @@ describe('Chart graphics', () => {
     renderChart([null, null, null, null], [null, null, null, null]);
     expect(host.querySelector('.chart--empty')).not.toBeNull();
     expect(host.querySelector('.chart__area')).toBeNull();
+  });
+
+  it('spaces date labels so they never run together on a narrow chart', () => {
+    // jsdom has no layout, so the chart draws at its narrowest (phone) width.
+    const months = Array.from({ length: 361 }, (_, i) => {
+      const year = 2026 + Math.floor(i / 12);
+      return `${year}-${String((i % 12) + 1).padStart(2, '0')}`;
+    });
+    const values = months.map((_, i) => i * 100);
+    act(() => {
+      render(<Chart dates={months} liquid={values} total={values} scenarioName="base" />, host);
+    });
+    expect(host.querySelector('.chart__svg')?.getAttribute('viewBox')).toBe('0 0 320 340');
+    const xs = [...host.querySelectorAll('.chart__axis text')].map((node) => Number(node.getAttribute('x')));
+    expect(xs.length).toBeGreaterThanOrEqual(2);
+    // A YYYY-MM label is about 45 px wide at the axis font size.
+    for (let i = 1; i < xs.length; i += 1) expect(xs[i]! - xs[i - 1]!).toBeGreaterThanOrEqual(52);
   });
 });

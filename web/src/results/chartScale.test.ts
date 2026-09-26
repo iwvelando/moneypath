@@ -3,6 +3,7 @@ import {
   areaPolygon,
   extentOf,
   indexFromPosition,
+  dateTickLimit,
   indexTicks,
   negativeSpans,
   normalize,
@@ -72,6 +73,17 @@ describe('indexTicks', () => {
     expect(indexTicks(0)).toEqual([]);
     expect(indexTicks(1)).toEqual([0]);
     expect(indexTicks(2)).toEqual([0, 1]);
+  });
+});
+
+describe('dateTickLimit', () => {
+  it('fits as many date labels as the plot has room for, up to six', () => {
+    expect(dateTickLimit(1000)).toBe(6);
+    // A phone-width plot: six labels would sit 37 px apart and collide;
+    // four leave 61 px gaps.
+    expect(dateTickLimit(184)).toBe(4);
+    // Never fewer than the two ends.
+    expect(dateTickLimit(10)).toBe(2);
   });
 });
 

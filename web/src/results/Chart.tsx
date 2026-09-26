@@ -5,6 +5,7 @@ import {
   areaPolygon,
   extentOf,
   indexFromPosition,
+  dateTickLimit,
   indexTicks,
   negativeSpans,
   normalize,
@@ -216,7 +217,7 @@ export function Chart({ dates, liquid, total, scenarioName }: ChartProps) {
           </g>
 
           <g class="chart__axis" aria-hidden="true">
-            {indexTicks(count).map((index) => (
+            {indexTicks(count, dateTickLimit(plotWidth)).map((index) => (
               <text key={index} class="chart__tick" x={x(index)} y={HEIGHT - 12} text-anchor="middle">
                 {dates[index]}
               </text>
