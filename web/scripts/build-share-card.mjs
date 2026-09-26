@@ -1,15 +1,10 @@
-// Renders the link-preview card (public/og-image.png) from the built site, so
-// it carries moneypath's own chart, type, and colours: the starter plan's
-// forecast, drawn by the real engine, under the app's brand. Run `make
-// share-card` (which builds first), check the image by eye, and commit it; it
-// changes only when the site's look does.
-//
-// Fonts come from the machine that renders; the app uses a system stack, so
-// render on macOS.
+// Render the full branching-path logo and wordmark from the built app.
+// This is a brand illustration, not a forecast. Run `make share-card` and
+// check the image by eye when the identity changes. Render on macOS so the
+// system serif matches the app's usual presentation.
 import { chromium } from '@playwright/test';
 import { preview } from 'vite';
 
-// Not 4173: that port belongs to the Playwright test server.
 const server = await preview({ preview: { host: '127.0.0.1', port: 4174, strictPort: true } });
 const browser = await chromium.launch();
 try {
@@ -19,43 +14,21 @@ try {
     reducedMotion: 'reduce',
   });
   await page.goto('http://127.0.0.1:4174/');
-  await page.waitForSelector('html[data-engine=ready]');
-  await page.getByRole('button', { name: 'Run Forecast' }).first().click();
-  await page.waitForSelector('.chart__svg .chart__line');
-
-  // The chart without its hover cursor or tick labels, over the header's
-  // brand. Stacked and centred so a square crop keeps both.
+  await page.waitForSelector('.path-sketch');
   await page.evaluate(() => {
-    // Clones, not the live nodes: the chart redraws itself when its container
-    // resizes, and moving it out would shrink it to its minimum width.
-    const svg = document.querySelector('.chart__svg').cloneNode(true);
-    for (const noise of svg.querySelectorAll('.chart__cursor, .chart__tick, .chart__axis')) noise.remove();
-
-    const brand = document.querySelector('.appbar__brand').cloneNode(true);
-    brand.style.cssText = 'gap: 22px';
-    const mark = brand.querySelector('.brandmark');
-    mark.setAttribute('width', '76');
-    mark.setAttribute('height', '76');
-    brand.querySelector('h1').style.cssText = 'font-size: 60px; line-height: 1';
-    brand.querySelector('p').style.cssText = 'font-size: 22px; margin-top: 8px';
-
+    const logo = document.querySelector('.path-sketch').cloneNode(true);
+    logo.style.cssText = 'display: block; width: 640px; height: auto; flex: none';
+    const wordmark = document.querySelector('.appbar__brand > div').cloneNode(true);
+    wordmark.querySelector('h1').style.cssText = 'font: 400 76px/1.1 var(--serif); letter-spacing: -2px';
+    wordmark.querySelector('p').style.cssText = 'font-size: 22px; margin-top: 16px; color: var(--text-muted)';
     const card = document.createElement('main');
     card.style.cssText = `
-      width: 1200px; height: 630px; box-sizing: border-box; padding: 44px 80px;
+      width: 1200px; height: 630px; padding: 60px 80px;
       display: flex; flex-direction: column; align-items: center; justify-content: center;
-      gap: 34px; background: var(--bg); color: var(--text);`;
-    card.append(brand, svg);
+      gap: 58px; text-align: center; background: var(--bg); color: var(--text);`;
+    card.append(wordmark, logo);
     document.body.replaceChildren(card);
     document.body.style.margin = '0';
-
-    // Crop to what is drawn, now that the tick labels' margin is empty.
-    const box = svg.getBBox();
-    const pad = Math.max(box.width, box.height) * 0.02;
-    const [x, y, w, h] = [box.x - pad, box.y - pad, box.width + 2 * pad, box.height + 2 * pad];
-    svg.setAttribute('viewBox', `${x} ${y} ${w} ${h}`);
-    const scale = Math.min(1040 / w, 360 / h);
-    svg.setAttribute('width', String(w * scale));
-    svg.setAttribute('height', String(h * scale));
   });
   await page.screenshot({ path: 'public/og-image.png' });
 } finally {

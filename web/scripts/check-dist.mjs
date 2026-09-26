@@ -8,6 +8,7 @@ for (const file of [
   'index.html',
   '404.html',
   'favicon.svg',
+  'moneypath.svg',
   'favicon-32.png',
   'apple-touch-icon.png',
   'og-image.png',

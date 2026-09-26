@@ -1,49 +1,26 @@
 #!/bin/sh
-# Regenerate the raster favicons in web/public/ from the same geometry as
-# public/favicon.svg and the BrandMark component in src/components/icons.tsx.
-#
-# The PNGs are committed (a fresh checkout must not need ImageMagick), so run
-# this only when the mark itself changes — then commit what it produces.
-#
-# ImageMagick's own SVG renderer ignores the gradient and the stroked path, so
-# the shapes are drawn with draw primitives here rather than rasterized from
-# the SVG. Coordinates are the SVG's 32-unit grid scaled by 16.
-#
-#   usage: sh web/scripts/make-favicons.sh   (from the repository root)
-
+# Regenerate committed PNG icons from the compact branching-path geometry.
+# Keep paths in sync with public/favicon.svg and BrandMark in icons.tsx.
+# ImageMagick primitives avoid platform differences in SVG delegates.
+# Usage: sh web/scripts/make-favicons.sh (from the repository root)
 set -eu
 
 out="$(CDPATH= cd -- "$(dirname -- "$0")/../public" && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-magick -size 512x512 -define gradient:direction=SouthEast \
-  gradient:'#2f6fbe'-'#173f78' "$work/tile.png"
-
-magick -size 512x512 xc:black -fill white \
-  -draw "roundrectangle 16,16 496,496 128,128" "$work/mask.png"
-
-# The mark, drawn over a tile. iOS rounds home-screen icons itself and fills
-# any transparency with black, so the apple-touch-icon is the full-bleed tile;
-# the favicon keeps its own rounded corners.
+# Draw at 16x resolution for clean small-size antialiasing.
 mark() {
   magick "$1" \
-    -stroke '#f4f8ff' -strokewidth 38 -fill none \
-    -draw "stroke-linecap round stroke-linejoin round polyline 112,368 208,264 288,304 400,152" \
-    -stroke none -fill '#f4f8ff' \
-    -draw "circle 112,368 112,395" \
-    -draw "circle 208,264 208,291" \
-    -draw "circle 288,304 288,331" \
-    -draw "circle 400,152 400,194" \
-    -fill '#173f78' -draw "circle 400,152 400,170" \
+    -draw "scale 16,16 stroke-linecap round stroke-linejoin round fill none stroke '#ddb180' stroke-width 1.7 path 'M12 19C18 24 23 17 28 17' stroke '#95c8ad' stroke-width 2 path 'M4 25C8 25 8 18 12 19S20 10 28 6' fill '#192622' stroke-width 1.6 circle 4,25 5.8,25 circle 12,19 13.8,19 circle 28,6 29.8,6" \
     "$2"
 }
 
-magick "$work/tile.png" "$work/mask.png" -alpha off -compose CopyOpacity -composite "$work/rounded.png"
-mark "$work/rounded.png" "$work/icon-512.png"
-mark "$work/tile.png" "$work/full-512.png"
-
-magick "$work/full-512.png" -alpha off -resize 180x180 "$out/apple-touch-icon.png"
-magick "$work/icon-512.png" -resize 32x32 "$out/favicon-32.png"
-
+magick -size 512x512 xc:none -fill '#192622' -draw "roundrectangle 0,0 512,512 96,96" "$work/rounded.png"
+magick -size 512x512 xc:'#192622' "$work/full.png"
+mark "$work/rounded.png" "$work/icon.png"
+mark "$work/full.png" "$work/touch.png"
+magick "$work/icon.png" -resize 32x32 "$out/favicon-32.png"
+# iOS applies its own corner mask; the touch icon is opaque and full bleed.
+magick "$work/touch.png" -alpha off -resize 180x180 "$out/apple-touch-icon.png"
 echo "wrote $out/apple-touch-icon.png and $out/favicon-32.png"

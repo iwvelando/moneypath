@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
-import { BrandMark } from './components/icons';
+import { BrandMark, PathSketch } from './components/icons';
 import { Toolbar } from './components/Toolbar';
 import { Workspace } from './components/Workspace';
 import {
@@ -306,7 +306,7 @@ export function App() {
           <BrandMark />
           <div>
             <h1>moneypath</h1>
-            <p>Personal finance scenario simulator — everything runs in your browser.</p>
+            <p>A little perspective for the road ahead.</p>
           </div>
         </div>
         <div class="tablist tablist--main" role="tablist" aria-label="Views">
@@ -420,6 +420,18 @@ export function App() {
       ) : null}
 
       <main>
+        <div class="page-intro">
+          <div>
+            <p class="eyebrow">{tab === 'workspace' ? 'Your financial landscape' : 'Your forecast'}</p>
+            <h2>{tab === 'workspace' ? 'Life has possibilities. Plan for them.' : 'See where each path takes you.'}</h2>
+            <p class="page-intro__description">
+              {tab === 'workspace'
+                ? 'Start with today, explore the what-ifs, and find your way forward.'
+                : 'Compare your scenarios and follow the details, month by month.'}
+            </p>
+          </div>
+          <PathSketch />
+        </div>
         <div
           id="panel-workspace"
           role="tabpanel"

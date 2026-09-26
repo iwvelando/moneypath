@@ -6,7 +6,7 @@ which move faster than prose can follow. See SPEC.md.*
 
 ## What it is
 
-A single-page static app that is the second front door to the same engine: a structured
+A single-page static app that is the primary interface to the same engine: a structured
 editor for a v2 config, and a reader for the results of running it. The user should be
 able to plan without ever learning the YAML format, and to leave with the YAML if they
 want it.
@@ -66,6 +66,18 @@ The app covers, at a coarse grain:
   its notices shown), downloading the engine-serialized v2 YAML, and downloading the
   engine-rendered CSV, which is byte-for-byte what the CLI produces.
 - **Resetting** to a built-in starter config, and a System / Light / Dark theme.
+
+## Presentation
+
+The interface uses warm paper surfaces, evergreen accents, and system serif headings
+with sans-serif controls. On wide screens, each editor section has an introduction
+beside its fields; on smaller screens these stack. A pinned navigation and run bar
+stays reachable while the plan scrolls. Results use the same palette, with distinct
+liquid and total series and separate headings for the chart and monthly table.
+System, Light, and Dark themes share this layout. All fonts and illustrations remain
+local, with no additional runtime requests. The branching-path illustration is the
+project logo; a simplified square version serves the masthead and favicons. On
+desktop, the chart title sits inside its card, aligned with the summary card headings.
 
 ## User-facing text
 

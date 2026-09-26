@@ -239,15 +239,25 @@ export function ResultsView({
       </div>
 
       <div id="scenario-panel" role="tabpanel" aria-labelledby={`scenario-tab-${index}`} tabIndex={0}>
-        <SummaryPanel
-          metrics={results.metrics[index]}
-          scenarioName={scenarioName}
-          statusOf={statusOf}
-          onApply={onApply}
-        />
+        <div class="results__overview">
+          <div class="results__projection">
+            <div class="results__section-heading">
+              <h3>Net worth over time</h3>
+            </div>
+            <Chart dates={dates} liquid={liquid} total={total} scenarioName={scenarioName} />
+          </div>
+          <SummaryPanel
+            metrics={results.metrics[index]}
+            scenarioName={scenarioName}
+            statusOf={statusOf}
+            onApply={onApply}
+          />
+        </div>
 
-        <Chart dates={dates} liquid={liquid} total={total} scenarioName={scenarioName} />
-
+        <div class="results__section-heading">
+          <h3>Month by month</h3>
+          <p>The numbers behind your path.</p>
+        </div>
         <div class="table-wrap">
           <table class="results-table">
             <caption class="visually-hidden">

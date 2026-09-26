@@ -43,15 +43,17 @@ function Section({ id, title, description, highlighted, icon, actions, children 
       aria-labelledby={`${id}-heading`}
       tabIndex={-1}
     >
-      <div class="section__head">
-        <h3 id={`${id}-heading`}>
-          {icon ? <span class="section__icon">{icon}</span> : null}
-          {title}
-        </h3>
-        {actions}
+      <div class="section__intro">
+        <div class="section__head">
+          <h3 id={`${id}-heading`}>
+            {icon ? <span class="section__icon">{icon}</span> : null}
+            {title}
+          </h3>
+        </div>
+        {description ? <p class="section__description">{description}</p> : null}
+        {actions ? <div class="section__actions">{actions}</div> : null}
       </div>
-      {description ? <p class="section__description">{description}</p> : null}
-      {children}
+      <div class="section__body">{children}</div>
     </section>
   );
 }
