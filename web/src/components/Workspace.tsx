@@ -22,7 +22,6 @@ import { OptimizerControl } from './OptimizerControl';
 import { EventList } from './editor/EventList';
 import { InvestmentList } from './editor/InvestmentList';
 import { LoanList } from './editor/LoanList';
-import { sectionAt } from './scrollSpy';
 import { SectionNav, type SectionRef } from './SectionNav';
 
 interface SectionProps {
@@ -121,28 +120,25 @@ export function Workspace({
     return () => observer.disconnect();
   }, []);
 
-  const [currentId, setCurrentId] = useState('section-simulation');
+  const [openPanel, setOpenPanel] = useState<'sections' | 'optimizer' | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const highlightTimer = useRef<number | null>(null);
 
   const sections: SectionRef[] = useMemo(
     () => [
       { id: 'section-simulation', label: 'Simulation' },
-      { id: 'section-common', label: 'Common settings', stepOnly: true },
-      { id: 'section-scenarios', label: 'Scenarios' },
-      ...config.scenarios.map((scenario, index) => ({
-        id: `section-scenario-${scenario.id}`,
-        label: scenario.name.trim() || `Scenario ${index + 1}`,
-      })),
+      { id: 'section-common', label: 'Common settings' },
+      {
+        id: 'section-scenarios',
+        label: 'Scenarios',
+        children: config.scenarios.map((scenario, index) => ({
+          id: `section-scenario-${scenario.id}`,
+          label: scenario.name.trim() || `Scenario ${index + 1}`,
+        })),
+      },
     ],
     [config.scenarios],
   );
-
-  useEffect(() => {
-    if (!sections.some((section) => section.id === currentId)) {
-      setCurrentId(sections[0]?.id ?? 'section-simulation');
-    }
-  }, [sections, currentId]);
 
   const reveal = useCallback((id: string) => {
     const target = document.getElementById(id);
@@ -153,78 +149,23 @@ export function Workspace({
     target.focus({ preventScroll: true });
   }, []);
 
-  /*
-   * Previous/Next follow the reader's scrolling; jump links stay neutral.
-   * A jump is the exception: its
-   * smooth scroll passes every section in between, so the jumped-to section
-   * holds until scrolling has been quiet for a moment.
-   */
-  const holding = useRef(false);
-  const holdTimer = useRef<number | null>(null);
-  const hold = useCallback(() => {
-    holding.current = true;
-    if (holdTimer.current !== null) window.clearTimeout(holdTimer.current);
-    holdTimer.current = window.setTimeout(() => {
-      holding.current = false;
-      holdTimer.current = null;
-    }, 150);
-  }, []);
-
-  useEffect(() => {
-    const onScroll = () => {
-      if (holding.current) {
-        hold();
-        return;
-      }
-      const bar = document.querySelector('.workbar');
-      // Below the bar by about a heading and its first row, so a section
-      // counts as soon as it has clearly arrived rather than once it fills
-      // the view.
-      const line = (bar?.getBoundingClientRect().bottom ?? 0) + 72;
-      const root = document.documentElement;
-      const atBottom = window.innerHeight + window.scrollY >= root.scrollHeight - 2;
-      const present = sections.filter((section) => document.getElementById(section.id));
-      const tops = present.map((section) => document.getElementById(section.id)!.getBoundingClientRect().top);
-      const index = sectionAt(tops, line, atBottom);
-      if (index >= 0) setCurrentId(present[index]!.id);
-    };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, [sections, hold]);
-
-  useEffect(
-    () => () => {
-      if (holdTimer.current !== null) window.clearTimeout(holdTimer.current);
-    },
-    [],
-  );
-
   const jump = useCallback(
     (id: string) => {
-      hold();
-      setCurrentId(id);
       reveal(id);
       setHighlightId(id);
       if (highlightTimer.current !== null) window.clearTimeout(highlightTimer.current);
       highlightTimer.current = window.setTimeout(() => setHighlightId(null), 1600);
     },
-    [reveal, hold],
+    [reveal],
   );
 
   const optimizers = useMemo(() => findOptimizers(config), [config]);
 
-  /**
-   * Jumping to a single event rather than a section: the stepper follows
-   * the owning scenario, and the row takes focus so it is obvious which
-   * one was meant.
-   */
   const jumpToOptimizer = useCallback(
     (ref: OptimizerRef) => {
-      hold();
-      setCurrentId(`section-scenario-${ref.scenarioId}`);
       reveal(`event-${ref.eventId}`);
     },
-    [reveal, hold],
+    [reveal],
   );
 
   useEffect(
@@ -305,10 +246,17 @@ export function Workspace({
   return (
     <div class="workspace" ref={workspaceRef}>
       <div class="workbar" ref={workbarRef}>
-        <SectionNav sections={sections} currentId={currentId} onJump={jump} />
+        <SectionNav
+          sections={sections}
+          open={openPanel === 'sections'}
+          onOpenChange={(open) => setOpenPanel(open ? 'sections' : null)}
+          onJump={jump}
+        />
         <div class="workbar__actions">
           <OptimizerControl
             refs={optimizers}
+            open={openPanel === 'optimizer'}
+            onOpenChange={(open) => setOpenPanel(open ? 'optimizer' : null)}
             enabled={optimizerEnabled}
             onEnabledChange={onOptimizerEnabledChange}
             running={running}
@@ -319,7 +267,10 @@ export function Workspace({
             class="btn btn--primary"
             disabled={running || !canRun}
             title="Run the forecast — Ctrl+Enter, or Cmd+Enter on a Mac"
-            onClick={onRun}
+            onClick={() => {
+              setOpenPanel(null);
+              onRun();
+            }}
           >
             {running ? 'Running…' : 'Run Forecast'}
           </button>

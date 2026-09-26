@@ -1,80 +1,50 @@
+import { WorkbarDisclosure } from './WorkbarDisclosure';
+
 export interface SectionRef {
   id: string;
   label: string;
-  /**
-   * Reachable with Previous/Next, but given no link of its own. Common
-   * settings sits directly under the short, fixed Simulation section, so a
-   * jump to Simulation already puts it on screen — and the pinned bar has
-   * better uses for the width than a second link to the same place.
-   */
-  stepOnly?: boolean;
+  children?: SectionRef[];
 }
 
 interface SectionNavProps {
   sections: SectionRef[];
-  currentId: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onJump: (id: string) => void;
 }
 
-interface StepProps {
-  target: SectionRef | undefined;
-  direction: 'Previous' | 'Next';
-  onJump: (id: string) => void;
-}
-
-/**
- * Arrow-only stepper. The target's name goes in the accessible name and the
- * tooltip, which says more than a bare "Next" would and costs no width.
- * The two render as a pair: a lone forward arrow beside a horizontally
- * scrolling list reads as "scroll right" rather than "next section".
- */
-function Step({ target, direction, onJump }: StepProps) {
-  const name = target ? `${direction} section: ${target.label}` : `${direction} section`;
-  return (
-    <button
-      type="button"
-      class="btn btn--quiet sectionnav__step"
-      disabled={!target}
-      aria-label={name}
-      title={name}
-      onClick={() => target && onJump(target.id)}
-    >
-      <span aria-hidden="true">{direction === 'Previous' ? '←' : '→'}</span>
-    </button>
-  );
-}
-
-/**
- * Sticky section navigation with previous/next controls. Jumping
- * scrolls to the section and briefly highlights it — see `Workspace`.
- */
-export function SectionNav({ sections, currentId, onJump }: SectionNavProps) {
-  const index = Math.max(
-    0,
-    sections.findIndex((section) => section.id === currentId),
+export function SectionNav({ sections, open, onOpenChange, onJump }: SectionNavProps) {
+  const entry = (section: SectionRef) => (
+    <li key={section.id}>
+      <button
+        type="button"
+        class="sectionnav__link"
+        onClick={() => {
+          onOpenChange(false);
+          onJump(section.id);
+        }}
+      >
+        {section.label}
+      </button>
+      {section.children?.length ? (
+        <ul class="sectionnav__children">{section.children.map(entry)}</ul>
+      ) : null}
+    </li>
   );
 
   return (
     <nav class="sectionnav" aria-label="Editor sections">
-      <div class="sectionnav__steps">
-        <Step target={sections[index - 1]} direction="Previous" onJump={onJump} />
-        <Step target={sections[index + 1]} direction="Next" onJump={onJump} />
-      </div>
-      <ul class="sectionnav__list">
-        {sections
-          .filter((section) => !section.stepOnly)
-          .map((section) => (
-            <li key={section.id}>
-              <button
-                type="button"
-                class="sectionnav__link"
-                onClick={() => onJump(section.id)}
-              >
-                {section.label}
-              </button>
-            </li>
-          ))}
-      </ul>
+      <WorkbarDisclosure
+        id="sectionnav-panel"
+        className="sectionnav"
+        triggerClass="sectionnav__trigger"
+        label="Jump to section"
+        panelLabel="Jump destinations"
+        open={open}
+        onOpenChange={onOpenChange}
+      >
+        <ul class="sectionnav__list">{sections.map(entry)}</ul>
+      </WorkbarDisclosure>
     </nav>
   );
 }
