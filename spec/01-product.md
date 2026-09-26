@@ -42,10 +42,16 @@ In scope:
   from the legacy format.
 - `moneypath serve`: a convenience subcommand that serves the embedded static web app
   locally. It hosts files only — it MUST NOT expose any computation or upload API.
+- **One public deployment**, at `moneypath.isaacvelando.com`: CI in this repository
+  verifies every change and publishes `dist/` on each merge to `main`, by copying the tree
+  to a static bucket behind a CDN and nothing more. The hosting itself (bucket, CDN,
+  certificate, DNS, the deploy role) is infrastructure-as-code in a separate repository,
+  `iwvelando/cloud-accounts`; this one holds no IaC. The deployment is one host among
+  many, not a target the build bends to: `dist/` stays host-agnostic (chapter 02), and
+  the public site computes exactly what `moneypath serve` does, in the visitor's browser.
 
 Out of scope (design must not preclude them, but build none of them):
 
-- Cloud hosting, CDN setup, IaC, CI/CD pipelines.
 - Accounts, authentication, server-side persistence, telemetry.
 - Multi-currency, inflation modeling, Monte Carlo simulation, tax-bracket modeling.
 
@@ -55,5 +61,5 @@ Running forecast computation on a server couples cost and scale to user traffic 
 moment the app is exposed publicly. These calculations are small (a few thousand
 floating-point operations per scenario) and belong on the client. moneypath is therefore
 shaped so the entire web experience can someday be served from a static bucket + CDN for
-pennies: static assets, client-side compute, zero backend. Local use is the current
-target, but nothing in the design may reintroduce a compute backend.
+pennies: static assets, client-side compute, zero backend. That is how the public site
+is served, and nothing in the design may reintroduce a compute backend.
