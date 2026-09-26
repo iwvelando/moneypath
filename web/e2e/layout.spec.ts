@@ -151,3 +151,55 @@ test('monthly events expand by keyboard or row and reset for another forecast', 
   await runForecast(page);
   await expect(table.locator('button[aria-expanded="true"]')).toHaveCount(0);
 });
+
+test('desktop section introductions stay below the bar and stop at their section boundary', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name === 'phone', 'Desktop side-by-side layout');
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await openApp(page);
+  const common = page.locator('#section-common');
+  const intro = common.locator('.section__intro');
+  const bar = page.locator('.workbar');
+  const checkPinned = async () => {
+    await expect.poll(async () => {
+      const heading = await intro.boundingBox();
+      const controls = await bar.boundingBox();
+      return Math.round(heading!.y - controls!.y - controls!.height);
+    }).toBe(24);
+    await expect(intro.getByRole('heading', { name: 'Common settings' })).toBeInViewport();
+  };
+  for (const width of [1440, 800]) {
+    await page.setViewportSize({ width, height: 998 });
+    for (const name of ['Loans', 'Investments']) {
+      await common.getByRole('heading', { name, exact: true }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
+      await checkPinned();
+    }
+    await page.getByRole('button', { name: 'Scenarios', exact: true }).click();
+    await expect(page.locator('#section-scenarios')).toBeFocused();
+    const section = await common.boundingBox();
+    const heading = await intro.boundingBox();
+    expect(heading!.y + heading!.height).toBeLessThanOrEqual(section!.y + section!.height);
+    expect(await overflow(page)).toBeLessThanOrEqual(0);
+  }
+  // A run error makes the pinned bar taller; it must not cover the introduction.
+  await page.getByRole('button', { name: 'Simulation', exact: true }).click();
+  const end = page.locator('#section-simulation').getByRole('textbox', { name: 'End month', exact: true });
+  await end.fill('1900-01');
+  await end.blur();
+  await page.getByRole('button', { name: 'Run Forecast', exact: true }).click();
+  await expect(page.locator('.workbar__error')).toBeVisible();
+  await common.getByRole('heading', { name: 'Loans', exact: true }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  await checkPinned();
+});
+
+test('phone introductions scroll away while jump and run controls stay available', async ({ page }, testInfo) => {
+  test.skip(testInfo.project.name !== 'phone', 'Phone layout');
+  await openApp(page);
+  const common = page.locator('#section-common');
+  await common.getByRole('heading', { name: 'Loans', exact: true }).evaluate((el) => el.scrollIntoView({ block: 'start' }));
+  const intro = await common.locator('.section__intro').boundingBox();
+  expect(intro!.y + intro!.height).toBeLessThan(0);
+  await expect(page.getByRole('button', { name: 'Run Forecast', exact: true })).toBeInViewport();
+  await page.getByRole('button', { name: 'Simulation', exact: true }).click();
+  await expect(page.locator('#section-simulation')).toBeFocused();
+  expect(await overflow(page)).toBeLessThanOrEqual(0);
+});

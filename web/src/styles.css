@@ -609,11 +609,6 @@ p {
   color: var(--text);
 }
 
-.sectionnav__link.is-current {
-  background: var(--accent-soft);
-  color: var(--text);
-}
-
 /* ------------------------------------------------------ optimizer cluster */
 
 /* Switch and list button read as one unit: shared border, no seam. */
@@ -715,7 +710,7 @@ p {
   gap: 36px;
   padding: 36px 0;
   border-bottom: 1px solid var(--border);
-  scroll-margin-top: 92px;
+  scroll-margin-top: calc(var(--workbar-height, 66px) + 24px);
   transition: box-shadow 220ms ease, border-color 220ms ease;
 }
 
@@ -1003,7 +998,7 @@ p {
   border-radius: 4px;
   background: var(--surface);
   padding: 20px 22px 24px;
-  scroll-margin-top: 76px;
+  scroll-margin-top: calc(var(--workbar-height, 66px) + 24px);
 }
 
 /* Programmatic focus, e.g. jumping here from the optimizer finder. */
@@ -1932,6 +1927,19 @@ input[type='checkbox'], input[type='radio'] {
 
 }
 
+/* Keep the section context beside long forms, within its own section.
+   On narrow screens the introduction stays in the document flow. */
+@media (min-width: 761px) {
+  .section__intro {
+    position: sticky;
+    align-self: start;
+    top: calc(var(--workbar-height, 66px) + 24px);
+    max-height: calc(100dvh - var(--workbar-height, 66px) - 48px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+  }
+}
+
 @media (max-width: 760px) {
   .app {
     padding-inline: 20px;
@@ -2049,10 +2057,6 @@ input[type='checkbox'], input[type='radio'] {
   .workbar__actions > .btn {
     flex: 1;
     padding-inline: 8px;
-  }
-
-  .section, .row-card {
-    scroll-margin-top: 140px;
   }
 
   .section__head h3 {

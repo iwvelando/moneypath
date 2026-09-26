@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { HELP } from '../config/help';
 import {
   findReplicates,
@@ -97,6 +97,30 @@ export function Workspace({
   runError,
   onRun,
 }: WorkspaceProps) {
+  const workspaceRef = useRef<HTMLDivElement | null>(null);
+  const workbarRef = useRef<HTMLDivElement | null>(null);
+
+  // Wrapping controls, zoom, and run errors can all change the bar's height.
+  // Share the measured height with sticky introductions and scroll targets.
+  useLayoutEffect(() => {
+    const bar = workbarRef.current;
+    const workspace = workspaceRef.current;
+    if (!bar || !workspace) return;
+    const measure = () => {
+      const height = bar.getBoundingClientRect().height;
+      // The workspace remains mounted while the Results tab hides it.
+      if (height > 0) workspace.style.setProperty('--workbar-height', `${height}px`);
+    };
+    measure();
+    if (typeof ResizeObserver === 'undefined') {
+      window.addEventListener('resize', measure);
+      return () => window.removeEventListener('resize', measure);
+    }
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, []);
+
   const [currentId, setCurrentId] = useState('section-simulation');
   const [highlightId, setHighlightId] = useState<string | null>(null);
   const highlightTimer = useRef<number | null>(null);
@@ -130,7 +154,8 @@ export function Workspace({
   }, []);
 
   /*
-   * The nav follows the reader's scrolling. A jump is the exception: its
+   * Previous/Next follow the reader's scrolling; jump links stay neutral.
+   * A jump is the exception: its
    * smooth scroll passes every section in between, so the jumped-to section
    * holds until scrolling has been quiet for a moment.
    */
@@ -189,8 +214,8 @@ export function Workspace({
   const optimizers = useMemo(() => findOptimizers(config), [config]);
 
   /**
-   * Jumping to a single event rather than a section: the nav follows the
-   * owning scenario, and the row itself takes focus so it is obvious which
+   * Jumping to a single event rather than a section: the stepper follows
+   * the owning scenario, and the row takes focus so it is obvious which
    * one was meant.
    */
   const jumpToOptimizer = useCallback(
@@ -278,8 +303,8 @@ export function Workspace({
     });
 
   return (
-    <div class="workspace">
-      <div class="workbar">
+    <div class="workspace" ref={workspaceRef}>
+      <div class="workbar" ref={workbarRef}>
         <SectionNav sections={sections} currentId={currentId} onJump={jump} />
         <div class="workbar__actions">
           <OptimizerControl

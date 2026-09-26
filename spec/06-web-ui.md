@@ -77,8 +77,12 @@ The app covers, at a coarse grain:
 
 The interface uses warm paper surfaces, evergreen accents, and system serif headings
 with sans-serif controls. On wide screens, each editor section has an introduction
-beside its fields; on smaller screens these stack. A pinned navigation and run bar
-stays reachable while the plan scrolls. Results use the same palette, with distinct
+beside its fields. This introduction stays pinned below the navigation bar while
+its section scrolls, then leaves with the section. On smaller screens introductions
+stack above the fields and scroll normally to preserve working space. A pinned
+navigation and run bar stays reachable while the plan scrolls. Its jump links have
+no active-section highlight; Previous/Next still follow the section on screen.
+Introductions and jump targets allow for the bar's height as it wraps or shows errors. Results use the same palette, with distinct
 liquid and total series and separate headings for the chart and monthly table.
 System, Light, and Dark themes share this layout. All fonts and illustrations remain
 local, with no additional runtime requests. The branching-path illustration is the
