@@ -3,3 +3,12 @@ node_modules/
 dist/
 .vite/
 *.tsbuildinfo
+
+# Written into public/ by `make notices` (scripts/build-notices.mjs) on each build
+public/LICENSE.txt
+public/GO-LICENSE.txt
+public/THIRD-PARTY-NOTICES.txt
+
+# Playwright
+test-results/
+playwright-report/

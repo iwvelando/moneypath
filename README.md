@@ -6,6 +6,10 @@ month-by-month projections of cash and net worth for each. One Go engine, two do
 CLI, and a fully static web app that runs the same engine in your browser via
 WebAssembly (your data never leaves your machine).
 
+**Try it at [moneypath.isaacvelando.com](https://moneypath.isaacvelando.com)**: the same
+static app, served from a CDN. Nothing you enter is sent anywhere; your plan stays in
+your browser's local storage.
+
 moneypath is the successor to
 [finance-forecast](https://github.com/iwvelando/finance-forecast): `moneypath migrate`
 converts its configs, and [spec/07](spec/07-migration.md) lists the behaviors that
@@ -49,7 +53,9 @@ placeholder that `make dist` overwrites locally).
 | `internal/app/` | shared CLI/WASM entry: run pipeline + results JSON |
 | `cmd/moneypath/` | CLI (`forecast`, `migrate`, `serve`, `version`) |
 | `cmd/moneypath-wasm/` | WASM bridge (`moneypathForecast` / `moneypathMigrate` / `moneypathVersion`) |
-| `web/` | static web app (Vite + TypeScript + Preact) |
+| `web/` | static web app (Vite + TypeScript + Preact); `web/e2e/` holds its browser tests |
+| `deploy/` | the production Content-Security-Policy |
+| `.github/` | CI that verifies every change and deploys `main` |
 | `conformance/` | fixture harness, CLI↔WASM parity, static-bundle identity checks |
 
 ## Tests
@@ -58,4 +64,28 @@ placeholder that `make dist` overwrites locally).
 make test-go   # engine/config/render/legacy units + all conformance fixtures
                # + CLI↔WASM parity (needs node; skipped without it)
 make test-web  # frontend vitest suite
+make test-browser  # Playwright against the production build (see DEVELOPMENT.md)
 ```
+
+## Hosting
+
+[moneypath.isaacvelando.com](https://moneypath.isaacvelando.com) is `web/dist/` copied to a
+private S3 bucket behind CloudFront. The bucket, CDN, certificate, DNS, and the deploy role
+are Terraform in [iwvelando/cloud-accounts](https://github.com/iwvelando/cloud-accounts)
+(`sites/moneypath.isaacvelando.com`); this repo holds no infrastructure.
+
+Merging to `main` deploys. `.github/workflows/ci.yml` builds and tests in `check` (Chromium)
+and `webkit` (Safari's engine on an iPhone profile). `deploy` then uploads that exact build
+through the repo's `production` environment, and `smoke` runs the `@smoke` browser tests
+against the live site. A failed run on `main` opens an issue.
+
+CloudFront sends the Content-Security-Policy in `deploy/content-security-policy.txt`. The
+local preview sends it too, so the browser tests run under it. The deploy fails if the
+live header ever differs from the file. A change that needs a new kind of resource
+changes both, cloud-accounts first.
+
+Shared links unfurl into a card: `web/public/og-image.png` shows the starter plan's
+forecast under the app's name. `index.html` points to it by absolute URL, because link
+scrapers need one. Run `make share-card` to re-render it when the app's look changes,
+check it by eye, and commit it.
+

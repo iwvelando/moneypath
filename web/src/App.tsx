@@ -76,6 +76,8 @@ export function App() {
     void loadEngine().then((status) => {
       if (cancelled) return;
       setEngineStatus(status);
+      // Browser tests wait on this rather than guessing when the engine is up.
+      document.documentElement.dataset.engine = status.state;
       if (status.state === 'ready' && status.fallbackReason) {
         pushNotice('warn', status.fallbackReason);
       }

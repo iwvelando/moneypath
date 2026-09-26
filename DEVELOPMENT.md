@@ -25,8 +25,10 @@ One source tree, two artifacts (spec/02-architecture.md, "Build artifacts"):
 
 ```sh
 make wasm    # 1. engine → web/src/engine/moneypath.wasm (GOOS=js GOARCH=wasm)
-make dist    # 2. Vite bundles the app with that wasm as a hashed asset → web/dist/,
-             #    then copies web/dist/ over internal/webembed/dist/
+make dist    # 2. writes license notices into web/public/, Vite bundles the app with
+             #    that wasm as a hashed asset → web/dist/, scripts/check-dist.mjs
+             #    confirms the tree is complete, then web/dist/ is copied over
+             #    internal/webembed/dist/
 make build   # 3. native binary embedding that same tree → bin/moneypath
 ```
 
@@ -70,6 +72,38 @@ any staged Go file that isn't formatted, judging the staged content so a
 partially staged file is checked by what you're actually committing. It skips
 silently when Go isn't installed, so frontend-only work isn't blocked.
 `make fmt-check` gives the same verdict for the whole tree without committing.
+
+### Browser tests
+
+`web/e2e/` holds Playwright tests that run against `vite preview` of the production
+build, under the production Content-Security-Policy. They check that the real engine
+loads, that a forecast and both downloads work, that storage denial is survivable,
+that no view scrolls sideways at 360 px, and the link-preview tags.
+
+```sh
+cd web && npx playwright install chromium webkit   # once
+make test-browser  # Chromium, plus a 360 px phone project for layout.spec.ts
+make test-webkit   # Safari's engine on an iPhone profile (webkit.spec.ts)
+```
+
+Tests wait for `<html data-engine="ready">`, which the app sets once the engine
+answers (`failed` if it can't load). Tests tagged `@smoke` must stay fast and
+read-only: CI runs them against the live site after every deploy, with `BASE_URL`
+set.
+
+Playwright reuses a server already listening on port 4173 outside CI. A leftover
+`vite preview` from another project will quietly serve the wrong app, so check
+`lsof -nP -iTCP:4173 -sTCP:LISTEN` when results make no sense.
+
+### Distribution files
+
+- `make notices` (part of `make dist`) writes `LICENSE.txt`, `GO-LICENSE.txt`, and
+  `THIRD-PARTY-NOTICES.txt` into `web/public/`, and they're gitignored there. The
+  published engine is the Go runtime plus every Go module it imports, so those
+  licenses ship with the site alongside the npm runtime dependencies'.
+- `web/public/og-image.png` (the link-preview card) is committed. `make share-card`
+  re-renders it from the built site; check it by eye before committing.
+  `web/scripts/make-favicons.sh` does the same for the icons.
 
 The project is developed test-first: `testdata/conformance/` and
 `testdata/migration/` are wired into `go test` and are the acceptance gates.

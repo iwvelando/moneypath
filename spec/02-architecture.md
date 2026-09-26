@@ -127,8 +127,8 @@ One source tree produces two artifacts:
 - **The native binary**, which embeds a copy of that same `dist/` tree via `go:embed` to
   back `moneypath serve`.
 
-Setting up any particular host stays out of scope (chapter 01), but these properties of
-the build are not — they are what keep that option open:
+The build never assumes a particular host, even though one public deployment exists
+(chapter 01, "Scope"); these properties of the build are what keep every host an option:
 
 - **Build order.** Three stages: (1) compile the engine wasm (`GOOS=js GOARCH=wasm`);
   (2) run the bundler with that wasm as a *bundler input* — imported as a hashed asset

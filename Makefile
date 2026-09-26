@@ -2,8 +2,9 @@
 #
 # Release build order:
 #   1. `make wasm`  — compile the engine to web/src/engine/moneypath.wasm
-#   2. `make dist`  — bundle the web app (wasm is a hashed bundler input),
-#                     then copy web/dist over the embedded tree
+#   2. `make dist`  — write license notices, bundle the web app (wasm is a
+#                     hashed bundler input), check the tree, then copy
+#                     web/dist over the embedded tree
 #   3. `make build` — native binary embedding that same dist/ tree
 #
 # `make dist` overwrites internal/webembed/dist locally; do not commit the
@@ -12,8 +13,10 @@
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -ldflags "-X main.version=$(VERSION)"
+# CI passes NPM_INSTALL="npm ci" so the lockfile is used exactly.
+NPM_INSTALL ?= npm install --no-fund --no-audit
 
-.PHONY: all build dist wasm fmt fmt-check typecheck test test-go test-web clean serve dev-setup
+.PHONY: all build dist wasm notices fmt fmt-check vet typecheck test test-go test-web test-browser test-webkit share-card clean serve dev-setup
 
 all: build
 
@@ -23,8 +26,14 @@ dev-setup:
 wasm:
 	GOOS=js GOARCH=wasm go build $(LDFLAGS) -o web/src/engine/moneypath.wasm ./cmd/moneypath-wasm
 
-dist: wasm
-	cd web && npm install --no-fund --no-audit && npm run build
+# Licenses the published site must carry: Go's (the engine is the Go runtime),
+# every Go module compiled into the wasm, and the npm runtime dependencies.
+notices:
+	cd web && $(NPM_INSTALL) && node scripts/build-notices.mjs "$$(go env GOROOT)" \
+		$$(cd .. && GOOS=js GOARCH=wasm go list -deps -f '{{with .Module}}{{if not .Main}}{{.Path}}@{{.Version}}={{.Dir}}{{end}}{{end}}' ./cmd/moneypath-wasm | sort -u)
+
+dist: wasm notices
+	cd web && npm run build && node scripts/check-dist.mjs
 	rm -rf internal/webembed/dist
 	cp -R web/dist internal/webembed/dist
 
@@ -36,6 +45,10 @@ build: dist
 # before committing; `fmt-check` is the non-mutating form for a quick verdict.
 fmt:
 	gofmt -w .
+
+vet:
+	go vet ./...
+	GOOS=js GOARCH=wasm go vet ./cmd/moneypath-wasm
 
 fmt-check:
 	@out="$$(gofmt -l .)"; \
@@ -55,6 +68,19 @@ test-go:
 
 test-web:
 	cd web && npm run test -- --run
+
+# Browser tests against `vite preview` of the production build, under the
+# production CSP. Needs `npx playwright install chromium` (and webkit) once.
+test-browser: dist
+	cd web && npx playwright test
+
+test-webkit: dist
+	cd web && WEBKIT=1 npx playwright test --project=webkit
+
+# Re-render the link-preview card from the built site. Check it by eye and
+# commit web/public/og-image.png; it changes only when the site's look does.
+share-card: dist
+	cd web && node scripts/build-share-card.mjs
 
 serve: build
 	./bin/moneypath serve

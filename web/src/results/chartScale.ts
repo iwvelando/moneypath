@@ -95,6 +95,15 @@ export function normalize(value: number, domain: Extent): number {
   return (value - domain.min) / span;
 }
 
+/**
+ * How many date labels fit along a plot this wide: a YYYY-MM label at the axis
+ * font is about 45 px, so each needs roughly 60 px of its own. Six at most,
+ * and never fewer than the two ends.
+ */
+export function dateTickLimit(plotWidth: number): number {
+  return Math.max(2, Math.min(6, Math.floor(plotWidth / 60) + 1));
+}
+
 /** Evenly spaced row indices for the date axis, always including the ends. */
 export function indexTicks(count: number, maxTicks = 6): number[] {
   if (count <= 0) return [];

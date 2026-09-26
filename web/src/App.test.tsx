@@ -99,6 +99,15 @@ describe('the app', () => {
     expect(resultsTab?.disabled).toBe(true);
   });
 
+  it('marks the document once the engine answers, so browser tests can wait on it', async () => {
+    delete document.documentElement.dataset.engine;
+    await act(async () => {
+      render(<App />, container);
+    });
+    await settle();
+    expect(document.documentElement.dataset.engine).toBe('ready');
+  });
+
   it('autosaves editor state to a versioned localStorage key', async () => {
     await act(async () => {
       render(<App />, container);

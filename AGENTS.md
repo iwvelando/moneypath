@@ -47,6 +47,8 @@ make fmt            # gofmt -w . — run after ANY Go edit, and before every com
 make fmt-check      # non-mutating: lists files that still need `make fmt`
 make test-go        # Go units + all fixture/parity/bundle checks
 make test-web       # frontend vitest suite (cd web && npm run test -- --run)
+make test-browser   # Playwright against the production build, under the production CSP
+make test-webkit    # the same on Safari's engine (iPhone profile)
 make typecheck      # tsc --noEmit over web/ — see below; test-web does NOT do this
 make build          # wasm → web/dist → binary with embedded web app
 go build ./cmd/moneypath   # CLI-only build, no Node needed
@@ -63,6 +65,23 @@ with the offending file list, so use it to confirm before staging. The
 pre-commit hook in `.githooks/` also refuses any staged Go file that isn't
 gofmt-clean (it checks the staged content, not the worktree), so a forgotten
 `make fmt` fails the commit rather than landing.
+
+## Deployment
+
+- Merging to `main` deploys to <https://moneypath.isaacvelando.com>
+  (`.github/workflows/ci.yml`); never deploy any other way. Dependabot patch and minor
+  updates merge and deploy on their own once `Verify` passes
+  (`.github/workflows/dependabot-merge.yml`). That leaves the test suites as the only
+  thing between a bad dependency and production.
+- The hosting is Terraform in `iwvelando/cloud-accounts`
+  (`sites/moneypath.isaacvelando.com`), not here. A change that needs a new kind of
+  resource (a worker, a font, a `data:` image, a fetch to anywhere) needs a matching
+  change to `deploy/content-security-policy.txt`. The same change must land in
+  cloud-accounts *before* this repo's change merges, or the deploy fails its CSP check.
+- Keep `@smoke` tests in `web/e2e/` fast and read-only: they run against the live site
+  after every deploy.
+- `web/dist/` must carry the license notices (`make notices`); `check-dist.mjs` fails
+  the build without them.
 
 ## Repo-specific gotchas
 
