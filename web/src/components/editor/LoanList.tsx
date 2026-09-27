@@ -1,10 +1,12 @@
+import { EditorCard, EditorFields, useEditorCards, type EditorCardState } from './EditorCard';
+import { loanSummary } from './summaries';
 import { HELP } from '../../config/help';
 import { cloneLoan, emptyLoan, type LoanModel, type SimulationModel } from '../../config/types';
 import { CheckField, MonthField, NumberField, TextField } from '../fields';
 import { IconPercent } from '../icons';
 import { EventList } from './EventList';
 
-interface LoanCardProps {
+interface LoanCardProps extends EditorCardState {
   loan: LoanModel;
   index: number;
   simulation: SimulationModel;
@@ -13,15 +15,20 @@ interface LoanCardProps {
   onDuplicate: () => void;
 }
 
-function LoanCard({ loan, index, simulation, onChange, onRemove, onDuplicate }: LoanCardProps) {
+function LoanCard({ loan, index, simulation, onChange, onRemove, onDuplicate, open, autoFocus, onOpenChange }: LoanCardProps) {
   const patch = (changes: Partial<LoanModel>) => onChange({ ...loan, ...changes });
   const title = loan.name.trim() || `Loan ${index + 1}`;
 
   return (
-    <li class="row-card">
-      <div class="row-card__head">
-        <h5 class="row-card__title">{title}</h5>
-        <div class="row-card__actions">
+    <EditorCard
+      id={`loan-${loan.id}`}
+      title={title}
+      summary={loanSummary(loan)}
+      open={open}
+      autoFocus={autoFocus}
+      onOpenChange={onOpenChange}
+      actions={
+        <>
           <button type="button" class="btn btn--quiet" aria-label={`Duplicate ${title}`} onClick={onDuplicate}>
             Duplicate
           </button>
@@ -33,115 +40,125 @@ function LoanCard({ loan, index, simulation, onChange, onRemove, onDuplicate }: 
           >
             Remove
           </button>
+        </>
+      }
+    >
+      <EditorFields title="Loan terms">
+        <div class="field-grid">
+          <TextField label="Name" help={HELP.loanName} value={loan.name} required onInput={(name) => patch({ name })} />
+          <NumberField
+            label="Principal"
+            help={HELP.loanPrincipal}
+            value={loan.principal}
+            step={1000}
+            onChange={(principal) => patch({ principal })}
+          />
+          <NumberField
+            label="Down payment"
+            help={HELP.loanDownPayment}
+            value={loan.downPayment}
+            step={500}
+            placeholder="0"
+            onChange={(downPayment) => patch({ downPayment })}
+          />
+          <NumberField
+            label="Interest rate"
+            help={HELP.loanInterestRate}
+            value={loan.interestRate}
+            step={0.05}
+            suffix="% / yr"
+            onChange={(interestRate) => patch({ interestRate })}
+          />
+          <NumberField
+            label="Term"
+            help={HELP.loanTerm}
+            value={loan.term}
+            step={12}
+            suffix="months"
+            onChange={(term) => patch({ term })}
+          />
+          <MonthField
+            label="First payment"
+            help={HELP.loanStartDate}
+            value={loan.startDate}
+            required
+            onChange={(startDate) => patch({ startDate })}
+          />
         </div>
-      </div>
-
-      <div class="field-grid">
-        <TextField label="Name" help={HELP.loanName} value={loan.name} required onInput={(name) => patch({ name })} />
-        <NumberField
-          label="Principal"
-          help={HELP.loanPrincipal}
-          value={loan.principal}
-          step={1000}
-          onChange={(principal) => patch({ principal })}
-        />
-        <NumberField
-          label="Down payment"
-          help={HELP.loanDownPayment}
-          value={loan.downPayment}
-          step={500}
-          placeholder="0"
-          onChange={(downPayment) => patch({ downPayment })}
-        />
-        <NumberField
-          label="Interest rate"
-          help={HELP.loanInterestRate}
-          value={loan.interestRate}
-          step={0.05}
-          suffix="% / yr"
-          onChange={(interestRate) => patch({ interestRate })}
-        />
-        <NumberField
-          label="Term"
-          help={HELP.loanTerm}
-          value={loan.term}
-          step={12}
-          suffix="months"
-          onChange={(term) => patch({ term })}
-        />
-        <MonthField
-          label="First payment"
-          help={HELP.loanStartDate}
-          value={loan.startDate}
-          required
-          onChange={(startDate) => patch({ startDate })}
-        />
-        <NumberField
-          label="Escrow"
-          help={HELP.loanEscrow}
-          value={loan.escrow}
-          step={25}
-          placeholder="0"
-          suffix="/ mo"
-          onChange={(escrow) => patch({ escrow })}
-        />
-        <NumberField
-          label="Mortgage insurance"
-          help={HELP.loanMortgageInsurance}
-          value={loan.mortgageInsurance}
-          step={5}
-          placeholder="0"
-          suffix="/ mo"
-          onChange={(mortgageInsurance) => patch({ mortgageInsurance })}
-        />
-        <NumberField
-          label="MI cutoff"
-          help={HELP.loanMortgageInsuranceCutoff}
-          value={loan.mortgageInsuranceCutoff}
-          step={1}
-          suffix="%"
-          onChange={(mortgageInsuranceCutoff) => patch({ mortgageInsuranceCutoff })}
-        />
-        <NumberField
-          label="Early payoff threshold"
-          help={HELP.loanEarlyPayoffThreshold}
-          value={loan.earlyPayoffThreshold}
-          step={500}
-          onChange={(earlyPayoffThreshold) => patch({ earlyPayoffThreshold })}
-        />
-        <MonthField
-          label="Early payoff month"
-          help={HELP.loanEarlyPayoffDate}
-          value={loan.earlyPayoffDate}
-          onChange={(earlyPayoffDate) => patch({ earlyPayoffDate })}
-        />
-      </div>
-
-      <CheckField
-        label="Sell the property at payoff"
-        help={HELP.loanSellProperty}
-        checked={loan.sellProperty}
-        onChange={(sellProperty) => patch({ sellProperty })}
-      />
-
-      {loan.sellProperty ? (
+      </EditorFields>
+      <EditorFields title="Escrow and insurance">
         <div class="field-grid">
           <NumberField
-            label="Sale price"
-            help={HELP.loanSellPrice}
-            value={loan.sellPrice}
-            step={1000}
-            onChange={(sellPrice) => patch({ sellPrice })}
+            label="Escrow"
+            help={HELP.loanEscrow}
+            value={loan.escrow}
+            step={25}
+            placeholder="0"
+            suffix="/ mo"
+            onChange={(escrow) => patch({ escrow })}
           />
           <NumberField
-            label="Net selling costs"
-            help={HELP.loanSellCostsNet}
-            value={loan.sellCostsNet}
-            step={500}
-            onChange={(sellCostsNet) => patch({ sellCostsNet })}
+            label="Mortgage insurance"
+            help={HELP.loanMortgageInsurance}
+            value={loan.mortgageInsurance}
+            step={5}
+            placeholder="0"
+            suffix="/ mo"
+            onChange={(mortgageInsurance) => patch({ mortgageInsurance })}
+          />
+          <NumberField
+            label="MI cutoff"
+            help={HELP.loanMortgageInsuranceCutoff}
+            value={loan.mortgageInsuranceCutoff}
+            step={1}
+            suffix="%"
+            onChange={(mortgageInsuranceCutoff) => patch({ mortgageInsuranceCutoff })}
           />
         </div>
-      ) : null}
+      </EditorFields>
+      <EditorFields title="Early payoff">
+        <div class="field-grid">
+          <NumberField
+            label="Early payoff threshold"
+            help={HELP.loanEarlyPayoffThreshold}
+            value={loan.earlyPayoffThreshold}
+            step={500}
+            onChange={(earlyPayoffThreshold) => patch({ earlyPayoffThreshold })}
+          />
+          <MonthField
+            label="Early payoff month"
+            help={HELP.loanEarlyPayoffDate}
+            value={loan.earlyPayoffDate}
+            onChange={(earlyPayoffDate) => patch({ earlyPayoffDate })}
+          />
+        </div>
+
+        <CheckField
+          label="Sell the property at payoff"
+          help={HELP.loanSellProperty}
+          checked={loan.sellProperty}
+          onChange={(sellProperty) => patch({ sellProperty })}
+        />
+
+        {loan.sellProperty ? (
+          <div class="field-grid">
+            <NumberField
+              label="Sale price"
+              help={HELP.loanSellPrice}
+              value={loan.sellPrice}
+              step={1000}
+              onChange={(sellPrice) => patch({ sellPrice })}
+            />
+            <NumberField
+              label="Net selling costs"
+              help={HELP.loanSellCostsNet}
+              value={loan.sellCostsNet}
+              step={500}
+              onChange={(sellCostsNet) => patch({ sellCostsNet })}
+            />
+          </div>
+        ) : null}
+      </EditorFields>
 
       <EventList
         title="Extra principal payments"
@@ -151,7 +168,7 @@ function LoanCard({ loan, index, simulation, onChange, onRemove, onDuplicate }: 
         simulation={simulation}
         onChange={(extraPrincipalPayments) => patch({ extraPrincipalPayments })}
       />
-    </li>
+    </EditorCard>
   );
 }
 
@@ -162,6 +179,7 @@ interface LoanListProps {
 }
 
 export function LoanList({ loans, simulation, onChange }: LoanListProps) {
+  const cards = useEditorCards(loans);
   return (
     <div class="list-block">
       <div class="list-block__head">
@@ -172,9 +190,16 @@ export function LoanList({ loans, simulation, onChange }: LoanListProps) {
           Loans
         </h4>
         {/* Prepend so the new card appears next to this button without scrolling. */}
-        <button type="button" class="btn" onClick={() => onChange([emptyLoan(), ...loans])}>
-          Add loan
-        </button>
+        <div class="list-block__actions">
+          {cards.toggleAll}
+          <button type="button" class="btn" onClick={() => {
+            const added = emptyLoan();
+            cards.openNew(added.id);
+            onChange([added, ...loans]);
+          }}>
+            Add loan
+          </button>
+        </div>
       </div>
       {loans.length === 0 ? (
         <p class="empty">None yet.</p>
@@ -183,14 +208,17 @@ export function LoanList({ loans, simulation, onChange }: LoanListProps) {
           {loans.map((loan, index) => (
             <LoanCard
               key={loan.id}
+              {...cards.cardProps(loan.id)}
               loan={loan}
               index={index}
               simulation={simulation}
               onChange={(next) => onChange(loans.map((existing, i) => (i === index ? next : existing)))}
               onRemove={() => onChange(loans.filter((_, i) => i !== index))}
-              onDuplicate={() =>
-                onChange([...loans.slice(0, index + 1), cloneLoan(loan), ...loans.slice(index + 1)])
-              }
+              onDuplicate={() => {
+                const duplicate = cloneLoan(loan);
+                cards.openNew(duplicate.id);
+                onChange([...loans.slice(0, index + 1), duplicate, ...loans.slice(index + 1)]);
+              }}
             />
           ))}
         </ul>

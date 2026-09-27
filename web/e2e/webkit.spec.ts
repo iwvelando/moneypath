@@ -10,6 +10,9 @@ test('an iPhone loads the engine, runs a forecast, and never scrolls sideways', 
   await page.getByRole('button', { name: 'Jump to section' }).tap();
   await page.getByRole('button', { name: 'Common settings', exact: true }).tap();
   await expect(page.locator('#section-common')).toBeFocused();
+  await page.getByRole('button', { name: 'Edit Living expenses', exact: true }).tap();
+  await expect(page.locator('#section-common').getByRole('textbox', { name: 'Amount', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Collapse Living expenses', exact: true }).tap();
   const optimizer = page.getByRole('button', { name: /^Optimizer:/ });
   await optimizer.tap();
   await expect(page.getByRole('checkbox', { name: 'Run the optimizer' })).toBeVisible();

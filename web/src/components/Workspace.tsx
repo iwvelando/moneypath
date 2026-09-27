@@ -143,6 +143,8 @@ export function Workspace({
   const reveal = useCallback((id: string) => {
     const target = document.getElementById(id);
     if (!target) return;
+    // A targeted editor entry may be collapsed; open it before moving there.
+    target.dispatchEvent(new Event('editor:reveal'));
     const gently = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
     // jsdom has no scrollIntoView; the focus below is what the tests observe.
     target.scrollIntoView?.({ behavior: gently ? 'smooth' : 'auto', block: 'start' });

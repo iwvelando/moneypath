@@ -44,7 +44,14 @@ The app covers, at a coarse grain:
 
 - A **config editor** — simulation settings, common events / loans / investments, and
   scenarios with their own events / loans / investments and per-event optimizer blocks.
-  Every field carries a help affordance explaining its semantics; where a field has
+  Existing entries appear as compact summaries and open into inline forms. Several
+  entries can stay open, and each list offers Expand all / Collapse all. Adding or
+  duplicating an entry opens it and focuses its name; jumping to an optimized event
+  reveals its form. Collapsing an entry preserves its values; existing inline field
+  errors are also signposted on the summary, including errors in nested schedules. Summaries describe
+  configured values and schedules, never calculated payments or forecast returns.
+  Loan terms, insurance, early payoff, and investment tax settings are grouped within
+  the forms. Every field carries a help affordance explaining its semantics; where a field has
   meaning defined in chapter 03, the help says what that chapter says.
 - **Running forecasts**, with a busy indicator and errors that appear where the run was
   started, never by moving the reader somewhere else. The editor is long and a tweak is
