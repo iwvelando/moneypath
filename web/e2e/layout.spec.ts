@@ -160,6 +160,9 @@ test('desktop section introductions stay below the bar and stop at their section
   await openApp(page);
   const common = page.locator('#section-common');
   const intro = common.locator('.section__intro');
+  // Exercise pinning within a long section, then verify its boundary.
+  await common.getByRole('button', { name: 'Edit Car loan', exact: true }).click();
+  await common.getByRole('button', { name: 'Edit Brokerage', exact: true }).click();
   const bar = page.locator('.workbar');
   const checkPinned = async () => {
     await expect.poll(async () => {
@@ -306,10 +309,74 @@ ${names.map((name) => `  - name: "${name}"
   expect(box!.y + box!.height).toBeLessThanOrEqual(page.viewportSize()!.height);
   await activate(page.locator('.optctl__entry').last());
   await expect(page.locator('.row-card:focus')).toContainText('Extra savings');
+  await expect(page.locator('.row-card:focus > .editor-card__body')).toBeVisible();
+  await expect(page.locator('.row-card:focus').getByRole('textbox', { name: 'Amount', exact: true })).toBeVisible();
   await activate(optimizer);
   await activate(jump);
   await expect(optimizer).toHaveAttribute('aria-expanded', 'false');
   await activate(page.getByRole('button', { name: 'Run Forecast', exact: true }));
   await expect(page.locator('.workbar__error')).toHaveCount(0);
   await expect(page.getByRole('tab', { name: 'Results' })).toHaveAttribute('aria-selected', 'true');
+});
+
+
+test('compact entries open inline, keep edits, and expose nested investment schedules', async ({ page }) => {
+  await openApp(page);
+  const common = page.locator('#section-common');
+  const rentToggle = common.getByRole('button', { name: 'Edit Living expenses', exact: true });
+  await expect(rentToggle).toHaveAttribute('aria-expanded', 'false');
+  await expect(common.getByRole('textbox', { name: 'Amount', exact: true })).toHaveCount(0);
+  await rentToggle.press('Enter');
+  const rent = common.locator('.editor-card').filter({ has: page.getByRole('button', { name: 'Collapse Living expenses', exact: true }) });
+  await expect(rent.getByRole('group', { name: 'Schedule', exact: true })).toBeVisible();
+  const amount = rent.getByRole('textbox', { name: 'Amount', exact: true });
+  await amount.fill('-4500');
+  await amount.blur();
+  await rent.getByRole('button', { name: 'Collapse details', exact: true }).click();
+  await expect(rentToggle).toContainText('-$4,500.00');
+  await rentToggle.press('Space');
+  await expect(amount).toHaveValue('-4500');
+  await common.getByRole('button', { name: 'Edit Car loan', exact: true }).click();
+  const loan = common.locator('.editor-card').filter({ has: page.getByRole('button', { name: 'Collapse Car loan', exact: true }) });
+  await expect(loan.getByRole('group', { name: 'Loan terms', exact: true })).toBeVisible();
+  await expect(loan.getByRole('group', { name: 'Escrow and insurance', exact: true })).toBeVisible();
+  await expect(loan.getByRole('textbox', { name: 'Principal', exact: true })).toHaveValue('28000');
+  await expect(amount).toBeVisible();
+  await common.getByRole('button', { name: 'Edit Brokerage', exact: true }).click();
+  const account = common.locator('.editor-card').filter({ has: page.getByRole('button', { name: 'Collapse Brokerage', exact: true }) });
+  await expect(account.getByRole('group', { name: 'Taxes and cash flow', exact: true })).toBeVisible();
+  await account.getByRole('button', { name: 'Edit Contribution 1', exact: true }).click();
+  await expect(account.getByRole('textbox', { name: 'Amount', exact: true })).toHaveValue('600');
+  expect(await overflow(page), 'expanded nested editor').toBeLessThanOrEqual(0);
+  await account.getByRole('button', { name: 'Collapse Brokerage', exact: true }).click();
+  await common.getByRole('button', { name: 'Edit Brokerage', exact: true }).click();
+  await expect(account.getByRole('textbox', { name: 'Amount', exact: true })).toHaveValue('600');
+  await runForecast(page);
+});
+
+test('new and duplicated entries open for editing and all entries remain expandable', async ({ page }, testInfo) => {
+  await openApp(page);
+  const common = page.locator('#section-common');
+  await common.getByRole('button', { name: 'Edit Living expenses', exact: true }).click();
+  await common.getByRole('button', { name: 'Duplicate Living expenses', exact: true }).click();
+  const duplicateId = await common.locator('.editor-card').filter({ has: page.getByRole('button', { name: 'Collapse Living expenses', exact: true }) }).last().getAttribute('id');
+  const duplicate = page.locator(`[id="${duplicateId}"]`);
+  await expect(duplicate.getByRole('textbox', { name: 'Name', exact: true })).toBeFocused();
+  await duplicate.getByRole('textbox', { name: 'Name', exact: true }).fill('New spending');
+  await duplicate.getByRole('button', { name: 'Collapse details', exact: true }).click();
+  await expect(common.getByRole('button', { name: 'Edit New spending', exact: true })).toBeVisible();
+  const eventList = common.locator('.section__body > .list-block').first();
+  await eventList.getByRole('button', { name: 'Expand all', exact: true }).click();
+  await expect(eventList.getByRole('textbox', { name: 'Amount', exact: true })).toHaveCount(4);
+  await eventList.getByRole('button', { name: 'Collapse all', exact: true }).click();
+  await expect(eventList.getByRole('textbox', { name: 'Amount', exact: true })).toHaveCount(0);
+  for (const kind of ['event', 'loan', 'investment']) {
+    const add = common.getByRole('button', { name: `Add ${kind}`, exact: true });
+    if (testInfo.project.name === 'phone') await add.tap();
+    else await add.click();
+    const focused = page.locator('input:focus');
+    await expect(focused).toHaveValue('');
+    await expect(focused).toBeInViewport();
+    expect(await overflow(page), `new ${kind}`).toBeLessThanOrEqual(0);
+  }
 });

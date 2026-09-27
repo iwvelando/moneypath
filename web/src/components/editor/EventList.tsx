@@ -1,3 +1,5 @@
+import { EditorCard, EditorFields, useEditorCards, type EditorCardState } from './EditorCard';
+import { eventSummary } from './summaries';
 import { EVENT_KIND_LABEL, HELP, eventAmountHelp } from '../../config/help';
 import {
   OPTIMIZE_FIELDS,
@@ -112,7 +114,7 @@ export interface EventMoveAction {
   onMove: (index: number) => void;
 }
 
-interface EventRowProps {
+interface EventRowProps extends EditorCardState {
   event: EventModel;
   index: number;
   kind: EventKind;
@@ -136,18 +138,25 @@ function EventRow({
   onChange,
   onRemove,
   onDuplicate,
+  open,
+  autoFocus,
+  onOpenChange,
 }: EventRowProps) {
   const patch = (changes: Partial<EventModel>) => onChange({ ...event, ...changes });
   const title = event.name.trim() || `${EVENT_KIND_LABEL[kind]} ${index + 1}`;
   const usePercentage = kind === 'withdrawal' && withdrawalStyle === 'percentage';
 
   return (
-    // The id and tabindex let the optimizer finder scroll this row into
-    // view and focus it (see `Workspace`).
-    <li class="row-card" id={`event-${event.id}`} tabIndex={-1}>
-      <div class="row-card__head">
-        <h5 class="row-card__title">{title}</h5>
-        <div class="row-card__actions">
+    <EditorCard
+      id={`event-${event.id}`}
+      title={title}
+      summary={eventSummary(event, kind, simulation)}
+      open={open}
+      autoFocus={autoFocus}
+      onOpenChange={onOpenChange}
+      badge={event.optimize ? `Optimizer: ${OPTIMIZE_FIELD_LABEL[event.optimize.field]}` : undefined}
+      actions={
+        <>
           {allowOptimize && kind === 'cashflow' && event.optimize === null ? (
             <button
               type="button"
@@ -183,56 +192,64 @@ function EventRow({
           >
             Remove
           </button>
+        </>
+      }
+    >
+      <EditorFields title={`${EVENT_KIND_LABEL[kind]} details`}>
+        <div class="field-grid">
+          <TextField
+            label="Name"
+            help={HELP.eventName}
+            value={event.name}
+            onInput={(name) => patch({ name })}
+          />
+          {usePercentage ? (
+            <NumberField
+              label="Percentage"
+              help={HELP.eventPercentageWithdrawal}
+              value={event.percentage}
+              step={0.5}
+              suffix="%"
+              onChange={(percentage) => patch({ percentage })}
+            />
+          ) : (
+            <NumberField
+              label="Amount"
+              help={eventAmountHelp(kind)}
+              value={event.amount}
+              step={kind === 'cashflow' ? 50 : 25}
+              onChange={(amount) => patch({ amount })}
+            />
+          )}
         </div>
-      </div>
-
-      <div class="field-grid">
-        <TextField
-          label="Name"
-          help={HELP.eventName}
-          value={event.name}
-          onInput={(name) => patch({ name })}
-        />
-        {usePercentage ? (
+      </EditorFields>
+      <EditorFields title="Schedule">
+        <div class="field-grid">
           <NumberField
-            label="Percentage"
-            help={HELP.eventPercentageWithdrawal}
-            value={event.percentage}
-            step={0.5}
-            suffix="%"
-            onChange={(percentage) => patch({ percentage })}
+            label="Frequency"
+            help={HELP.eventFrequency}
+            value={event.frequency}
+            step={1}
+            placeholder="1"
+            suffix="months"
+            onChange={(frequency) => patch({ frequency })}
           />
-        ) : (
-          <NumberField
-            label="Amount"
-            help={eventAmountHelp(kind)}
-            value={event.amount}
-            step={kind === 'cashflow' ? 50 : 25}
-            onChange={(amount) => patch({ amount })}
+          <MonthField
+            label="Start month"
+            help={HELP.eventStartDate}
+            value={event.startDate}
+            placeholder="Simulation start"
+            onChange={(startDate) => patch({ startDate })}
           />
-        )}
-        <NumberField
-          label="Frequency"
-          help={HELP.eventFrequency}
-          value={event.frequency}
-          step={1}
-          placeholder="1"
-          suffix="months"
-          onChange={(frequency) => patch({ frequency })}
-        />
-        <MonthField
-          label="Start month"
-          help={HELP.eventStartDate}
-          value={event.startDate}
-          onChange={(startDate) => patch({ startDate })}
-        />
-        <MonthField
-          label="End month"
-          help={HELP.eventEndDate}
-          value={event.endDate}
-          onChange={(endDate) => patch({ endDate })}
-        />
-      </div>
+          <MonthField
+            label="End month"
+            help={HELP.eventEndDate}
+            value={event.endDate}
+            placeholder="Simulation end"
+            onChange={(endDate) => patch({ endDate })}
+          />
+        </div>
+      </EditorFields>
 
       {event.optimize && kind === 'cashflow' ? (
         <OptimizeForm
@@ -243,7 +260,7 @@ function EventRow({
           onRemove={() => patch({ optimize: null })}
         />
       ) : null}
-    </li>
+    </EditorCard>
   );
 }
 
@@ -273,6 +290,7 @@ export function EventList({
   moveAction,
   onChange,
 }: EventListProps) {
+  const cards = useEditorCards(events);
   const replace = (index: number, event: EventModel) =>
     onChange(events.map((existing, i) => (i === index ? event : existing)));
 
@@ -286,9 +304,16 @@ export function EventList({
           {title}
         </h4>
         {/* Prepend so the new row appears next to this button without scrolling. */}
-        <button type="button" class="btn" onClick={() => onChange([emptyEvent(), ...events])}>
-          Add {EVENT_KIND_LABEL[kind].toLowerCase()}
-        </button>
+        <div class="list-block__actions">
+          {cards.toggleAll}
+          <button type="button" class="btn" onClick={() => {
+            const added = emptyEvent();
+            cards.openNew(added.id);
+            onChange([added, ...events]);
+          }}>
+            Add {EVENT_KIND_LABEL[kind].toLowerCase()}
+          </button>
+        </div>
       </div>
       {description ? <p class="list-block__hint">{description}</p> : null}
       {events.length === 0 ? (
@@ -298,6 +323,7 @@ export function EventList({
           {events.map((event, index) => (
             <EventRow
               key={event.id}
+              {...cards.cardProps(event.id)}
               event={event}
               index={index}
               kind={kind}
@@ -307,9 +333,11 @@ export function EventList({
               moveAction={moveAction}
               onChange={(next) => replace(index, next)}
               onRemove={() => onChange(events.filter((_, i) => i !== index))}
-              onDuplicate={() =>
-                onChange([...events.slice(0, index + 1), cloneEvent(event), ...events.slice(index + 1)])
-              }
+              onDuplicate={() => {
+                const duplicate = cloneEvent(event);
+                cards.openNew(duplicate.id);
+                onChange([...events.slice(0, index + 1), duplicate, ...events.slice(index + 1)]);
+              }}
             />
           ))}
         </ul>

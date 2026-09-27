@@ -1,3 +1,5 @@
+import { EditorCard, EditorFields, useEditorCards, type EditorCardState } from './EditorCard';
+import { investmentSummary } from './summaries';
 import { HELP } from '../../config/help';
 import {
   cloneInvestment,
@@ -28,7 +30,7 @@ function convertWithdrawals(withdrawals: EventModel[], style: WithdrawalStyle): 
   );
 }
 
-interface InvestmentCardProps {
+interface InvestmentCardProps extends EditorCardState {
   investment: InvestmentModel;
   index: number;
   simulation: SimulationModel;
@@ -44,16 +46,24 @@ function InvestmentCard({
   onChange,
   onRemove,
   onDuplicate,
+  open,
+  autoFocus,
+  onOpenChange,
 }: InvestmentCardProps) {
   const patch = (changes: Partial<InvestmentModel>) => onChange({ ...investment, ...changes });
   const title = investment.name.trim() || `Investment ${index + 1}`;
   const style = withdrawalStyleOf(investment);
 
   return (
-    <li class="row-card">
-      <div class="row-card__head">
-        <h5 class="row-card__title">{title}</h5>
-        <div class="row-card__actions">
+    <EditorCard
+      id={`investment-${investment.id}`}
+      title={title}
+      summary={investmentSummary(investment)}
+      open={open}
+      autoFocus={autoFocus}
+      onOpenChange={onOpenChange}
+      actions={
+        <>
           <button type="button" class="btn btn--quiet" aria-label={`Duplicate ${title}`} onClick={onDuplicate}>
             Duplicate
           </button>
@@ -65,68 +75,74 @@ function InvestmentCard({
           >
             Remove
           </button>
+        </>
+      }
+    >
+      <EditorFields title="Account">
+        <div class="field-grid">
+          <TextField
+            label="Name"
+            help={HELP.investmentName}
+            value={investment.name}
+            required
+            onInput={(name) => patch({ name })}
+          />
+          <NumberField
+            label="Starting value"
+            help={HELP.investmentStartingValue}
+            value={investment.startingValue}
+            step={1000}
+            placeholder="0"
+            onChange={(startingValue) => patch({ startingValue })}
+          />
+          <NumberField
+            label="Annual return"
+            help={HELP.investmentAnnualReturnRate}
+            value={investment.annualReturnRate}
+            step={0.1}
+            placeholder="0"
+            suffix="% / yr"
+            onChange={(annualReturnRate) => patch({ annualReturnRate })}
+          />
         </div>
-      </div>
+      </EditorFields>
+      <EditorFields title="Taxes and cash flow">
+        <div class="field-grid">
+          <NumberField
+            label="Growth tax rate"
+            help={HELP.investmentTaxRate}
+            value={investment.taxRate}
+            step={1}
+            placeholder="0"
+            suffix="%"
+            onChange={(taxRate) => patch({ taxRate })}
+          />
+          <NumberField
+            label="Withdrawal tax rate"
+            help={HELP.investmentWithdrawalTaxRate}
+            value={investment.withdrawalTaxRate}
+            step={1}
+            placeholder="0"
+            suffix="%"
+            onChange={(withdrawalTaxRate) => patch({ withdrawalTaxRate })}
+          />
+        </div>
 
-      <div class="field-grid">
-        <TextField
-          label="Name"
-          help={HELP.investmentName}
-          value={investment.name}
-          required
-          onInput={(name) => patch({ name })}
-        />
-        <NumberField
-          label="Starting value"
-          help={HELP.investmentStartingValue}
-          value={investment.startingValue}
-          step={1000}
-          placeholder="0"
-          onChange={(startingValue) => patch({ startingValue })}
-        />
-        <NumberField
-          label="Annual return"
-          help={HELP.investmentAnnualReturnRate}
-          value={investment.annualReturnRate}
-          step={0.1}
-          placeholder="0"
-          suffix="% / yr"
-          onChange={(annualReturnRate) => patch({ annualReturnRate })}
-        />
-        <NumberField
-          label="Growth tax rate"
-          help={HELP.investmentTaxRate}
-          value={investment.taxRate}
-          step={1}
-          placeholder="0"
-          suffix="%"
-          onChange={(taxRate) => patch({ taxRate })}
-        />
-        <NumberField
-          label="Withdrawal tax rate"
-          help={HELP.investmentWithdrawalTaxRate}
-          value={investment.withdrawalTaxRate}
-          step={1}
-          placeholder="0"
-          suffix="%"
-          onChange={(withdrawalTaxRate) => patch({ withdrawalTaxRate })}
-        />
-      </div>
-
-      <div class="check-grid">
-        <CheckField
-          label="Contributions come out of simulated cash"
-          help={HELP.investmentContributionsFromCash}
-          checked={investment.contributionsFromCash}
-          onChange={(contributionsFromCash) => patch({ contributionsFromCash })}
-        />
-        <CheckField
-          label="Can fund loan payoffs"
-          help={HELP.investmentFundLoanPayoffs}
-          checked={investment.fundLoanPayoffs}
-          onChange={(fundLoanPayoffs) => patch({ fundLoanPayoffs })}
-        />
-      </div>
+        <div class="check-grid">
+          <CheckField
+            label="Contributions come out of simulated cash"
+            help={HELP.investmentContributionsFromCash}
+            checked={investment.contributionsFromCash}
+            onChange={(contributionsFromCash) => patch({ contributionsFromCash })}
+          />
+          <CheckField
+            label="Can fund loan payoffs"
+            help={HELP.investmentFundLoanPayoffs}
+            checked={investment.fundLoanPayoffs}
+            onChange={(fundLoanPayoffs) => patch({ fundLoanPayoffs })}
+          />
+        </div>
+      </EditorFields>
 
       <EventList
         title="Contributions"
@@ -165,7 +181,7 @@ function InvestmentCard({
         withdrawalStyle={style}
         onChange={(withdrawals) => patch({ withdrawals: convertWithdrawals(withdrawals, style) })}
       />
-    </li>
+    </EditorCard>
   );
 }
 
@@ -176,6 +192,7 @@ interface InvestmentListProps {
 }
 
 export function InvestmentList({ investments, simulation, onChange }: InvestmentListProps) {
+  const cards = useEditorCards(investments);
   return (
     <div class="list-block">
       <div class="list-block__head">
@@ -186,9 +203,16 @@ export function InvestmentList({ investments, simulation, onChange }: Investment
           Investments
         </h4>
         {/* Prepend so the new card appears next to this button without scrolling. */}
-        <button type="button" class="btn" onClick={() => onChange([emptyInvestment(), ...investments])}>
-          Add investment
-        </button>
+        <div class="list-block__actions">
+          {cards.toggleAll}
+          <button type="button" class="btn" onClick={() => {
+            const added = emptyInvestment();
+            cards.openNew(added.id);
+            onChange([added, ...investments]);
+          }}>
+            Add investment
+          </button>
+        </div>
       </div>
       {investments.length === 0 ? (
         <p class="empty">None yet.</p>
@@ -197,6 +221,7 @@ export function InvestmentList({ investments, simulation, onChange }: Investment
           {investments.map((investment, index) => (
             <InvestmentCard
               key={investment.id}
+              {...cards.cardProps(investment.id)}
               investment={investment}
               index={index}
               simulation={simulation}
@@ -204,13 +229,11 @@ export function InvestmentList({ investments, simulation, onChange }: Investment
                 onChange(investments.map((existing, i) => (i === index ? next : existing)))
               }
               onRemove={() => onChange(investments.filter((_, i) => i !== index))}
-              onDuplicate={() =>
-                onChange([
-                  ...investments.slice(0, index + 1),
-                  cloneInvestment(investment),
-                  ...investments.slice(index + 1),
-                ])
-              }
+              onDuplicate={() => {
+                const duplicate = cloneInvestment(investment);
+                cards.openNew(duplicate.id);
+                onChange([...investments.slice(0, index + 1), duplicate, ...investments.slice(index + 1)]);
+              }}
             />
           ))}
         </ul>
