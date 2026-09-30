@@ -40,6 +40,27 @@ describe('editor state persistence', () => {
     if (outcome.source === 'starter') expect(outcome.reason).toMatch(/incomplete/);
   });
 
+  it('backfills simulation settings that an older save predates, keeping the rest', () => {
+    // A draft saved before cashInterestRate existed has no such key at all.
+    const saved = JSON.parse(encodeEditorState(starterConfig('2025-06')));
+    delete saved.config.simulation.cashInterestRate;
+    saved.config.simulation.startingCash = 12345;
+
+    const outcome = decodeEditorState(JSON.stringify(saved));
+
+    expect(outcome.source).toBe('restored');
+    expect(outcome.config.simulation.cashInterestRate).toBeNull();
+    expect(outcome.config.simulation.startingCash).toBe(12345);
+    expect(outcome.config.simulation.startDate).toBe('2025-06');
+  });
+
+  it('keeps a saved cash interest rate', () => {
+    const config = starterConfig('2025-06');
+    config.simulation.cashInterestRate = 4.5;
+    const outcome = decodeEditorState(encodeEditorState(config));
+    expect(outcome.config.simulation.cashInterestRate).toBe(4.5);
+  });
+
   it('re-keys restored rows so ids stay unique', () => {
     const config = starterConfig('2025-06');
     const outcome = decodeEditorState(encodeEditorState(config));

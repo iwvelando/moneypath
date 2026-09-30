@@ -7,11 +7,15 @@
  * config rather than failing to boot.
  */
 
-import type { ConfigModel } from '../config/types';
+import { emptySimulation, type ConfigModel } from '../config/types';
 import { refreshIds } from '../config/serialize';
 import { starterConfig } from '../config/starter';
 
-/** Bump when the editor model shape changes incompatibly. */
+/**
+ * Bump when the editor model shape changes incompatibly. Adding an optional
+ * setting is compatible: decodeEditorState backfills it, so a bump would only
+ * throw away people's saved drafts.
+ */
 export const EDITOR_STATE_VERSION = 1;
 
 export const KEYS = {
@@ -80,7 +84,10 @@ export function decodeEditorState(raw: string | null): RestoreOutcome {
       reason: 'Saved editor state was incomplete, so the starter config was loaded.',
     };
   }
-  return { source: 'restored', config: refreshIds(stored.config) };
+  // A save from before a setting existed lacks that key; fill it in so the
+  // editor never sees `undefined`. Saved values win over the blanks.
+  const config = { ...stored.config, simulation: { ...emptySimulation(), ...stored.config.simulation } };
+  return { source: 'restored', config: refreshIds(config) };
 }
 
 export function encodeEditorState(config: ConfigModel): string {
