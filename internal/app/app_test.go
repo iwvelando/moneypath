@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/iwvelando/moneypath/config"
@@ -110,5 +111,29 @@ scenarios:
 	}
 	if config.Month(int(value)) != want {
 		t.Errorf("value %v does not match display %q", value, display)
+	}
+}
+
+// Spec chapter 03/04: the cash interest rate reaches results and the echoed
+// config that the web app and CLI share (a 12% rate is 1% a month).
+func TestResultsCarryCashInterest(t *testing.T) {
+	out := runPlan(t, `
+version: 2
+simulation: {startDate: 2025-01, endDate: 2025-02, startingCash: 1200, cashInterestRate: 12}
+recommendations: {emergencyFundMonths: 0}
+scenarios: [{name: plan}]
+`, false)
+	rows, ok := out["rows"].([]any)
+	if !ok || len(rows) != 2 { // the starting row and one simulated month
+		t.Fatalf("rows = %v", out["rows"])
+	}
+	row := rows[1].(map[string]any)
+	liquid := row["values"].([]any)[0].(map[string]any)["liquid"].(float64)
+	if liquid != 1212 {
+		t.Errorf("liquid after one month = %v, want 1212", liquid)
+	}
+	yaml, _ := out["configYaml"].(string)
+	if !strings.Contains(yaml, "cashInterestRate: 12") {
+		t.Errorf("configYaml lost the rate:\n%s", yaml)
 	}
 }

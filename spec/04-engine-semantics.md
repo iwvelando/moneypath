@@ -22,14 +22,16 @@ For each **active** scenario, independently:
   absent), `end` = `simulation.endDate`.
 - If `start ≥ end`, the simulation records only the initial row (no iteration). This MUST
   NOT loop or error.
-- State: `cash = simulation.startingCash`; per-investment states (§4); loan schedules
+- State: `cash = simulation.startingCash`; `r_cash` = the monthly rate derived from
+  `simulation.cashInterestRate` (0 when unset); per-investment states (§4); loan schedules
   precomputed (§3) for the scenario's loans and the common loans.
 - Record the initial row at `start`: `liquid = cash`,
   `total = cash + Σ investment startingValue` (scenario + common investments).
 - For each month `m` = `start+1`, `start+2`, … up to and including `end`:
 
-  1. **Events**: `eventDelta` = sum of `amount` over every occurrence (§2) at `m` among
-     scenario events and common events.
+  1. **Events and cash interest**: `eventDelta` = sum of `amount` over every occurrence
+     (§2) at `m` among scenario events and common events. `cashInterest` =
+     `max(0, cash) · r_cash`, where `cash` is the balance recorded at `m−1` (see §1.1).
   2. **Investments** (§4): process every scenario and common investment for `m`,
      yielding `investmentDelta` (net change in combined investment value),
      `cashContributions` (Σ contributions of investments with
@@ -46,13 +48,39 @@ For each **active** scenario, independently:
   4. **Loans**: `loanDelta` = −Σ of every loan's scheduled payment amount at `m`
      (a schedule is a sparse date→payment map; months without entries contribute 0).
   5. **Update cash**:
-     `cash += eventDelta + loanDelta − cashContributions + withdrawalCash`.
+     `cash += cashInterest + eventDelta + loanDelta − cashContributions + withdrawalCash`.
   6. **Record**: `liquid[m] = cash`;
      `total[m] = cash + (running sum of investment values)`.
   7. Accumulate emergency-fund expense stats (§5) for the first 12 iterated months.
 
 Results per scenario: the date→liquid and date→total series, date→notes lists, and
 metrics (§5, §7).
+
+### 1.1 Cash interest
+
+Cash earns interest the way an investment grows (§4 step 1): simple interest at the
+monthly rate, compounding month over month because each month's interest is added to the
+balance the next month earns on.
+
+- **Base**: the balance at the end of the previous month — before this month's events,
+  loan payments, contributions, and withdrawals. Money that arrives in month `m` starts
+  earning in `m+1`, exactly as a new investment contribution does. Interest is computed
+  on the same balance as the month's other flows regardless of their order, so it can
+  never depend on how events happen to be listed.
+- **Positive balances only**: a zero or negative balance earns nothing. Negative cash is
+  debt, and the engine has no overdraft or borrowing rate; a savings rate MUST NOT be
+  charged against it. Model the cost of carrying debt with a loan.
+- **Untaxed**: no tax is applied. `cashInterestRate` is understood as an after-tax yield
+  (chapter 03, Conventions).
+- **Silent**: interest emits no notes (§6) — it would put a line in every month of every
+  scenario.
+- **Not an expense or an income**: interest is not part of `monthlyExpenses` (§5) and
+  does not change `initialLiquid`, which is the starting balance before any month
+  iterates. It does count in `projectedLiquid` for threshold payoffs (§3.5), because it
+  is cash in hand that month.
+- The initial row (month `start`) carries no interest: `startingCash` is the balance at
+  the end of the month before `start`, and interest first accrues on it in `start+1`.
+- Unrounded, like investment growth; only the rendered CSV rounds to cents.
 
 ## 2. Event occurrences
 

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { emptyEvent, emptyInvestment, emptyLoan } from '../../config/types';
 import { eventSummary, investmentSummary, loanSummary } from './summaries';
 
-const simulation = { startDate: '2026-01', endDate: '2030-12', startingCash: 0, emergencyFundMonths: null };
+const simulation = { startDate: '2026-01', endDate: '2030-12', startingCash: 0, cashInterestRate: null, emergencyFundMonths: null };
 
 describe('editor summaries reflect entered values and documented defaults', () => {
   it('shows signed cash flow, default monthly cadence, and inherited dates', () => {

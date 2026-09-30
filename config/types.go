@@ -20,6 +20,9 @@ type Simulation struct {
 	StartDate    string   `yaml:"startDate,omitempty"`
 	EndDate      string   `yaml:"endDate"`
 	StartingCash *float64 `yaml:"startingCash,omitempty"`
+	// CashInterestRate is the annual percent earned on positive cash,
+	// compounded monthly (spec chapter 03; 0 when unset).
+	CashInterestRate float64 `yaml:"cashInterestRate,omitempty"`
 
 	ResolvedStart        Month   `yaml:"-"`
 	ResolvedEnd          Month   `yaml:"-"`

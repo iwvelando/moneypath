@@ -1,0 +1,23 @@
+description: "Cash interest at 6% a year (0.5% a month): earned on the prior month's balance, compounding; a negative balance earns nothing until it turns positive; emergency-fund figures ignore interest."
+normative: true
+optimize: false
+tolerance: 0.01
+expectedMetrics:
+  - scenario: saver
+    emergencyFund:
+      targetMonths: 6.00
+      averageMonthlyExpenses: 3216.67
+      targetAmount: 19300.00
+      initialLiquid: 20000.00
+      fundedMonths: 6.2176
+      shortfall: 0.00
+      surplus: 700.00
+  - scenario: overdrawn
+    emergencyFund:
+      targetMonths: 6.00
+      averageMonthlyExpenses: 4883.33
+      targetAmount: 29300.00
+      initialLiquid: 20000.00
+      fundedMonths: 4.0956
+      shortfall: 9300.00
+      surplus: 0.00

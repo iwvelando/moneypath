@@ -42,7 +42,7 @@ These are the properties that must survive any redesign:
 
 The app covers, at a coarse grain:
 
-- A **config editor** — simulation settings, common events / loans / investments, and
+- A **config editor** — simulation settings (including the interest rate cash earns), common events / loans / investments, and
   scenarios with their own events / loans / investments and per-event optimizer blocks.
   Existing entries appear as compact summaries and open into inline forms. Several
   entries can stay open, and each list offers Expand all / Collapse all. Adding or

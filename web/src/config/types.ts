@@ -81,6 +81,7 @@ export interface SimulationModel {
   startDate: string;
   endDate: string;
   startingCash: number | null;
+  cashInterestRate: number | null;
   emergencyFundMonths: number | null;
 }
 

@@ -381,7 +381,7 @@ export function Workspace({
       <Section
         id="section-simulation"
         title="Simulation"
-        description="The window the forecast covers and the cash you start with."
+        description="The window the forecast covers, the cash you start with, and what that cash earns."
         highlighted={highlightId === 'section-simulation'}
         icon={<IconSliders />}
       >
@@ -405,6 +405,15 @@ export function Workspace({
             value={config.simulation.startingCash}
             step={500}
             onChange={(startingCash) => patchSimulation({ startingCash })}
+          />
+          <NumberField
+            label="Cash interest rate"
+            help={HELP.cashInterestRate}
+            value={config.simulation.cashInterestRate}
+            step={0.25}
+            placeholder="0"
+            suffix="% / yr"
+            onChange={(cashInterestRate) => patchSimulation({ cashInterestRate })}
           />
           <NumberField
             label="Emergency fund months"

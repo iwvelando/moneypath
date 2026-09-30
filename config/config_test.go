@@ -82,6 +82,7 @@ func TestValidateHardErrors(t *testing.T) {
 		"mixed withdrawals":        "version: 2\nsimulation: {endDate: 2030-01, startingCash: 0}\nscenarios: [{name: a, investments: [{name: i, withdrawals: [{amount: 1}, {percentage: 2}]}]}]\n",
 		"amount and pct":           "version: 2\nsimulation: {endDate: 2030-01, startingCash: 0}\nscenarios: [{name: a, investments: [{name: i, withdrawals: [{amount: 1, percentage: 2}]}]}]\n",
 		"taxRate 100":              "version: 2\nsimulation: {endDate: 2030-01, startingCash: 0}\nscenarios: [{name: a, investments: [{name: i, withdrawalTaxRate: 100}]}]\n",
+		"negative cash interest":   "version: 2\nsimulation: {endDate: 2030-01, startingCash: 0, cashInterestRate: -0.5}\nscenarios: [{name: a}]\n",
 		"downPayment >= principal": "version: 2\nsimulation: {endDate: 2030-01, startingCash: 0}\nscenarios: [{name: a, loans: [{name: l, principal: 100, downPayment: 100, interestRate: 1, term: 12, startDate: 2025-01}]}]\n",
 	}
 	for name, doc := range cases {
@@ -114,6 +115,39 @@ func TestValidateWarnings(t *testing.T) {
 	}
 	if cfg.Simulation.ResolvedStartingCash != 0 {
 		t.Errorf("absent startingCash must resolve to 0")
+	}
+}
+
+// Spec chapter 03: simulation.cashInterestRate is an optional annual percent,
+// default 0, and is a known key (no unknown-key warning).
+func TestCashInterestRate(t *testing.T) {
+	now := mustMonth(t, "2025-01")
+	cases := []struct {
+		name, sim string
+		want      float64
+	}{
+		{"absent defaults to zero", "{endDate: 2030-01, startingCash: 0}", 0},
+		{"explicit zero", "{endDate: 2030-01, startingCash: 0, cashInterestRate: 0}", 0},
+		{"a savings rate", "{endDate: 2030-01, startingCash: 0, cashInterestRate: 4.25}", 4.25},
+	}
+	for _, tc := range cases {
+		cfg, parseWarns, err := Parse([]byte("version: 2\nsimulation: " + tc.sim + "\nscenarios: [{name: a}]\n"))
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if len(parseWarns) != 0 {
+			t.Errorf("%s: cashInterestRate must be a known key, got warnings %v", tc.name, parseWarns)
+		}
+		warns, err := Validate(cfg, now)
+		if err != nil {
+			t.Fatalf("%s: %v", tc.name, err)
+		}
+		if len(warns) != 0 {
+			t.Errorf("%s: unexpected validation warnings %v", tc.name, warns)
+		}
+		if got := cfg.Simulation.CashInterestRate; got != tc.want {
+			t.Errorf("%s: CashInterestRate = %v, want %v", tc.name, got, tc.want)
+		}
 	}
 }
 

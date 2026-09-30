@@ -138,6 +138,7 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 	}
 
 	cash := cfg.Simulation.ResolvedStartingCash
+	cashRate := cfg.Simulation.CashInterestRate / 100 / 12
 	invTotal := 0.0
 	for _, iv := range invs {
 		invTotal += iv.value
@@ -151,7 +152,9 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 	for idx := 1; idx <= n; idx++ {
 		m := start + config.Month(idx)
 
-		// 1. Events.
+		// 1. Cash interest (§1.1) on the prior month's balance, then events.
+		// Only a positive balance earns; debt is not charged the savings rate.
+		cashInterest := math.Max(0, cash) * cashRate
 		eventDelta := 0.0
 		negEvents := 0.0
 		for _, ev := range events {
@@ -177,7 +180,7 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		}
 
 		// 3. Threshold payoff checks (loan order: scenario, then common).
-		projectedLiquid := cash + eventDelta - cashContributions + withdrawalCash
+		projectedLiquid := cash + cashInterest + eventDelta - cashContributions + withdrawalCash
 		var payoffNotes []string
 		for _, ls := range loans {
 			fired, notes, netCashEffect, proceeds := ls.checkThresholdPayoff(m, projectedLiquid, invs, end)
@@ -201,7 +204,7 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		}
 
 		// 5. Cash.
-		cash += eventDelta + loanDelta - cashContributions + withdrawalCash
+		cash += cashInterest + eventDelta + loanDelta - cashContributions + withdrawalCash
 
 		// 6. Record.
 		invTotal = 0.0

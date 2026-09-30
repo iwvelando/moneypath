@@ -132,6 +132,7 @@ export function toConfigDocument(model: ConfigModel): JsonObject {
   put(simulation, 'startDate', model.simulation.startDate.trim());
   put(simulation, 'endDate', model.simulation.endDate.trim());
   put(simulation, 'startingCash', model.simulation.startingCash);
+  put(simulation, 'cashInterestRate', model.simulation.cashInterestRate);
 
   const doc: JsonObject = { version: CONFIG_VERSION, simulation };
 
@@ -315,6 +316,7 @@ export function fromConfigDocument(value: unknown): ConfigModel {
       startDate: readString(simulation['startDate']),
       endDate: readString(simulation['endDate']),
       startingCash: readNumber(simulation['startingCash']),
+      cashInterestRate: readNumber(simulation['cashInterestRate']),
       emergencyFundMonths: readNumber(recommendations['emergencyFundMonths']),
     },
     common: parseCommon(doc['common']),

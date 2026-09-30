@@ -32,6 +32,8 @@ simulation:
   endDate: 2090-01    # required; the simulation stops at this month (inclusive)
   startingCash: 30000.00   # required; cash balance as of the END of the month
                            # preceding startDate
+  cashInterestRate: 4.0    # optional; default 0; annual percent earned on positive
+                           # cash, compounded monthly (chapter 04 §1)
 
 recommendations:      # optional block
   emergencyFundMonths: 6   # optional; default 6; 0 disables the recommendation
@@ -51,8 +53,14 @@ scenarios:            # required; at least one
 
 Validation (hard errors): missing/wrong `version`; missing `simulation.endDate`;
 `endDate` before `startDate`; no scenarios; a scenario without a name; duplicate scenario
-names. `startingCash` MAY be zero or negative (debt) — absent is treated as `0.00` with
-a warning.
+names; `cashInterestRate` below zero. `startingCash` MAY be zero or negative (debt) —
+absent is treated as `0.00` with a warning.
+
+`cashInterestRate` models where the cash is kept: the default `0` is the worst case (a
+non-interest-bearing account), and a higher rate models keeping most or all cash in, say,
+a high-yield savings account. It is one rate for the whole simulation, applies to every
+scenario, and is entered **after tax** like every other money figure (see Conventions).
+Only a positive balance earns it; the engine has no overdraft rate (chapter 04 §1).
 
 Validation (warnings, not errors): an event that starts at/after `simulation.endDate`, or
 ends after it; unknown keys; `startingCash` absent.
