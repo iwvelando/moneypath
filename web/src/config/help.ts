@@ -14,6 +14,12 @@ export const HELP = {
     'Required. The simulation runs through this month, inclusive. It must not be before the start month.',
   startingCash:
     'Required. Cash balance as of the end of the month preceding the start month. It may be zero or negative (debt); leaving it blank is treated as 0.00 with a warning.',
+  cashInterestRate:
+    'Optional, default 0. The yearly interest your cash earns, as a percentage (4.5 means 4.5% per year). ' +
+    'It is added every month to the cash you had at the end of the previous month, so it compounds. ' +
+    'Leave it at 0 to assume your cash sits in an account that pays nothing; enter a higher rate to ' +
+    'model keeping cash in something like a high-yield savings account. Enter the rate after tax. ' +
+    'Only a positive balance earns interest, and it must be at least 0.',
   emergencyFundMonths:
     'Months of average expenses to target for the emergency-fund recommendation. Default 6; 0 disables the recommendation.',
 

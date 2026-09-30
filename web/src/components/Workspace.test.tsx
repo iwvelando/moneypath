@@ -19,7 +19,7 @@ function event(name: string): EventModel {
 
 function makeConfig(commonEvents: EventModel[], scenarios: ScenarioModel[]): ConfigModel {
   return {
-    simulation: { startDate: '', endDate: '2030-12', startingCash: 0, emergencyFundMonths: null },
+    simulation: { startDate: '', endDate: '2030-12', startingCash: 0, cashInterestRate: null, emergencyFundMonths: null },
     common: { events: commonEvents, loans: [], investments: [] },
     scenarios,
   };
@@ -191,6 +191,43 @@ describe('Move to scenario', () => {
     expect(latest.common.events).toHaveLength(0);
     expect(latest.scenarios[0]!.events).toHaveLength(0);
     expect(latest.scenarios[1]!.events.map((e) => e.name)).toEqual(['Bonus']);
+  });
+});
+
+describe('the cash interest rate field', () => {
+  function cashInterestInput(): HTMLInputElement {
+    const label = Array.from(container.querySelectorAll('label')).find(
+      (element) => element.textContent?.trim() === 'Cash interest rate',
+    );
+    if (!label) throw new Error('no "Cash interest rate" field in the Simulation section');
+    return container.querySelector<HTMLInputElement>(`#${CSS.escape(label.htmlFor)}`)!;
+  }
+
+  it('sits in the Simulation section, blank by default, with help', async () => {
+    await mount(makeConfig([], [emptyScenario('plan a')]));
+
+    const input = cashInterestInput();
+    expect(input.value).toBe('');
+    expect(input.closest('#section-simulation')).not.toBeNull();
+    expect(input.placeholder).toBe('0');
+    expect(container.querySelector('button[aria-label="Help: Cash interest rate"]')).not.toBeNull();
+  });
+
+  it('writes what is typed into the simulation settings, and clears back to blank', async () => {
+    await mount(makeConfig([], [emptyScenario('plan a')]));
+
+    const input = cashInterestInput();
+    await act(async () => {
+      input.value = '4.5';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(latest.simulation.cashInterestRate).toBe(4.5);
+
+    await act(async () => {
+      input.value = '';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(latest.simulation.cashInterestRate).toBeNull();
   });
 });
 

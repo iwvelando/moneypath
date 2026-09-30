@@ -11,6 +11,8 @@ groups alternative futures into **scenarios** (e.g. "keep the house" vs. "sell a
 The simulator steps month by month from a start date to an end date and reports, for each
 scenario, the **liquid** balance (cash) and **total** net worth (cash + investments) at
 every month, plus notes about notable happenings (loan payoffs, withdrawals, etc.).
+Cash can earn interest at one plan-wide rate — 0% by default, the worst case of a
+non-interest-bearing account, or higher to model a high-yield savings account.
 
 The more faithfully the user describes their events, the more useful the projection. The
 tool is a deterministic best-guess guide, not a Monte Carlo engine or a financial-advice

@@ -7,11 +7,29 @@
  * config rather than failing to boot.
  */
 
-import type { ConfigModel } from '../config/types';
+import {
+  emptyEvent,
+  emptyInvestment,
+  emptyLoan,
+  emptyOptimize,
+  emptyScenario,
+  emptySimulation,
+  type CommonModel,
+  type ConfigModel,
+  type EventModel,
+  type InvestmentModel,
+  type LoanModel,
+  type ScenarioModel,
+} from '../config/types';
 import { refreshIds } from '../config/serialize';
 import { starterConfig } from '../config/starter';
 
-/** Bump when the editor model shape changes incompatibly. */
+/**
+ * Bump when the editor model shape changes incompatibly (a field renamed,
+ * removed, or changing meaning). Adding a field is compatible: restoring lays
+ * each saved entry over its empty* constructor in config/types.ts, so the new
+ * field arrives blank. A bump would only throw away people's saved drafts.
+ */
 export const EDITOR_STATE_VERSION = 1;
 
 export const KEYS = {
@@ -40,16 +58,77 @@ function storage(): Storage | null {
   }
 }
 
+/** A list a save may predate (backfilled empty) but must not hold as something else. */
+function listsAreArrays(section: unknown, keys: readonly string[]): boolean {
+  if (typeof section !== 'object' || section === null) return false;
+  const record = section as Record<string, unknown>;
+  return keys.every((key) => record[key] === undefined || Array.isArray(record[key]));
+}
+
+const SECTION_LISTS = ['events', 'loans', 'investments'] as const;
+
+/**
+ * The structure withModelDefaults can rely on. Missing lists and fields are
+ * fine (that is what backfilling is for); the wrong kind of value is not.
+ */
 function looksLikeConfig(value: unknown): value is ConfigModel {
   if (typeof value !== 'object' || value === null) return false;
   const candidate = value as Partial<ConfigModel>;
   if (typeof candidate.simulation !== 'object' || candidate.simulation === null) return false;
-  if (typeof candidate.common !== 'object' || candidate.common === null) return false;
+  if (!listsAreArrays(candidate.common, SECTION_LISTS)) return false;
   if (!Array.isArray(candidate.scenarios)) return false;
-  if (!Array.isArray(candidate.common.events)) return false;
-  if (!Array.isArray(candidate.common.loans)) return false;
-  if (!Array.isArray(candidate.common.investments)) return false;
-  return true;
+  return candidate.scenarios.every((scenario) => listsAreArrays(scenario, SECTION_LISTS));
+}
+
+// A saved draft may predate any field in the model, at any depth. Each helper
+// lays the saved object over the blank one (saved values win, nothing is
+// dropped) and does the same for the entries nested inside it. The inputs are
+// Partial because that is what an older save really is.
+type Saved<T> = Partial<T>;
+
+function withEventDefaults(saved: Saved<EventModel>): EventModel {
+  return {
+    ...emptyEvent(),
+    ...saved,
+    optimize: saved.optimize ? { ...emptyOptimize(), ...saved.optimize } : null,
+  };
+}
+
+function withLoanDefaults(saved: Saved<LoanModel>): LoanModel {
+  return {
+    ...emptyLoan(),
+    ...saved,
+    extraPrincipalPayments: (saved.extraPrincipalPayments ?? []).map(withEventDefaults),
+  };
+}
+
+function withInvestmentDefaults(saved: Saved<InvestmentModel>): InvestmentModel {
+  return {
+    ...emptyInvestment(),
+    ...saved,
+    contributions: (saved.contributions ?? []).map(withEventDefaults),
+    withdrawals: (saved.withdrawals ?? []).map(withEventDefaults),
+  };
+}
+
+function withSectionDefaults(saved: Saved<CommonModel>): CommonModel {
+  return {
+    events: (saved.events ?? []).map(withEventDefaults),
+    loans: (saved.loans ?? []).map(withLoanDefaults),
+    investments: (saved.investments ?? []).map(withInvestmentDefaults),
+  };
+}
+
+function withScenarioDefaults(saved: Saved<ScenarioModel>): ScenarioModel {
+  return { ...emptyScenario(''), ...saved, ...withSectionDefaults(saved) };
+}
+
+function withModelDefaults(saved: ConfigModel): ConfigModel {
+  return {
+    simulation: { ...emptySimulation(), ...saved.simulation },
+    common: withSectionDefaults(saved.common),
+    scenarios: saved.scenarios.map(withScenarioDefaults),
+  };
 }
 
 /** Pure decision function, unit-tested independently of the DOM. */
@@ -80,7 +159,7 @@ export function decodeEditorState(raw: string | null): RestoreOutcome {
       reason: 'Saved editor state was incomplete, so the starter config was loaded.',
     };
   }
-  return { source: 'restored', config: refreshIds(stored.config) };
+  return { source: 'restored', config: refreshIds(withModelDefaults(stored.config)) };
 }
 
 export function encodeEditorState(config: ConfigModel): string {

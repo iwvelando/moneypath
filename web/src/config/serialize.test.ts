@@ -24,6 +24,45 @@ describe('editor model -> config document', () => {
     expect(doc['simulation']).toMatchObject({ startDate: '2025-06', startingCash: 25000 });
   });
 
+  it('emits the cash interest rate under simulation, and omits it when blank', () => {
+    const withRate = model();
+    withRate.simulation.cashInterestRate = 4.25;
+    expect(toConfigDocument(withRate)['simulation']).toMatchObject({ cashInterestRate: 4.25 });
+
+    const blank = model();
+    blank.simulation.cashInterestRate = null;
+    expect(toConfigDocument(blank)['simulation']).not.toHaveProperty('cashInterestRate');
+  });
+
+  it('keeps an explicit zero cash interest rate, which is meaningful', () => {
+    const zero = model();
+    zero.simulation.cashInterestRate = 0;
+    expect(toConfigDocument(zero)['simulation']).toMatchObject({ cashInterestRate: 0 });
+  });
+
+  it('reads the cash interest rate back, treating an absent one as blank', () => {
+    const read = fromConfigDocument({
+      version: 2,
+      simulation: { endDate: '2030-01', startingCash: 100, cashInterestRate: 3.5 },
+      scenarios: [{ name: 'a' }],
+    });
+    expect(read.simulation.cashInterestRate).toBe(3.5);
+
+    const absent = fromConfigDocument({
+      version: 2,
+      simulation: { endDate: '2030-01', startingCash: 100 },
+      scenarios: [{ name: 'a' }],
+    });
+    expect(absent.simulation.cashInterestRate).toBeNull();
+  });
+
+  it('round-trips the cash interest rate through YAML text', () => {
+    const original = model();
+    original.simulation.cashInterestRate = 4.5;
+    const again = fromConfigDocument(parseYaml(toConfigYaml(original)));
+    expect(again.simulation.cashInterestRate).toBe(4.5);
+  });
+
   it('omits blank and null fields rather than emitting empty values', () => {
     const event = emptyEvent();
     event.amount = -35;

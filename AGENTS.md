@@ -93,6 +93,15 @@ gofmt-clean (it checks the staged content, not the worktree), so a forgotten
   blanket `git add -A` / `git add .` — stage paths explicitly.
 - The real `moneypath.wasm` is gitignored everywhere (`*.wasm`); the web
   build generates a placeholder when it's absent (`web/scripts/ensure-wasm.mjs`).
+- **A new field in the web editor model (`web/src/config/types.ts`) must also work for
+  saved drafts that predate it**, not just fresh and uploaded configs. The editor
+  restores its draft from `localStorage` (`web/src/state/persistence.ts`), and an old
+  draft has no such key, so the field arrives `undefined` (an input showing
+  "undefined", or a crash). Give the field a blank in the matching `empty*` constructor
+  in `types.ts`; restoring lays each saved entry over that, so nothing more is needed
+  and `EDITOR_STATE_VERSION` stays put (a bump discards everyone's draft). Extend the
+  sparse-draft tests in `persistence.test.ts` if the field sits somewhere they don't
+  reach.
 - Dates are `YYYY-MM` strings at boundaries and `config.Month` ints
   internally; behavior-deciding comparisons round to cents first
   (`round2`, spec/04 preamble).

@@ -9,6 +9,10 @@ simulation:
   endDate: 2090-01
   # Required; cash balance as of the end of the month before startDate.
   startingCash: 30000.00
+  # Optional; annual percent your cash earns, compounded monthly. Default 0 (cash
+  # in an account that pays nothing). Try 4.0 to model a high-yield savings
+  # account. Enter it after tax; only positive cash earns it.
+  cashInterestRate: 0
 
 recommendations:
   # Months of average expenses to target for the emergency-fund

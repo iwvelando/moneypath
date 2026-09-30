@@ -62,6 +62,10 @@ func Validate(cfg *Config, now Month) ([]string, error) {
 		sim.ResolvedStartingCash = *sim.StartingCash
 	}
 
+	if sim.CashInterestRate < 0 {
+		return nil, fmt.Errorf("simulation.cashInterestRate must be at least 0 (got %v)", sim.CashInterestRate)
+	}
+
 	// Recommendations.
 	cfg.ResolvedEmergencyFundMonths = 6
 	if cfg.Recommendations != nil && cfg.Recommendations.EmergencyFundMonths != nil {
