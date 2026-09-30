@@ -131,6 +131,8 @@ function withModelDefaults(saved: ConfigModel): ConfigModel {
   };
 }
 
+const UNREADABLE_STATE_REASON = 'Saved editor state could not be read, so the starter config was loaded.';
+
 /** Pure decision function, unit-tested independently of the DOM. */
 export function decodeEditorState(raw: string | null): RestoreOutcome {
   if (raw === null) return { source: 'starter', config: starterConfig() };
@@ -141,7 +143,7 @@ export function decodeEditorState(raw: string | null): RestoreOutcome {
     return {
       source: 'starter',
       config: starterConfig(),
-      reason: 'Saved editor state could not be read, so the starter config was loaded.',
+      reason: UNREADABLE_STATE_REASON,
     };
   }
   const stored = parsed as Partial<StoredEditorState>;
@@ -159,7 +161,17 @@ export function decodeEditorState(raw: string | null): RestoreOutcome {
       reason: 'Saved editor state was incomplete, so the starter config was loaded.',
     };
   }
-  return { source: 'restored', config: refreshIds(withModelDefaults(stored.config)) };
+  try {
+    return { source: 'restored', config: refreshIds(withModelDefaults(stored.config)) };
+  } catch {
+    // Damage below the shallow check (a null entry, a list holding the wrong
+    // kind of value): discard the whole draft rather than fail to boot.
+    return {
+      source: 'starter',
+      config: starterConfig(),
+      reason: UNREADABLE_STATE_REASON,
+    };
+  }
 }
 
 export function encodeEditorState(config: ConfigModel): string {
