@@ -131,6 +131,8 @@ function withModelDefaults(saved: ConfigModel): ConfigModel {
   };
 }
 
+const UNREADABLE_STATE_REASON = 'Saved editor state could not be read, so the starter config was loaded.';
+
 /** Pure decision function, unit-tested independently of the DOM. */
 export function decodeEditorState(raw: string | null): RestoreOutcome {
   if (raw === null) return { source: 'starter', config: starterConfig() };
@@ -141,7 +143,7 @@ export function decodeEditorState(raw: string | null): RestoreOutcome {
     return {
       source: 'starter',
       config: starterConfig(),
-      reason: 'Saved editor state could not be read, so the starter config was loaded.',
+      reason: UNREADABLE_STATE_REASON,
     };
   }
   const stored = parsed as Partial<StoredEditorState>;
@@ -167,7 +169,7 @@ export function decodeEditorState(raw: string | null): RestoreOutcome {
     return {
       source: 'starter',
       config: starterConfig(),
-      reason: 'Saved editor state could not be read, so the starter config was loaded.',
+      reason: UNREADABLE_STATE_REASON,
     };
   }
 }
