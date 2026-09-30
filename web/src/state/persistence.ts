@@ -159,7 +159,17 @@ export function decodeEditorState(raw: string | null): RestoreOutcome {
       reason: 'Saved editor state was incomplete, so the starter config was loaded.',
     };
   }
-  return { source: 'restored', config: refreshIds(withModelDefaults(stored.config)) };
+  try {
+    return { source: 'restored', config: refreshIds(withModelDefaults(stored.config)) };
+  } catch {
+    // Damage below the shallow check (a null entry, a list holding the wrong
+    // kind of value): discard the whole draft rather than fail to boot.
+    return {
+      source: 'starter',
+      config: starterConfig(),
+      reason: 'Saved editor state could not be read, so the starter config was loaded.',
+    };
+  }
 }
 
 export function encodeEditorState(config: ConfigModel): string {

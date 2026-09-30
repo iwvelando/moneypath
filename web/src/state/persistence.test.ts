@@ -47,6 +47,44 @@ describe('editor state persistence', () => {
     expect(outcome.source).toBe('starter');
   });
 
+  describe('damage below the top-level shape', () => {
+    const starterNotice = 'Saved editor state could not be read, so the starter config was loaded.';
+
+    function expectStarterFallback(mutate: (draft: ReturnType<typeof sparseDraft>) => void) {
+      const draft = sparseDraft();
+      mutate(draft);
+      const outcome = decodeEditorState(JSON.stringify(draft));
+      expect(outcome.source).toBe('starter');
+      expect(outcome).toMatchObject({ reason: starterNotice });
+    }
+
+    it('falls back when a loan holds extra payments that are not a list', () => {
+      expectStarterFallback((draft) => {
+        (draft.config.scenarios[0]!.loans[0] as Record<string, unknown>)['extraPrincipalPayments'] = 'x';
+      });
+    });
+
+    it('falls back when an investment holds contributions that are not a list', () => {
+      expectStarterFallback((draft) => {
+        (draft.config.common.investments[0] as Record<string, unknown>)['contributions'] = {};
+      });
+    });
+
+    it('falls back when an events list holds a null entry', () => {
+      expectStarterFallback((draft) => {
+        (draft.config.common.events as unknown[]).push(null);
+      });
+    });
+
+    it('falls back when the scenario list holds a null', () => {
+      // Already caught by the shallow structure check (with its own notice), so
+      // this one never threw; it is pinned here so it stays a fallback.
+      const draft = sparseDraft();
+      (draft.config.scenarios as unknown[]).push(null);
+      expect(decodeEditorState(JSON.stringify(draft)).source).toBe('starter');
+    });
+  });
+
   it('backfills simulation settings that an older save predates, keeping the rest', () => {
     // A draft saved before cashInterestRate existed has no such key at all.
     const saved = JSON.parse(encodeEditorState(starterConfig('2025-06')));
