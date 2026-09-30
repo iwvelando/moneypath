@@ -26,8 +26,9 @@ These are the properties that must survive any redesign:
   no external fonts or CDNs.
 - **Persistence is localStorage only**, and always optional to the engine: editor state
   under a versioned key, theme choice, optimizer toggle. Corrupt or version-mismatched
-  state falls back to the starter config rather than failing. No cookies, no external
-  storage.
+  state falls back to the starter config rather than failing. A draft saved before a
+  setting existed restores with that setting blank, not discarded. No cookies, no
+  external storage.
 - **It must work from any path prefix** with no configuration: relative URLs for every
   asset including the WASM binary. A host serves `index.html` for the deploy root and
   needs no rewrite rules — the app is a single page with no client-side routing, and no
@@ -42,17 +43,18 @@ These are the properties that must survive any redesign:
 
 The app covers, at a coarse grain:
 
-- A **config editor** — simulation settings (including the interest rate cash earns), common events / loans / investments, and
-  scenarios with their own events / loans / investments and per-event optimizer blocks.
-  Existing entries appear as compact summaries and open into inline forms. Several
-  entries can stay open, and each list offers Expand all / Collapse all. Adding or
-  duplicating an entry opens it and focuses its name; jumping to an optimized event
-  reveals its form. Collapsing an entry preserves its values; existing inline field
-  errors are also signposted on the summary, including errors in nested schedules. Summaries describe
-  configured values and schedules, never calculated payments or forecast returns.
-  Loan terms, insurance, early payoff, and investment tax settings are grouped within
-  the forms. Every field carries a help affordance explaining its semantics; where a field has
-  meaning defined in chapter 03, the help says what that chapter says.
+- A **config editor** — simulation settings (including the interest rate cash earns),
+  common events / loans / investments, and scenarios with their own events / loans /
+  investments and per-event optimizer blocks. Existing entries appear as compact
+  summaries and open into inline forms. Several entries can stay open, and each list
+  offers Expand all / Collapse all. Adding or duplicating an entry opens it and focuses
+  its name; jumping to an optimized event reveals its form. Collapsing an entry
+  preserves its values; existing inline field errors are also signposted on the summary,
+  including errors in nested schedules. Summaries describe configured values and
+  schedules, never calculated payments or forecast returns. Loan terms, insurance, early
+  payoff, and investment tax settings are grouped within the forms. Every field carries
+  a help affordance explaining its semantics; where a field has meaning defined in
+  chapter 03, the help says what that chapter says.
 - **Running forecasts**, with a busy indicator and errors that appear where the run was
   started, never by moving the reader somewhere else. The editor is long and a tweak is
   usually followed by a run, so the run action stays reachable from any scroll position

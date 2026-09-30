@@ -112,6 +112,11 @@ export function newId(prefix = 'i'): string {
   return `${prefix}${counter.toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** A blank optimizer block, for backfilling one a saved draft only partly has. */
+export function emptyOptimize(): OptimizeModel {
+  return { field: 'amount', min: null, max: null, minDate: '', maxDate: '', tolerance: null, maxIterations: null };
+}
+
 /** A blank simulation block: every setting unset, which the engine reads as its default. */
 export function emptySimulation(): SimulationModel {
   return { startDate: '', endDate: '', startingCash: null, cashInterestRate: null, emergencyFundMonths: null };
