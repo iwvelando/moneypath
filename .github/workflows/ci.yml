@@ -97,7 +97,7 @@ jobs:
       # `sync --delete` below would wipe the site if the build came out empty.
       - name: sanity-check build
         run: |
-          for f in index.html 404.html favicon.svg apple-touch-icon.png og-image.png; do test -s "dist/$f"; done
+          for f in index.html 404.html favicon.svg apple-touch-icon.png og-image.png robots.txt sitemap.xml; do test -s "dist/$f"; done
           ls dist/assets/*.js
           test "$(find dist/assets -name '*.wasm' | wc -l)" -eq 1
           test "$(stat -c %s dist/assets/*.wasm)" -gt 1000000
