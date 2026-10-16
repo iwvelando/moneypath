@@ -104,6 +104,10 @@ Playwright reuses a server already listening on port 4173 outside CI. A leftover
 - `web/public/og-image.png` (the link-preview card) is committed. `make share-card`
   re-renders it from the built site; check it by eye before committing.
   `web/scripts/make-favicons.sh` does the same for the icons.
+- `web/public/robots.txt` and `web/public/sitemap.xml` are committed and name the
+  public host's absolute URLs, like the link-preview tags. The sitemap lists the
+  one page there is; `e2e/crawl.spec.ts` holds it to the canonical URL in
+  `index.html`.
 
 The project is developed test-first: `testdata/conformance/` and
 `testdata/migration/` are wired into `go test` and are the acceptance gates.

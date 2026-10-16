@@ -12,6 +12,8 @@ for (const file of [
   'favicon-32.png',
   'apple-touch-icon.png',
   'og-image.png',
+  'robots.txt',
+  'sitemap.xml',
   'LICENSE.txt',
   'GO-LICENSE.txt',
   'THIRD-PARTY-NOTICES.txt',
