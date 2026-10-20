@@ -1,0 +1,17 @@
+version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2026-01
+  startingCash: 10000
+recommendations:
+  emergencyFundMonths: 3
+scenarios:
+  - name: car budget
+    events:
+      - {name: Income, amount: 1000}
+      - {name: Living expenses, amount: -1000}
+      - name: Car
+        amount: -100
+        frequency: 6
+        startDate: 2025-04
+        optimize: {field: amount, min: -5000, max: 0}
