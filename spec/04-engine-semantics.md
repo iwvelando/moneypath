@@ -301,9 +301,13 @@ Date-based early payoffs emit no note (the configured date is the user's own doi
 ## 7. Optimizer
 
 Activated by the `--optimize` flag / `optimize: true` option. Adjusts each event carrying
-an `optimize` block (scenario events only) to the value requiring the **smallest
-adjustment from the configured original** that keeps cash at or above the emergency-fund
-floor.
+an `optimize` block (scenario events only) while keeping cash at or above the
+emergency-fund floor. When the optimized field is `amount` and the configured original
+amount is negative, choose the **smallest feasible signed amount within the bounds**:
+the largest affordable expense, even if the original expense is already feasible.
+For all other targets, choose the value requiring the **smallest adjustment from the
+configured original**. The original amount's sign determines the objective before
+snapping or clamping, including when the bounds cross zero.
 
 Setup:
 - Run the baseline forecast (original config). For each scenario containing targets, the
@@ -330,20 +334,22 @@ Search, per target (each target optimized in turn — scenario order, then event
 with earlier targets' chosen values left in place; floors stay as snapshotted from the
 baseline):
 
-1. Evaluate the original value (snapped, clamped), and both bounds.
-2. Original feasible → keep it. `converged = true`, `iterations = 0`.
-3. Neither bound feasible (and original isn't) → keep the original value,
+1. Set the search anchor to the lower bound for a negative original `amount`, otherwise
+   to the original value (snapped, clamped). Evaluate the anchor and both bounds.
+2. Anchor feasible → choose it. `converged = true`, `iterations = 0`. In particular,
+   an affordable lower bound is chosen for an expense instead of keeping the original.
+3. Neither bound feasible (and anchor isn't) → keep the original value,
    `converged = false`, note:
    `unable to satisfy minimum cash <floor> within bounds <min> to <max>` (floor as
    currency `$1,234.56`; bounds formatted per field — currency for amount, integer for
    frequency, `YYYY-MM` for dates). Report the higher-headroom bound's
    `minCash`/`headroom`.
-4. Otherwise, for each feasible bound, bisect on the interval between the original value
+4. Otherwise, for each feasible bound, bisect on the interval between the anchor
    and that bound: maintain (infeasibleSide, feasibleSide), evaluate the midpoint
    (snapped/clamped), narrow toward the boundary, stop when the interval ≤ `tolerance`
    or `maxIterations` evaluations have been spent; the candidate is the closest feasible
    value found. Choose the candidate (across the one or two feasible directions)
-   minimizing |candidate − original|, ties to the smaller value. `converged = true`;
+   minimizing |candidate − anchor|, ties to the smaller value. `converged = true`;
    `iterations` = total midpoint evaluations.
 
 Applying results: chosen values are written into the config (the exported/echoed YAML

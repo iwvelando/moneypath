@@ -1,6 +1,8 @@
 package engine
 
 import (
+	"fmt"
+	"math"
 	"strings"
 	"testing"
 
@@ -21,7 +23,7 @@ func loadConfig(t *testing.T, doc string) *config.Config {
 	return cfg
 }
 
-// Spec chapter 04 §7 step 2: a feasible original is kept with
+// Spec chapter 04 §7 step 2: a feasible expense lower bound is chosen with
 // iterations = 0 and converged = true.
 func TestOptimizerOriginalFeasible(t *testing.T) {
 	cfg := loadConfig(t, `
@@ -45,7 +47,107 @@ scenarios:
 		t.Errorf("want converged with 0 iterations, got converged=%v iterations=%d", opt.Converged, opt.Iterations)
 	}
 	if opt.Value != -100 {
-		t.Errorf("feasible original must be kept, got %v", opt.Value)
+		t.Errorf("feasible lower bound must be chosen, got %v", opt.Value)
+	}
+}
+
+// Spec chapter 04 §7: negative amount targets maximize affordable spending,
+// using the baseline floor even when the original is already feasible.
+func TestOptimizerLargestAffordableExpense(t *testing.T) {
+	for _, tc := range []struct {
+		name                     string
+		original, min, max, want float64
+	}{
+		{"feasible original", -100, -5000, 0, -3475},
+		{"infeasible original", -4000, -5000, 0, -2500},
+		{"affordable lower bound", -100, -200, 0, -200},
+		{"negative upper bound", -100, -5000, -50, -3475},
+		{"bounds cross zero", -100, -5000, 100, -3475},
+		{"original outside bounds", -100, -2000, -1000, -2000},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := loadConfig(t, fmt.Sprintf(`
+version: 2
+simulation: {startDate: 2025-01, endDate: 2026-01, startingCash: 10000}
+recommendations: {emergencyFundMonths: 3}
+scenarios:
+  - name: plan
+    events:
+      - {name: Income, amount: 1000}
+      - {name: Living expenses, amount: -1000}
+      - name: Car
+        amount: %g
+        frequency: 6
+        startDate: 2025-04
+        optimize: {field: amount, min: %g, max: %g}
+`, tc.original, tc.min, tc.max))
+			baselineFloor := forecast(cfg, Options{}).Scenarios[0].EmergencyFund.TargetAmount
+			res, err := Run(cfg, Options{Optimize: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			opt := res.Scenarios[0].Optimizations[0]
+			if !opt.Converged || math.Abs(opt.Value-tc.want) > 0.010001 {
+				t.Fatalf("want affordable expense %v, got %+v", tc.want, opt)
+			}
+			if opt.Original != tc.original || opt.Floor != baselineFloor {
+				t.Errorf("original or baseline floor changed: %+v", opt)
+			}
+			ev := cfg.Scenarios[0].Events[2]
+			if *ev.Amount != opt.Value || opt.ValueDisplay != money.Format(opt.Value) {
+				t.Errorf("chosen amount must match config and display: %+v", opt)
+			}
+			if e := feasibility(res.Scenarios[0].Liquid, baselineFloor); !e.feasible || e.minCash != opt.MinimumCash {
+				t.Errorf("chosen expense does not preserve the reported cash floor: %+v", opt)
+			}
+			if opt.Value > tc.min {
+				// More spending beyond the search tolerance must breach the floor.
+				setEventField(ev, "amount", opt.Value-0.02)
+				if feasibility(forecast(cfg, Options{}).Scenarios[0].Liquid, baselineFloor).feasible {
+					t.Errorf("larger expense %v is still feasible", *ev.Amount)
+				}
+			} else if opt.Iterations != 0 {
+				t.Errorf("affordable lower bound should need no bisection, got %d iterations", opt.Iterations)
+			}
+		})
+	}
+}
+
+// Other objectives retain the closest feasible value to the original.
+func TestOptimizerIncomeAmount(t *testing.T) {
+	for _, tc := range []struct {
+		name           string
+		original, want float64
+	}{
+		{"feasible original", 2000, 2000},
+		{"infeasible original", 100, 1000},
+		{"zero original", 0, 1000},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := loadConfig(t, fmt.Sprintf(`
+version: 2
+simulation: {startDate: 2025-01, endDate: 2026-01, startingCash: 3000}
+recommendations: {emergencyFundMonths: 3}
+scenarios:
+  - name: plan
+    events:
+      - {name: Rent, amount: -1000}
+      - name: Income
+        amount: %g
+        optimize: {field: amount, min: 0, max: 3000}
+`, tc.original))
+			res, err := Run(cfg, Options{Optimize: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			opt := res.Scenarios[0].Optimizations[0]
+			if !opt.Converged || math.Abs(opt.Value-tc.want) > 0.010001 {
+				t.Errorf("want income %v, got %+v", tc.want, opt)
+			}
+			if tc.original == tc.want && opt.Iterations != 0 {
+				t.Errorf("feasible income should need no bisection, got %d iterations", opt.Iterations)
+			}
+		})
 	}
 }
 

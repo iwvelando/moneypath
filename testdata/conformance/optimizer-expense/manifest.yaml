@@ -1,0 +1,18 @@
+description: A feasible periodic expense is increased to the largest affordable spending within its bounds, preserving the baseline emergency-fund floor rather than keeping the original amount.
+normative: true
+optimize: true
+tolerance: 0.01
+expectedMetrics:
+  - scenario: car budget
+    optimizations:
+      - targetName: Car
+        field: amount
+        original: -100
+        value: -3475
+        originalDisplay: "-$100.00"
+        valueDisplay: "-$3,475.00"
+        floor: 3050
+        minimumCash: 3050
+        headroom: 0
+        iterations: 19
+        converged: true

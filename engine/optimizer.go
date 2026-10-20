@@ -12,8 +12,9 @@ import (
 )
 
 // runOptimized implements spec chapter 04 §7: adjust each event carrying an
-// optimize block to the value requiring the smallest adjustment from the
-// configured original that keeps cash at or above the emergency-fund floor.
+// optimize block while keeping cash at or above the emergency-fund floor.
+// Negative amount targets maximize affordable spending within their bounds;
+// other targets require the smallest adjustment from the configured original.
 // Chosen values are written back into cfg before the final forecast.
 func runOptimized(cfg *config.Config, opts Options) (*Result, error) {
 	if emergencyMonths(cfg, opts) <= 0 {
@@ -114,16 +115,21 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int, floor fl
 		Floor:           floor,
 	}
 
-	orig := snapClamp(original)
-	origEval, err := evaluate(orig)
+	anchor := snapClamp(original)
+	if field == "amount" && original < 0 {
+		// Search for the largest affordable expense, even when the configured
+		// expense already works. The most negative bound is the ideal value.
+		anchor = lo
+	}
+	anchorEval, err := evaluate(anchor)
 	if err != nil {
 		return nil, err
 	}
-	if origEval.feasible {
-		sum.Value = orig
-		sum.ValueDisplay = displayValue(field, orig)
-		sum.MinimumCash = origEval.minCash
-		sum.Headroom = origEval.minCash - floor
+	if anchorEval.feasible {
+		sum.Value = anchor
+		sum.ValueDisplay = displayValue(field, anchor)
+		sum.MinimumCash = anchorEval.minCash
+		sum.Headroom = anchorEval.minCash - floor
 		sum.Converged = true
 		return sum, nil
 	}
@@ -154,7 +160,7 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int, floor fl
 		return sum, nil
 	}
 
-	// Bisect between the (infeasible) original and each feasible bound.
+	// Bisect between the (infeasible) anchor and each feasible bound.
 	type candidate struct {
 		value float64
 		eval  evalResult
@@ -166,7 +172,7 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int, floor fl
 		if !dir.eval.feasible {
 			continue
 		}
-		inf, feas, feasEval := orig, dir.value, dir.eval
+		inf, feas, feasEval := anchor, dir.value, dir.eval
 		for math.Abs(feas-inf) > o.ResolvedTol && iterations < budget {
 			mid := snapClamp((inf + feas) / 2)
 			if mid == inf || mid == feas {
@@ -188,8 +194,8 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int, floor fl
 
 	best := candidates[0]
 	for _, c := range candidates[1:] {
-		dBest := math.Abs(best.value - orig)
-		dC := math.Abs(c.value - orig)
+		dBest := math.Abs(best.value - anchor)
+		dC := math.Abs(c.value - anchor)
 		if dC < dBest || (dC == dBest && c.value < best.value) {
 			best = c
 		}

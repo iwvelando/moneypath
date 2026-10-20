@@ -91,8 +91,9 @@ export const HELP = {
 
   /* optimizer */
   optimizeBlock:
-    'Available on scenario events only. With the optimizer on, the chosen field is adjusted to the value needing the smallest change from what you configured while keeping cash at or above the emergency-fund floor.',
-  optimizeField: 'Which field to adjust: amount, frequency, start month or end month.',
+    'Available on scenario events only. When adjusting a negative amount, the optimizer finds the largest affordable expense within your bounds while keeping cash at or above the emergency-fund floor. For other targets, it finds the smallest change from what you configured that preserves that floor.',
+  optimizeField:
+    'Which field to adjust: amount, frequency, start month or end month. For a negative amount, finds the largest affordable expense within your bounds. For other targets, finds the smallest change needed to preserve the emergency-fund floor.',
   optimizeMin: 'Required lower bound for amount or frequency. For frequency it must be an integer of at least 1.',
   optimizeMax: 'Required upper bound for amount or frequency; it must be greater than the lower bound.',
   optimizeMinDate: 'Required inclusive lower bound month for a start- or end-month search.',
