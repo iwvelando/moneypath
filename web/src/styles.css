@@ -1667,6 +1667,16 @@ nav.sectionnav {
   color: var(--text);
 }
 
+.appfoot a {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.appfoot a:hover {
+  color: var(--text);
+}
+
 /* Stack navigation over the actions on phones. Anchor either panel to the
    full bar so neither can spill off an edge or cover the run button. */
 @media (max-width: 620px) {

@@ -488,6 +488,7 @@ export function App() {
           <span class="tag tag--warn">mock engine — synthetic numbers</span>
         ) : null}
         <span>Nothing you enter leaves your machine.</span>
+        <a href="https://github.com/iwvelando/moneypath">About this site</a>
       </footer>
     </div>
   );
