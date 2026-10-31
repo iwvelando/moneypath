@@ -99,6 +99,18 @@ describe('the app', () => {
     expect(resultsTab?.disabled).toBe(true);
   });
 
+  it('links to the public source repository from the footer', async () => {
+    await act(async () => {
+      render(<App />, container);
+    });
+    await settle();
+
+    const link = Array.from(container.querySelectorAll<HTMLAnchorElement>('footer a')).find(
+      (element) => element.textContent?.trim() === 'About this site',
+    );
+    expect(link?.getAttribute('href')).toBe('https://github.com/iwvelando/moneypath');
+  });
+
   it('marks the document once the engine answers, so browser tests can wait on it', async () => {
     delete document.documentElement.dataset.engine;
     await act(async () => {
