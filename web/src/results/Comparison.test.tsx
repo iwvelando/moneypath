@@ -112,6 +112,27 @@ describe('the scenario comparison', () => {
     expect(legend().map((entry) => entry.value)).toEqual(['$3,000.00', '$2,500.00', '$600.00']);
   });
 
+  it('shows a visible mark for each scenario when the plan only has its initial month', () => {
+    const data = three();
+    data.rows = data.rows.slice(0, 1);
+    show(data);
+    const marks = [...host.querySelectorAll('.comparison__point')];
+    expect(marks).toHaveLength(3);
+    expect(new Set(marks.map((mark) => mark.getAttribute('cy'))).size).toBe(3);
+    for (const mark of marks) {
+      expect(Number(mark.getAttribute('r'))).toBeGreaterThan(0);
+      expect(mark.getAttribute('cx')).toBe('182');
+    }
+    expect(legend().map((entry) => entry.value)).toEqual(['$1,000.00', '$900.00', '$800.00']);
+  });
+
+  it('draws an isolated month between gaps without joining the gaps', () => {
+    show(results({ steady: [value(1, 10), value(2, 20), value(3, 30)], isolated: [null, value(5, 50), null] }));
+    expect(host.querySelectorAll('.comparison__point')).toHaveLength(1);
+    expect(host.querySelector('.comparison__point')?.getAttribute('cx')).toBe('182');
+    expect(host.querySelectorAll('.chart__line')).toHaveLength(1);
+  });
+
   it('switches every scenario to the liquid series', () => {
     show(three());
     act(() => seriesButton('Liquid').click());
@@ -177,6 +198,19 @@ describe('the scenario comparison', () => {
     pointer('pointerleave', 'mouse');
     expect(monthText()).toContain('2026-03');
     expect(monthText()).toContain('final month');
+  });
+
+  it('lets keyboard navigation take over from a stationary pointer', () => {
+    show(three());
+    pointer('pointermove', 'mouse', 292);
+    expect(monthText()).toContain('2026-03');
+    focusChart();
+    key('Home');
+    expect(monthText()).toContain('2026-01');
+    key('ArrowRight');
+    expect(monthText()).toContain('2026-02');
+    pointer('pointermove', 'mouse', 292);
+    expect(monthText()).toContain('2026-03');
   });
 
   it('keeps the month a finger tapped until the next tap elsewhere', () => {

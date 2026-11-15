@@ -155,7 +155,15 @@ function ComparisonChart({ dates, lines, seriesLabel }: ComparisonChartProps) {
           <ChartAxes plot={plot} scale={scale} dates={dates} />
 
           {lines.map((line, i) =>
-            segments(line.values).map((segment, part) => (
+            segments(line.values).map((segment, part) => segment.length === 1 ? (
+              <circle
+                key={`${i}-${part}`}
+                class={`comparison__point chart__scenario-dot--${i % SCENARIO_COLORS}`}
+                cx={x(segment[0]!.index)}
+                cy={y(segment[0]!.value)}
+                r={3.2}
+              />
+            ) : (
               <polyline
                 key={`${i}-${part}`}
                 class={`chart__line ${styleOf(i)}`}

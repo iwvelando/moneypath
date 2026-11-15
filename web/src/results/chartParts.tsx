@@ -122,6 +122,10 @@ export function useMonthCursor(
       onFocus: () => setFocused((current) => current ?? 0),
       onBlur: () => setFocused(null),
       onKeyDown: (event: KeyboardEvent) => {
+        if (!['ArrowRight', 'ArrowLeft', 'Home', 'End', 'Escape'].includes(event.key)) return;
+        // The latest input owns the readout, even while a mouse stays over the chart.
+        setHovered(null);
+        setPinned(false);
         if (event.key === 'ArrowRight') {
           event.preventDefault();
           move(1);

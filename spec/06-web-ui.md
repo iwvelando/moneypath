@@ -80,7 +80,9 @@ The app covers, at a coarse grain:
   one whose cash goes negative. Its legend names each scenario and doubles as the month
   readout: it lists every scenario's value for the month under the pointer, a tap, or
   the keyboard cursor, and for the final month otherwise. A plan with one scenario has
-  no Compare entry. The comparison shows only figures the engine reported.
+  no Compare entry. An isolated recorded month is drawn as a point so a plan
+  containing only its initial month remains visible. The comparison shows only figures
+  the engine reported.
   Editing the config
   marks all of these as describing an earlier version of the plan; they stay readable,
   being the baseline the next run will be compared against.

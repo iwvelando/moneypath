@@ -521,7 +521,9 @@ scenarios:
 
   // By keyboard: focus the chart and walk the months.
   const chart = comparison.locator('.chart__svg');
+  if (!phone) await page.mouse.move(plot.x + plot.width * 0.9, plot.y + plot.height * 0.5);
   await chart.focus();
+  await chart.press('Home');
   await expect(month).toContainText('2026-01');
   const first = await values.allTextContents();
   await chart.press('ArrowRight');
@@ -649,4 +651,33 @@ ${names.map((name, i) => `  - name: ${name}\n    events:\n      - name: Income\n
     .toBeLessThanOrEqual(1);
   await expect(page.locator('.comparison')).toBeVisible();
   expect(await overflow(page), 'comparison with many scenarios').toBeLessThanOrEqual(0);
+});
+
+test('a comparison with only the initial month still draws every scenario', async ({ page }) => {
+  await openApp(page);
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'initial-month.yaml',
+    mimeType: 'application/yaml',
+    buffer: Buffer.from(`version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2026-01
+  startingCash: 5000
+scenarios:
+  - name: First
+  - name: Second
+`),
+  });
+  await runForecast(page);
+  await page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab', { name: 'Compare' }).click();
+  const comparison = page.locator('.comparison');
+  await expect(comparison.locator('.comparison__value')).toHaveText(['$5,000.00', '$5,000.00']);
+  const points = comparison.locator('.comparison__point');
+  await expect(points).toHaveCount(2);
+  for (const point of await points.all()) {
+    const box = (await point.boundingBox())!;
+    expect(box.width).toBeGreaterThan(0);
+    expect(box.height).toBeGreaterThan(0);
+  }
+  expect(await overflow(page)).toBeLessThanOrEqual(0);
 });
