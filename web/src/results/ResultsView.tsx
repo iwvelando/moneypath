@@ -197,6 +197,19 @@ export function ResultsView({
     (event.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
   };
 
+  // The tab a pointer sent focus to, which therefore shows no focus ring.
+  const [quietTab, setQuietTab] = useState<number | null>(null);
+
+  // From a row of the comparison's key figures. Focus goes to the scenario's
+  // tab, since the row that had it is about to leave the page.
+  const openScenario = (scenario: number, byPointer: boolean) => {
+    setSelected(scenario);
+    setQuietTab(byPointer ? scenario : null);
+    const tab = document.getElementById(tabId(scenario));
+    tab?.focus();
+    tab?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  };
+
   const scenarioName = results.scenarios[index] ?? '';
 
   // One Total series per scenario, for the sparkline in each tab.
@@ -241,7 +254,8 @@ export function ResultsView({
               aria-selected={i === current}
               aria-controls="scenario-panel"
               tabIndex={i === current ? 0 : -1}
-              class={i === current ? 'tablist__tab is-active' : 'tablist__tab'}
+              class={`tablist__tab${i === current ? ' is-active' : ''}${i === quietTab ? ' is-focus-quiet' : ''}`}
+              onBlur={() => setQuietTab(null)}
               onClick={(event) => choose(event, i)}
               onKeyDown={(event) => stepTab(event, i)}
             >
@@ -279,9 +293,7 @@ export function ResultsView({
 
       <div id="scenario-panel" role="tabpanel" aria-labelledby={tabId(current)} tabIndex={0}>
         {comparing ? (
-          <div class="results__projection results__comparison">
-            <Comparison results={results} />
-          </div>
+          <Comparison results={results} onOpenScenario={openScenario} />
         ) : (
           <>
         <div class="results__overview">

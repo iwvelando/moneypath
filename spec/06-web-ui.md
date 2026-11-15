@@ -81,8 +81,13 @@ The app covers, at a coarse grain:
   readout: it lists every scenario's value for the month under the pointer, a tap, or
   the keyboard cursor, and for the final month otherwise. A plan with one scenario has
   no Compare entry. An isolated recorded month is drawn as a point so a plan
-  containing only its initial month remains visible. The comparison shows only figures
-  the engine reported.
+  containing only its initial month remains visible. Under the chart, a table of key
+  figures has one row per scenario, in the plan's order: the lowest cash and the month
+  it is reached, cash and total at the end of the plan, and the emergency-fund
+  shortfall or surplus. The emergency-fund column is left out when the recommendation
+  is disabled, never shown as zero. A row leads to its scenario's own view: choosing
+  the scenario's name, or anywhere on its row, selects that scenario's tab and moves
+  focus to it. The comparison shows only figures the engine reported.
   Editing the config
   marks all of these as describing an earlier version of the plan; they stay readable,
   being the baseline the next run will be compared against.
@@ -107,7 +112,10 @@ Run Forecast remains directly accessible, including while either panel is open.
 Introductions and jump targets allow for the bar's height as it wraps or shows errors. Results use the same palette, with distinct
 liquid and total series and separate headings for the chart and monthly table. In the
 comparison each scenario's line has its own color and its own dash pattern, so lines
-stay distinguishable in both themes and without relying on color; the scenario tabs
+stay distinguishable in both themes and without relying on color, and the same line
+marks its row in the key figures. That table stays a table to assistive technology at
+every width; on a phone its rows stack, each figure under its column's name, so nothing
+scrolls sideways. The scenario tabs
 stay on one row that scrolls sideways within the page when there are more than fit,
 on any screen width, and choosing a tab brings it fully into view.
 System, Light, and Dark themes share this layout. All fonts and illustrations remain

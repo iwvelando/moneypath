@@ -63,7 +63,9 @@ The WASM module exposes to JavaScript (names normative):
   ],
   "csv": "…engine-rendered CSV, exactly as the CLI would print…",
   "metrics": [
-    {"emergencyFund": {"targetMonths": 6, "averageMonthlyExpenses": 0.0,
+    {"keyFigures": {"lowestCash": 0.0, "lowestCashDate": "2025-06",
+                    "endingCash": 0.0, "endingTotal": 0.0},
+     "emergencyFund": {"targetMonths": 6, "averageMonthlyExpenses": 0.0,
                        "targetAmount": 0.0, "initialLiquid": 0.0,
                        "fundedMonths": 0.0, "shortfall": 0.0, "surplus": 0.0},
      "optimizations": [
@@ -82,6 +84,10 @@ The WASM module exposes to JavaScript (names normative):
 `rows` is sorted ascending by date; `values` and `metrics` are index-aligned with
 `scenarios`. `liquid`/`total` are omitted (JSON `null` or absent) for dates a scenario has
 no value for. Numbers are raw float64 values; formatting is the consumer's job.
+
+`keyFigures` (chapter 04 §8) is present for every scenario; `lowestCashDate` is a
+`YYYY-MM` string. `emergencyFund` is absent when the recommendation is disabled, and
+`optimizations` when the optimizer produced no summary for the scenario.
 
 In `optimizations`, `original` and `value` are the raw numbers the optimizer searched over
 — currency for `amount`, a count for `frequency`, a month index (`year·12 + month − 1`)

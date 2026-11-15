@@ -4,18 +4,12 @@ import type { ForecastResults } from '../engine/types';
 import { formatMoney, isNegativeMoney } from '../util/format';
 import { ChartAxes, plotOf, useChartWidth, useMonthCursor } from './chartParts';
 import { extentOf, segments, valueScale, type Series } from './chartScale';
+import { KeyFigures } from './KeyFigures';
+import { SCENARIO_COLORS, ScenarioSample, styleOf } from './scenarioStyle';
 
 // No end-of-line labels here: the legend carries each scenario's value. The
 // right pad only has to hold half of the last date label.
 const PAD = { top: 18, right: 28, bottom: 34, left: 72 };
-
-/**
- * How many colors and line patterns the stylesheet defines for scenarios.
- * They differ in length so a pattern never repeats with the same color until
- * every combination has been used.
- */
-export const SCENARIO_COLORS = 6;
-export const SCENARIO_DASHES = 5;
 
 type SeriesKey = 'total' | 'liquid';
 
@@ -24,20 +18,19 @@ const SERIES: { key: SeriesKey; label: string }[] = [
   { key: 'liquid', label: 'Liquid' },
 ];
 
-function styleOf(index: number): string {
-  return `chart__scenario--${index % SCENARIO_COLORS} chart__dash--${index % SCENARIO_DASHES}`;
-}
-
 interface ComparisonProps {
   results: ForecastResults;
+  /** `byPointer` is false when the keyboard chose the scenario. */
+  onOpenScenario: (index: number, byPointer: boolean) => void;
 }
 
 /**
- * Every scenario of a run on one chart, for one series at a time. The legend
- * doubles as the readout: it shows each scenario's value for the month under
- * the pointer or keyboard cursor, and for the final month otherwise.
+ * Every scenario of a run on one chart, for one series at a time, above a
+ * table of each scenario's key figures. The legend doubles as the readout: it
+ * shows each scenario's value for the month under the pointer or keyboard
+ * cursor, and for the final month otherwise.
  */
-export function Comparison({ results }: ComparisonProps) {
+export function Comparison({ results, onOpenScenario }: ComparisonProps) {
   const [seriesKey, setSeriesKey] = useState<SeriesKey>('total');
   const seriesLabel = SERIES.find((series) => series.key === seriesKey)?.label ?? '';
 
@@ -53,6 +46,7 @@ export function Comparison({ results }: ComparisonProps) {
 
   return (
     <div class="comparison">
+      <div class="results__projection results__comparison">
       <div class="results__section-heading comparison__heading">
         <h3>Scenarios side by side</h3>
         <div class="comparison__series" role="group" aria-label="Series to compare">
@@ -70,6 +64,8 @@ export function Comparison({ results }: ComparisonProps) {
         </div>
       </div>
       <ComparisonChart dates={dates} lines={lines} seriesLabel={seriesLabel} />
+      </div>
+      <KeyFigures results={results} onOpenScenario={onOpenScenario} />
     </div>
   );
 }
@@ -118,9 +114,7 @@ function ComparisonChart({ dates, lines, seriesLabel }: ComparisonChartProps) {
           const value = valueAt(line.values);
           return (
             <li key={i}>
-              <svg class="comparison__sample" viewBox="0 0 28 8" width="28" height="8" aria-hidden="true">
-                <line class={`chart__line-sample ${styleOf(i)}`} x1="1" x2="27" y1="4" y2="4" />
-              </svg>
+              <ScenarioSample index={i} />
               <span class="comparison__name">{line.name}</span>
               <span
                 class={

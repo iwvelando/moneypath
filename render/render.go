@@ -63,6 +63,10 @@ func Pretty(res *engine.Result) string {
 	dates := res.Dates()
 	for _, sc := range res.Scenarios {
 		fmt.Fprintf(&b, "--- Results for scenario %s ---\n", sc.Name)
+		kf := sc.KeyFigures
+		fmt.Fprintf(&b, "Lowest cash: %s in %s | Ending cash: %s | Ending total: %s\n",
+			Currency(kf.LowestCash), kf.LowestCashDate.String(),
+			Currency(kf.EndingCash), Currency(kf.EndingTotal))
 		if ef := sc.EmergencyFund; ef != nil {
 			fmt.Fprintf(&b, "Emergency fund target (%.1f months): %s | Avg monthly expenses: %s",
 				ef.TargetMonths, Currency(ef.TargetAmount), Currency(ef.AverageMonthlyExpenses))

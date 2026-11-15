@@ -31,8 +31,39 @@ type ScenarioResult struct {
 	Liquid        []float64
 	Total         []float64
 	Notes         [][]string
+	KeyFigures    KeyFigures
 	EmergencyFund *EmergencyFund
 	Optimizations []*Optimization
+}
+
+// KeyFigures are the per-scenario figures a comparison between scenarios
+// turns on (spec chapter 04 §8).
+type KeyFigures struct {
+	LowestCash     float64
+	LowestCashDate config.Month
+	EndingCash     float64
+	EndingTotal    float64
+}
+
+// keyFigures reads a scenario's key figures from its recorded series, whose
+// index i is month start+i. Lowest cash is decided in whole cents and the
+// earliest month attaining it wins (spec chapter 04 §8).
+func keyFigures(start config.Month, liquid, total []float64) KeyFigures {
+	if len(liquid) == 0 || len(total) == 0 {
+		return KeyFigures{LowestCashDate: start}
+	}
+	lowest := 0
+	for i, v := range liquid {
+		if round2(v) < round2(liquid[lowest]) {
+			lowest = i
+		}
+	}
+	return KeyFigures{
+		LowestCash:     liquid[lowest],
+		LowestCashDate: start + config.Month(lowest),
+		EndingCash:     liquid[len(liquid)-1],
+		EndingTotal:    total[len(total)-1],
+	}
 }
 
 type EmergencyFund struct {
@@ -221,6 +252,8 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 			expenseMonths++
 		}
 	}
+
+	sr.KeyFigures = keyFigures(start, sr.Liquid, sr.Total)
 
 	if emMonths > 0 {
 		ef := &EmergencyFund{TargetMonths: emMonths, InitialLiquid: sr.Liquid[0]}

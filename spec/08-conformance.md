@@ -15,8 +15,9 @@ description: what this case exercises
 normative: true          # false = informative only (do not gate CI on it)
 optimize: false          # run with the optimizer enabled?
 tolerance: 0.01          # max |actual − expected| per numeric cell; notes/dates exact
-expectedMetrics: […]     # optional: per-scenario emergency-fund and optimization
-                         # metrics (rounded to 4 decimals; compare within 0.01).
+expectedMetrics: […]     # optional: per-scenario key-figure, emergency-fund and
+                         # optimization metrics (rounded to 4 decimals; compare
+                         # within 0.01; `keyFigures.lowestCashDate` exactly).
                          # Metrics reflect the FINAL forecast — after optimizer
                          # adjustments. The last optimization's `floor` is that
                          # forecast's emergency-fund target (chapter 04 §7).

@@ -30,8 +30,16 @@ type manifest struct {
 
 type scenarioMetric struct {
 	Scenario      string             `yaml:"scenario"`
+	KeyFigures    *keyFigureMetric   `yaml:"keyFigures"`
 	EmergencyFund map[string]float64 `yaml:"emergencyFund"`
 	Optimizations []optMetric        `yaml:"optimizations"`
+}
+
+type keyFigureMetric struct {
+	LowestCash     float64 `yaml:"lowestCash"`
+	LowestCashDate string  `yaml:"lowestCashDate"`
+	EndingCash     float64 `yaml:"endingCash"`
+	EndingTotal    float64 `yaml:"endingTotal"`
 }
 
 type optMetric struct {
@@ -164,6 +172,24 @@ func compareMetrics(t *testing.T, want []scenarioMetric, res *engine.Result) {
 		if !ok {
 			t.Errorf("expectedMetrics: scenario %q missing from results", wm.Scenario)
 			continue
+		}
+		if wk := wm.KeyFigures; wk != nil {
+			gk := sc.KeyFigures
+			if got := gk.LowestCashDate.String(); got != wk.LowestCashDate {
+				t.Errorf("scenario %q: keyFigures.lowestCashDate want %s, got %s", wm.Scenario, wk.LowestCashDate, got)
+			}
+			for _, c := range []struct {
+				name      string
+				want, got float64
+			}{
+				{"lowestCash", wk.LowestCash, gk.LowestCash},
+				{"endingCash", wk.EndingCash, gk.EndingCash},
+				{"endingTotal", wk.EndingTotal, gk.EndingTotal},
+			} {
+				if math.Abs(c.want-c.got) > tol {
+					t.Errorf("scenario %q: keyFigures.%s want %.4f, got %.4f", wm.Scenario, c.name, c.want, c.got)
+				}
+			}
 		}
 		if len(wm.EmergencyFund) > 0 {
 			if sc.EmergencyFund == nil {

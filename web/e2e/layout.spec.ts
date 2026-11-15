@@ -15,12 +15,12 @@ test('no view scrolls sideways on a narrow phone', async ({ page }) => {
   await runForecast(page);
   expect(await overflow(page), 'results').toBeLessThanOrEqual(0);
   const scenarios = page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab');
-  // The last tab is the comparison, which has a chart and legend but no table.
+  // The last tab is the comparison, which ends in the key figures, not the monthly table.
   for (let i = 0; i < (await scenarios.count()); i += 1) {
     const tab = scenarios.nth(i);
     await tab.click();
     const compare = (await tab.textContent())?.trim() === 'Compare';
-    await page.locator(compare ? '.comparison__legend' : '.results-table').scrollIntoViewIfNeeded();
+    await page.locator(compare ? '.figures-table' : '.results-table').scrollIntoViewIfNeeded();
     expect(await overflow(page), `results, tab ${i + 1}`).toBeLessThanOrEqual(0);
   }
 
@@ -546,6 +546,142 @@ scenarios:
   await tabs.first().click();
   await expect(page.locator('.results-table')).toBeVisible();
   await expect(comparison).toHaveCount(0);
+});
+
+test('the key figures list every scenario and lead to each one', async ({ page }, testInfo) => {
+  const phone = testInfo.project.name === 'phone';
+  await openApp(page);
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'figures.yaml',
+    mimeType: 'application/yaml',
+    buffer: Buffer.from(`version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2025-07
+  startingCash: 5000
+common:
+  investments:
+    - name: Index fund
+      startingValue: 10000
+      annualReturnRate: 12
+scenarios:
+  - name: Dips twice
+    events:
+      - {name: Roof repair, amount: -2000, startDate: 2025-02, endDate: 2025-02}
+      - {name: Bonus, amount: 2000, startDate: 2025-03, endDate: 2025-03}
+      - {name: Car repair, amount: -2000, startDate: 2025-05, endDate: 2025-05}
+      - {name: Tax refund, amount: 2500, startDate: 2025-06, endDate: 2025-06}
+  - name: Only grows while everything else in the plan stays exactly as it is
+    events:
+      - {name: Income, amount: 500}
+  - name: Spends down
+    events:
+      - {name: Living costs, amount: -1000000}
+`),
+  });
+  await runForecast(page);
+  const tabs = page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab');
+  const compare = tabs.last();
+  if (phone) await compare.tap();
+  else await compare.click();
+
+  // A table to assistive technology at every width, stacked or not.
+  const table = page.getByRole('table', { name: 'Key figures for each scenario' });
+  await expect(table).toBeVisible();
+  await expect(table.getByRole('columnheader')).toHaveText(
+    ['Scenario', 'Lowest cash', 'Ending cash', 'Ending total', 'Emergency fund'],
+  );
+  await expect(table.getByRole('rowheader')).toHaveText([
+    'Dips twice',
+    'Only grows while everything else in the plan stays exactly as it is',
+    'Spends down',
+  ]);
+  const rows = table.locator('tbody').getByRole('row');
+  await expect(rows).toHaveCount(3);
+
+  // The engine's figures: the earlier of two equal lows, a low that is the
+  // starting cash, and one in the final month.
+  const values = (row: number) => rows.nth(row).locator('.figures-table__value');
+  const lowest = (row: number) => rows.nth(row).getByRole('cell').first();
+  await expect(lowest(0)).toContainText('$3,000.00 in 2025-02');
+  await expect(lowest(1)).toContainText('$5,000.00 in 2025-01');
+  await expect(lowest(2)).toContainText('-$5,995,000.00 in 2025-07');
+  await expect(values(0)).toHaveText(['$3,000.00', '$5,500.00', '$16,115.20', '$1,000.00 surplus']);
+  await expect(values(2)).toHaveText(['-$5,995,000.00', '-$5,995,000.00', '-$5,984,384.80', '$5,995,000.00 short']);
+
+  // The ending totals are the ones the chart's legend reads for the final month.
+  const legend = await page.locator('.comparison__value').allTextContents();
+  for (let row = 0; row < 3; row += 1) await expect(values(row).nth(2)).toHaveText(legend[row]!);
+
+  // Long names and large amounts stay inside the page and inside their table.
+  await table.scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'key figures').toBeLessThanOrEqual(0);
+  const wrap = page.locator('.figures__wrap');
+  expect(await wrap.evaluate((el) => el.scrollWidth - el.clientWidth), 'table scrolls sideways').toBeLessThanOrEqual(0);
+  const labels = rows.first().locator('.figures-table__label');
+  if (phone) {
+    // Stacked: every figure sits under its own column name, and the header row is out of sight.
+    await expect(labels).toHaveText(['Lowest cash', 'Ending cash', 'Ending total', 'Emergency fund']);
+    for (const label of await labels.all()) await expect(label).toBeVisible();
+    const head = (await table.locator('thead').boundingBox())!;
+    expect(head.width * head.height, 'header row area').toBeLessThanOrEqual(1);
+    const frame = (await wrap.boundingBox())!;
+    for (const box of await table.locator('tbody th, tbody td').evaluateAll((cells) =>
+      cells.map((cell) => cell.getBoundingClientRect().toJSON() as { left: number; right: number }),
+    )) {
+      expect(box.left, 'cell').toBeGreaterThanOrEqual(frame.x - 0.5);
+      expect(box.right, 'cell').toBeLessThanOrEqual(frame.x + frame.width + 0.5);
+    }
+  } else {
+    for (const label of await labels.all()) await expect(label).toBeHidden();
+    await expect(table.getByRole('columnheader').first()).toBeVisible();
+  }
+
+  // A row leads to its scenario's own view, with its tab in sight.
+  const open = table.getByRole('button', { name: 'Spends down' });
+  if (phone) await open.tap();
+  else await open.click();
+  await expect(tabs.nth(2)).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.nth(2)).toBeInViewport({ ratio: 1 });
+  await expect(page.locator('.results-table')).toBeVisible();
+  await expect(page.locator('.comparison')).toHaveCount(0);
+
+  // The same from the keyboard, which takes focus to the tab.
+  await compare.click();
+  await table.getByRole('button', { name: 'Dips twice' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.first()).toBeFocused();
+  await expect(page.getByRole('heading', { name: 'Month by month' })).toBeVisible();
+});
+
+test('the key figures leave out the emergency fund when it is switched off', async ({ page }) => {
+  await openApp(page);
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'no-fund.yaml',
+    mimeType: 'application/yaml',
+    buffer: Buffer.from(`version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2025-04
+  startingCash: 5000
+recommendations:
+  emergencyFundMonths: 0
+scenarios:
+  - name: Keep
+    events:
+      - {name: Income, amount: 100}
+  - name: Spend
+    events:
+      - {name: Costs, amount: -100}
+`),
+  });
+  await runForecast(page);
+  await page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab').last().click();
+  const table = page.getByRole('table', { name: 'Key figures for each scenario' });
+  await expect(table.getByRole('columnheader')).toHaveText(['Scenario', 'Lowest cash', 'Ending cash', 'Ending total']);
+  await expect(table.locator('tbody').getByRole('row').first().getByRole('cell')).toHaveCount(3);
+  await expect(table).not.toContainText('Emergency fund');
 });
 
 for (const theme of ['Light', 'Dark'] as const) {

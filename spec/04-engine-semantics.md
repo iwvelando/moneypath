@@ -383,3 +383,25 @@ summary attached to its scenario's metrics: target event name, field, original a
 values (raw numeric and display-formatted — currency for amounts, integer for frequency,
 `YYYY-MM` for dates), the chosen value's floor, minCash, headroom, iterations,
 converged, notes.
+
+## 8. Key figures
+
+Each scenario reports the few figures a comparison between scenarios turns on. They
+are read from the recorded series (§1) and add nothing to the simulation:
+
+- `lowestCash` and `lowestCashDate` — the least recorded `liquid` and the month it is
+  recorded at. Every recorded month counts, the initial row included. Months are
+  compared in whole cents (`round2`, per the preamble), and when several months share
+  the least value the **earliest** is reported: `lowestCashDate` is the first month `m`
+  with `round2(liquid[m]) = min round2(liquid)`, and `lowestCash = liquid[m]`, unrounded
+  like every other reported number. A scenario whose cash never falls below where it
+  starts therefore reports its starting cash and `start`.
+- `endingCash` and `endingTotal` — `liquid` and `total` of the last recorded month.
+
+When `start ≥ end` only the initial row is recorded (§1), so all four describe it:
+`lowestCash = endingCash = liquid[start]`, `endingTotal = total[start]`, and
+`lowestCashDate = start`.
+
+The figures describe the forecast that is reported: with the optimizer (§7), the final
+forecast on the adjusted config. They do not depend on the emergency-fund
+recommendation (§5) and are reported when it is disabled.

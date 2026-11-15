@@ -34,7 +34,16 @@ export interface OptimizationSummary {
   notes?: string[] | null;
 }
 
+/** Decided by the engine; `lowestCashDate` is the `YYYY-MM` month of `lowestCash`. */
+export interface KeyFigureMetrics {
+  lowestCash: number;
+  lowestCashDate: string;
+  endingCash: number;
+  endingTotal: number;
+}
+
 export interface ScenarioMetrics {
+  keyFigures?: KeyFigureMetrics | null;
   emergencyFund?: EmergencyFundMetrics | null;
   optimizations?: OptimizationSummary[] | null;
 }

@@ -128,3 +128,32 @@ func TestCSVNeverPrintsNegativeZero(t *testing.T) {
 		t.Errorf("CSV = %q, want %q", got, want)
 	}
 }
+
+// Spec chapter 05 pretty format: each scenario's key figures (chapter 04 §8)
+// sit on one line under its heading, whether or not the emergency-fund
+// recommendation is enabled.
+func TestPrettyListsKeyFigures(t *testing.T) {
+	start, _ := config.ParseMonth("2025-06")
+	res := &engine.Result{
+		Start: start, End: start + 2,
+		Scenarios: []*engine.ScenarioResult{
+			{
+				Name:   "plan",
+				Liquid: []float64{30000, -1250.5, 4000},
+				Total:  []float64{55000, 26000, 31234.56},
+				Notes:  [][]string{nil, nil, nil},
+				KeyFigures: engine.KeyFigures{
+					LowestCash: -1250.5, LowestCashDate: start + 1,
+					EndingCash: 4000, EndingTotal: 31234.56,
+				},
+			},
+		},
+	}
+	got := Pretty(res)
+	want := "--- Results for scenario plan ---\n" +
+		"Lowest cash: -$1,250.50 in 2025-07 | Ending cash: $4,000.00 | Ending total: $31,234.56\n" +
+		"Date    | Liquid Net Worth"
+	if !strings.Contains(got, want) {
+		t.Errorf("pretty output missing %q\n--- got ---\n%s", want, got)
+	}
+}

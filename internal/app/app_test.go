@@ -137,3 +137,63 @@ scenarios: [{name: plan}]
 		t.Errorf("configYaml lost the rate:\n%s", yaml)
 	}
 }
+
+// Spec chapter 02, results JSON, and chapter 04 §8: every scenario's metrics
+// carry its key figures, with the month of lowest cash as a YYYY-MM string.
+func TestResultsJSONCarriesKeyFigures(t *testing.T) {
+	out := runPlan(t, `
+version: 2
+simulation: {startDate: 2025-01, endDate: 2025-04, startingCash: 5000}
+common:
+  investments:
+    - {name: Fund, startingValue: 1000, annualReturnRate: 0}
+scenarios:
+  - name: dips
+    events:
+      - {name: Repair, amount: -2000, startDate: 2025-02, endDate: 2025-02}
+      - {name: Bonus, amount: 2500, startDate: 2025-03, endDate: 2025-03}
+  - name: grows
+    events:
+      - {name: Income, amount: 500}
+`, false)
+	metrics, _ := out["metrics"].([]any)
+	if len(metrics) != 2 {
+		t.Fatalf("want 2 scenarios' metrics, got %d", len(metrics))
+	}
+	want := []map[string]any{
+		{"lowestCash": 3000.0, "lowestCashDate": "2025-02", "endingCash": 5500.0, "endingTotal": 6500.0},
+		{"lowestCash": 5000.0, "lowestCashDate": "2025-01", "endingCash": 6500.0, "endingTotal": 7500.0},
+	}
+	for i, m := range metrics {
+		got, ok := m.(map[string]any)["keyFigures"].(map[string]any)
+		if !ok {
+			t.Fatalf("scenario %d has no keyFigures: %v", i, m)
+		}
+		if len(got) != len(want[i]) {
+			t.Errorf("scenario %d keyFigures = %v, want %v", i, got, want[i])
+		}
+		for k, wv := range want[i] {
+			if got[k] != wv {
+				t.Errorf("scenario %d keyFigures.%s = %v, want %v", i, k, got[k], wv)
+			}
+		}
+	}
+}
+
+// Key figures do not depend on the emergency-fund recommendation: with it
+// disabled they are still reported, and no emergency fund is.
+func TestResultsJSONKeepsKeyFiguresWithoutAnEmergencyFund(t *testing.T) {
+	out := runPlan(t, `
+version: 2
+simulation: {startDate: 2025-01, endDate: 2025-03, startingCash: 1000}
+recommendations: {emergencyFundMonths: 0}
+scenarios: [{name: plan}]
+`, false)
+	m := out["metrics"].([]any)[0].(map[string]any)
+	if _, ok := m["keyFigures"].(map[string]any); !ok {
+		t.Errorf("keyFigures missing: %v", m)
+	}
+	if _, ok := m["emergencyFund"]; ok {
+		t.Errorf("emergencyFund reported while disabled: %v", m)
+	}
+}

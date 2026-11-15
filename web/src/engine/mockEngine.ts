@@ -124,7 +124,17 @@ function buildMetrics(scenarios: MockScenario[], rows: ResultRow[], optimize: bo
     const targetAmount = averageMonthlyExpenses * targetMonths;
     const initialLiquid = rows[0]?.values[index]?.liquid ?? 0;
     const fundedMonths = averageMonthlyExpenses === 0 ? 0 : initialLiquid / averageMonthlyExpenses;
+    // Read off the synthetic curve so the stand-in fills the same table.
+    const liquid = rows.map((row) => row.values[index]?.liquid ?? 0);
+    const lowest = liquid.indexOf(Math.min(...liquid));
+    const last = rows[rows.length - 1];
     const metrics: ScenarioMetrics = {
+      keyFigures: {
+        lowestCash: liquid[lowest] ?? 0,
+        lowestCashDate: rows[lowest]?.date ?? '',
+        endingCash: last?.values[index]?.liquid ?? 0,
+        endingTotal: last?.values[index]?.total ?? 0,
+      },
       emergencyFund: {
         targetMonths,
         averageMonthlyExpenses,
