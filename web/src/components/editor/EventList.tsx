@@ -74,6 +74,7 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
               help={HELP.optimizeMin}
               value={optimize.min}
               step={optimize.field === 'frequency' ? 1 : 50}
+              signed={optimize.field === 'amount'}
               onChange={(min) => patch({ min })}
             />
             <NumberField
@@ -81,6 +82,7 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
               help={HELP.optimizeMax}
               value={optimize.max}
               step={optimize.field === 'frequency' ? 1 : 50}
+              signed={optimize.field === 'amount'}
               onChange={(max) => patch({ max })}
             />
           </>
@@ -218,6 +220,7 @@ function EventRow({
               help={eventAmountHelp(kind)}
               value={event.amount}
               step={kind === 'cashflow' ? 50 : 25}
+              signed
               onChange={(amount) => patch({ amount })}
             />
           )}

@@ -98,6 +98,11 @@ interface NumberFieldProps {
   modifierMultiplier?: number;
   placeholder?: string;
   suffix?: string;
+  /**
+   * The value can be negative. A phone is then asked for its full keyboard:
+   * an iPhone's decimal keypad has no minus key.
+   */
+  signed?: boolean;
 }
 
 function roundStep(value: number, step: number): number {
@@ -118,6 +123,7 @@ export function NumberField({
   modifierMultiplier = 10,
   placeholder,
   suffix,
+  signed = false,
 }: NumberFieldProps) {
   const base = useId();
   const controlId = `${base}-input`;
@@ -166,7 +172,7 @@ export function NumberField({
           id={controlId}
           class={invalid ? 'input is-invalid' : 'input'}
           type="text"
-          inputMode="decimal"
+          inputMode={signed ? 'text' : 'decimal'}
           autoComplete="off"
           value={draft}
           placeholder={placeholder}
