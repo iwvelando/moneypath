@@ -266,6 +266,138 @@ supply the detail, so the prompts need not repeat it.
 For a review without merge authority, end the last prompt with "hand the PR back
 without merging" instead.
 
+## Roadmap assignments
+
+[ROADMAP.md](ROADMAP.md) holds the accepted direction; GitHub issues hold the work.
+This section applies to any assignment tracked in an issue. It adds to "Changing
+behavior" and "Delivering a change" above; a ready issue waives neither.
+
+### Where information lives
+
+| Information | Home |
+|---|---|
+| Accepted motivation, principles, scope limits and the reason for each wave | `ROADMAP.md` |
+| A feature's agreed outcome and acceptance criteria | Its parent issue |
+| One implementation or research assignment | A sub-issue |
+| Readiness, active work and prerequisites | Labels, native sub-issue and blocked-by relationships |
+| Specified config format, engine rules, CLI and web behavior | `spec/`, the fixtures and the tests |
+| What a change did and how it was verified | The PR |
+| Discussion, experiments and superseded decisions | Issue and PR comments |
+
+`ROADMAP.md` is not a status log. Amend it only when the direction changes. An issue
+body states the current assignment as a whole; a comment explains each material edit to
+it. A settled format or engine rule moves into its spec chapter in the PR that
+implements it, so nobody has to rebuild a contract from a comment thread. If shipped
+behavior disagrees with the accepted requirement, report it; do not quietly redefine
+either one.
+
+### Waves, features and slices
+
+- A **wave** is a milestone grouping features that mature together. It has no dates,
+  and its order is scheduling guidance, not a dependency.
+- A **feature** is a parent issue titled with its roadmap identifier, such as
+  `[R04] Guardrails`. It is the acceptance record, and it is not ordinarily assigned
+  whole.
+- A **slice** is a native sub-issue, such as `[R04.2]`: usually one PR that can merge
+  and deploy alone, with its tests, spec changes and fixtures. Engine, CLI, web and
+  documentation are not routinely split into separate slices. Every merge to `main`
+  deploys, so no slice leaves a public interaction that a later slice must repair.
+- A **blocked-by** relationship marks a real prerequisite, never a shared theme.
+
+Labels:
+
+- `roadmap` on every parent and slice.
+- Exactly one of `kind:feature`, `kind:implementation` or `kind:research`.
+- On an open issue, exactly one of `stage:needs-design`, `stage:ready`, `stage:active`
+  or `stage:review`. `needs-design` means the issue cannot be implemented from what it
+  says, not that its subject was rejected. `ready` describes the specification; the
+  issue can start only once its prerequisites are merged and usable.
+
+Completion is the issue's own state and blockers are native relationships; neither is
+repeated as a status list in prose. Search closed issues before opening a replacement
+or a follow-up. Milestone percentages count issues, not effort.
+
+### Preparing an assignment
+
+Use the **Roadmap feature** template for a parent and **Roadmap implementation or
+research** for a slice. A ready slice states:
+
+1. The outcome for the user and the parent criteria it advances.
+2. Included and excluded work, with settled constraints kept apart from suggested
+   implementation choices.
+3. The spec chapters, code entry points and tests to start from, and the revision they
+   were checked against. Paths and symbols, not line numbers.
+4. Each prerequisite and the exact capability consumed from it, and what this slice
+   exposes to the issues that depend on it. A bare issue link is not enough.
+5. Which spec chapters change and their status. A Contract change names the rule and
+   the fixtures that will pin it, and what existing configs, saved drafts and CSV
+   output keep doing.
+6. Observable acceptance criteria, including invalid input, boundary months, plans with
+   one scenario or none of the new feature, and existing behavior that must not move.
+7. Feature-specific verification, and whether the exploration checkpoint applies.
+
+Specify near-term work fully against the current code. Keep later parents and slices
+short and `stage:needs-design` until their prerequisites have merged and their design
+questions are settled: a slice designed against code that does not exist yet is a
+guess. A research slice states the question, the evidence to gather and the decision
+the owner is asked to make. Finishing it neither completes its parent nor authorizes
+dropping the intended outcome.
+
+### Starting work
+
+1. Read `AGENTS.md`, the issue and its comments, its parent, the feature's entry in
+   `ROADMAP.md`, and the outcomes of its prerequisites:
+   `gh issue view <number> --comments` and
+   `gh issue view <number> --json parent,subIssues,blockedBy,blocking`. Use `gh api` if
+   the installed CLI lacks a relationship field.
+2. Recheck the assignment against current `main`. A closed prerequisite may have been
+   rejected, and a merged PR may not have delivered what this issue assumes. Refresh
+   stale context, and raise a material contradiction before building on it.
+3. Check for an existing claim. Then comment with a short plan and the working branch,
+   and set `stage:active`. Link the PR when it opens.
+4. Ordinary implementation decisions are the implementer's. A change to accepted scope,
+   an incompatible contract or an unresolved product choice goes to the owner.
+
+### Keeping issues current
+
+When the owner agrees to a material change of scope or acceptance, update the slice's
+body and every affected parent and downstream body before relying on the change, and
+leave a short comment saying what changed and why. A comment alone does not repair a
+body that now contradicts it. Before the review handoff and again at completion,
+compare the bodies with what was delivered. An unmet requirement is not rewritten as
+delivered without the owner's agreement.
+
+### Handoff and completion
+
+A PR links its slice with a closing keyword only when it fulfils the slice, and links
+the parent without one. At the review handoff, set `stage:review` and leave the issue
+open. A slice is complete when the change is merged, the required verification is done
+or its authorized exception is recorded, and the spec is current. Whoever merges then:
+
+- removes the stage label and leaves one outcome comment:
+
+  ```markdown
+  Delivered: the capability now available.
+  Integration: merged PR and commit; the spec sections, fixtures and tests to use.
+  Verification: link to the PR's evidence and any authorized limits.
+  Differences: agreed changes from the original assignment, or none.
+  Follow-ups: issue links, and whether each is required or optional.
+  Downstream: which issue bodies were refreshed and which can now start.
+  ```
+
+- updates dependent issue bodies with the interface, spec sections and tests that
+  exist, and reconciles a changed contract with its consumers before marking them
+  ready. Marking an issue ready does not assign it.
+
+Close a parent only when its feature acceptance is met, judged on its own and not by
+counting closed children. A deferred required criterion keeps the parent open unless
+the owner agrees to revise the scope. Close a wave's milestone when its features are
+accepted and no required work remains.
+
+The owner prompts above work unchanged with an issue URL. For an issue assignment, the
+handoff stage also reconciles the issue bodies, and the merge stage leaves the outcome
+comment and refreshes the downstream issues.
+
 ## Layout
 
 See the table in [README.md](README.md). The one architectural rule to keep
