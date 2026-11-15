@@ -99,6 +99,7 @@ function InvestmentCard({
             label="Annual return"
             help={HELP.investmentAnnualReturnRate}
             value={investment.annualReturnRate}
+            signed
             step={0.1}
             placeholder="0"
             suffix="% / yr"

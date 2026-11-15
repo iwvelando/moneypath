@@ -404,6 +404,7 @@ export function Workspace({
             help={HELP.startingCash}
             value={config.simulation.startingCash}
             step={500}
+            signed
             onChange={(startingCash) => patchSimulation({ startingCash })}
           />
           <NumberField

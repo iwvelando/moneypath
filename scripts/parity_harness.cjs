@@ -12,8 +12,9 @@ async function main() {
   go.run(instance); // main() registers the bridge functions, then blocks
   const configYaml = readFileSync(configPath, 'utf8');
   const out = globalThis.moneypathForecast(configYaml, optionsJSON);
-  process.stdout.write(out);
-  process.exit(0);
+  // Exit only once the write has drained: a pipe takes a large result in
+  // pieces, and exiting straight away cuts it off.
+  process.stdout.write(out, () => process.exit(0));
 }
 
 main().catch((err) => {

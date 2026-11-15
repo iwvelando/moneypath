@@ -53,6 +53,23 @@ test('a pointer selection works after keyboard focus in the workbar', async ({ p
 
 test('the comparison tab and its series control answer taps and keys', async ({ page }) => {
   const found = problems(page);
+  // WebKit styles a select's internal text with a blocked inline declaration.
+  // Match that event's target, rather than ignoring all stylesheet errors.
+  await page.addInitScript(() => {
+    const violations: { nativeSelect: boolean; directive: string; blocked: string }[] = [];
+    Object.assign(window, { comparisonPolicyViolations: violations });
+    document.addEventListener('securitypolicyviolation', (event) => {
+      violations.push({
+        nativeSelect:
+          event.target instanceof HTMLSelectElement &&
+          !event.target.hasAttribute('style') &&
+          event.effectiveDirective === 'style-src-attr' &&
+          event.blockedURI === 'inline',
+        directive: event.effectiveDirective,
+        blocked: event.blockedURI,
+      });
+    });
+  });
   await openApp(page);
   await runForecast(page);
   const tabs = page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab');
@@ -120,9 +137,37 @@ test('the comparison tab and its series control answer taps and keys', async ({ 
   await expect(tabs.nth(1)).toBeFocused();
   expect(await tabs.nth(1).evaluate((tab) => getComputedStyle(tab).outlineStyle)).not.toBe('none');
 
-  // Tapping anywhere else on a row works too.
+  // The difference between two scenarios: its pickers and its chart answer a
+  // finger, and nothing runs off the side.
   await compare.tap();
+  const difference = page.locator('.difference');
+  await difference.locator('.chart__svg').scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'difference').toBeLessThanOrEqual(0);
+  const first = difference.getByLabel('Compare');
+  const second = difference.getByLabel('against');
+  await expect(first.locator('option:checked')).toHaveText('current path');
+  await second.selectOption({ label: 'current path' });
+  await expect(first.locator('option:checked')).toHaveText('save more aggressively');
+  await expect(second.locator('option:checked')).toHaveText('current path');
+  await expect(difference.locator('.difference__reading')).toContainText(
+    'save more aggressively is ahead of current path',
+  );
+  const differenceChart = difference.locator('.chart__svg');
+  await differenceChart.tap();
+  await expect(difference.locator('.chart__tooltip')).toBeVisible();
+  await differenceChart.focus();
+  await differenceChart.press('End');
+  await expect(difference.getByRole('status')).toContainText('liquid');
+  expect(await overflow(page), 'difference after choosing').toBeLessThanOrEqual(0);
+
+  // Tapping anywhere else on a row works too.
+  await page.locator('.comparison').scrollIntoViewIfNeeded();
   await table.locator('tbody').getByRole('row').first().getByRole('cell').first().tap();
   await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
-  expect(found).toEqual([]);
+  const violations: { nativeSelect: boolean; directive: string; blocked: string }[] =
+    await page.evaluate(() => Reflect.get(window, 'comparisonPolicyViolations'));
+  expect(violations.filter((violation) => !violation.nativeSelect)).toEqual([]);
+  const selectMessage = "Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in the style-src directive of the Content Security Policy.";
+  expect(found.filter((problem) => problem !== selectMessage)).toEqual([]);
+  expect(found.filter((problem) => problem === selectMessage)).toHaveLength(violations.length);
 });

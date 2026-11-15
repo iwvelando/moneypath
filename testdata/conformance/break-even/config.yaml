@@ -1,0 +1,41 @@
+version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2025-09
+  startingCash: 5000.00
+scenarios:
+  - name: stay employed
+    events:
+      - name: Savings from salary
+        amount: 500.00
+    investments:
+      - name: Employer retirement match
+        startingValue: 0.00
+        annualReturnRate: 0.00
+        contributions:
+          - amount: 300.00
+  - name: take the course
+    events:
+      - name: Savings from salary
+        amount: 500.00
+      - name: Course fee
+        amount: -2000.00
+        startDate: 2025-02
+        endDate: 2025-02
+      - name: Freelance work
+        amount: 500.00
+        frequency: 2
+        startDate: 2025-03
+        endDate: 2025-09
+      - name: First contract
+        amount: 1500.00
+        startDate: 2025-04
+        endDate: 2025-04
+      - name: Equipment
+        amount: -500.00
+        startDate: 2025-06
+        endDate: 2025-06
+      - name: Conference
+        amount: -1500.00
+        startDate: 2025-08
+        endDate: 2025-08

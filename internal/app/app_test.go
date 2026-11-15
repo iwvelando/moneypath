@@ -197,3 +197,91 @@ scenarios: [{name: plan}]
 		t.Errorf("emergencyFund reported while disabled: %v", m)
 	}
 }
+
+const crossingPlan = `
+version: 2
+simulation: {startDate: 2025-01, endDate: 2025-04, startingCash: 1000}
+scenarios:
+  - name: rent
+    events:
+      - {name: Savings, amount: 500}
+  - name: buy
+    events:
+      - {name: Savings, amount: 500}
+      - {name: Deposit, amount: -1100, startDate: 2025-02, endDate: 2025-02}
+      - {name: Rebate, amount: 1100, startDate: 2025-03, endDate: 2025-03}
+      - {name: Lodger, amount: 700, startDate: 2025-04, endDate: 2025-04}
+  - name: skipped
+    active: false
+`
+
+// Spec chapter 02, results JSON: comparisons holds every ordered pair of
+// scenarios, by index, with the differences aligned to rows and the
+// break-even months naming the scenario that moves ahead.
+func TestResultsJSONComparesEveryOrderedPair(t *testing.T) {
+	out := runPlan(t, crossingPlan, false)
+	got, err := json.Marshal(out["comparisons"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := `[` +
+		`{"against":1,"cash":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,1100,0,-700]},"scenario":0,` +
+		`"total":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,1100,0,-700]}},` +
+		`{"against":0,"cash":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,-1100,0,700]},"scenario":1,` +
+		`"total":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,-1100,0,700]}}]`
+	if string(got) != want {
+		t.Errorf("comparisons =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// Spec chapter 02: with fewer than two scenarios comparisons is an empty
+// array, and a lead that never changes hands is an empty breakEven array.
+func TestResultsJSONComparisonsAreEmptyArraysNotNull(t *testing.T) {
+	one := runPlan(t, `
+version: 2
+simulation: {startDate: 2025-01, endDate: 2025-03, startingCash: 1000}
+scenarios: [{name: plan}]
+`, false)
+	if got, ok := one["comparisons"].([]any); !ok || len(got) != 0 {
+		t.Errorf("comparisons = %v, want an empty array", one["comparisons"])
+	}
+	two := runPlan(t, `
+version: 2
+simulation: {startDate: 2025-01, endDate: 2025-03, startingCash: 1000}
+scenarios: [{name: a}, {name: b, events: [{name: Pay, amount: 10}]}]
+`, false)
+	first := two["comparisons"].([]any)[0].(map[string]any)["cash"].(map[string]any)
+	if got, ok := first["breakEven"].([]any); !ok || len(got) != 0 {
+		t.Errorf("breakEven = %v, want an empty array", first["breakEven"])
+	}
+}
+
+// Spec chapter 05: a named pair renders in both output forms, and names that
+// cannot be compared are refused in words a user can act on.
+func TestCompareScenarios(t *testing.T) {
+	now, _ := config.ParseMonth("2025-01")
+	f, err := RunForecast(ForecastInput{ConfigYAML: []byte(crossingPlan), Now: now})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pretty, csv, err := CompareScenarios(f, "buy", "rent")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(pretty, "--- buy minus rent ---\nCash break-even: 2025-04 (buy moves ahead)\n") {
+		t.Errorf("pretty =\n%s", pretty)
+	}
+	if !strings.HasPrefix(csv, `"date","liquid (buy minus rent)","total (buy minus rent)"`+"\n") {
+		t.Errorf("csv =\n%s", csv)
+	}
+
+	for _, c := range []struct{ a, b, want string }{
+		{"buy", "lease", `"lease" is not an active scenario in this plan; the active scenarios are: rent, buy`},
+		{"skipped", "rent", `"skipped" is not an active scenario in this plan; the active scenarios are: rent, buy`},
+		{"buy", "buy", `a scenario cannot be compared with itself; name two different scenarios`},
+	} {
+		if _, _, err := CompareScenarios(f, c.a, c.b); err == nil || err.Error() != c.want {
+			t.Errorf("CompareScenarios(%q, %q) error = %v, want %q", c.a, c.b, err, c.want)
+		}
+	}
+}

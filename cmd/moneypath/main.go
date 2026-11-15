@@ -59,7 +59,7 @@ commands:
   forecast   run a forecast from a v2 config (default with bare flags)
              --config FILE [--output-format pretty|csv] [--optimize]
              [--write-config FILE] [--emergency-months N] [--now YYYY-MM]
-             [--log-level L]
+             [--log-level L] [--compare SCENARIO --against SCENARIO]
   migrate    convert a legacy (v1) config to v2
              moneypath migrate old-config.yaml [-o new-config.yaml]
   serve      serve the embedded static web app locally [--addr :8080]
@@ -87,6 +87,8 @@ func cmdForecast(args []string) int {
 	emergencyMonths := fs.Float64("emergency-months", -1, "override recommendations.emergencyFundMonths (0 disables)")
 	nowFlag := fs.String("now", "", "override the current month (YYYY-MM)")
 	logLevel := fs.String("log-level", "warn", "debug|info|warn|error")
+	compare := fs.String("compare", "", "print this scenario minus the --against scenario instead of the forecast")
+	against := fs.String("against", "", "the scenario to subtract from the --compare scenario")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -102,6 +104,24 @@ func cmdForecast(args []string) int {
 	}
 	if *outputFormat != "pretty" && *outputFormat != "csv" {
 		fmt.Fprintf(os.Stderr, "invalid --output-format %q (want pretty or csv)\n", *outputFormat)
+		return 2
+	}
+
+	compareSet, againstSet := false, false
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "compare":
+			compareSet = true
+		case "against":
+			againstSet = true
+		}
+	})
+	if compareSet && !againstSet {
+		fmt.Fprintln(os.Stderr, "--compare and --against go together: name the scenario to subtract with --against")
+		return 2
+	}
+	if againstSet && !compareSet {
+		fmt.Fprintln(os.Stderr, "--compare and --against go together: name the scenario to subtract from with --compare")
 		return 2
 	}
 
@@ -149,10 +169,17 @@ func cmdForecast(args []string) int {
 	}
 	log.logf(1, "info: ", "forecast completed in %s", time.Since(started).Round(time.Millisecond))
 
+	pretty, csv := f.Pretty, f.CSV
+	if compareSet {
+		if pretty, csv, err = app.CompareScenarios(f, *compare, *against); err != nil {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			return 2
+		}
+	}
 	if *outputFormat == "csv" {
-		fmt.Print(f.CSV)
+		fmt.Print(csv)
 	} else {
-		fmt.Print(f.Pretty)
+		fmt.Print(pretty)
 	}
 
 	// After the results, so a write failure never costs the user the forecast.

@@ -882,6 +882,23 @@ nav.sectionnav {
   font-variant-numeric: tabular-nums;
 }
 
+/* A select draws its own arrow, set in from the edge: the browser's sits flush
+   against it. Gradients, so no image has to be loaded. */
+select.input {
+  appearance: none;
+  -webkit-appearance: none;
+  padding-right: 38px;
+  text-overflow: ellipsis;
+  background-image:
+    linear-gradient(45deg, transparent 50%, currentColor 50%),
+    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-position:
+    right 19px center,
+    right 14px center;
+  background-size: 5px 5px;
+  background-repeat: no-repeat;
+}
+
 .input:focus-visible {
   outline: 2px solid var(--focus);
   outline-offset: 0;
@@ -2101,7 +2118,7 @@ nav.sectionnav {
 }
 
 .row-card .input {
-  background: var(--bg);
+  background-color: var(--bg);
 }
 
 input[type='checkbox'], input[type='radio'] {
@@ -2730,4 +2747,58 @@ input[type='checkbox'], input[type='radio'] {
     letter-spacing: 0.05em;
     text-transform: uppercase;
   }
+}
+
+/* The difference between two chosen scenarios, under the key figures. */
+.difference__pickers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 18px;
+}
+
+.difference__pickers label {
+  display: flex;
+  flex: 1 1 220px;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.difference__pickers select {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
+.difference__breakeven {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 24px;
+  margin: 0 0 14px;
+}
+
+.difference__breakeven dt {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+
+.difference__breakeven dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
+}
+
+.difference__breakeven ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.difference__reading {
+  margin: 0 0 16px;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
 }

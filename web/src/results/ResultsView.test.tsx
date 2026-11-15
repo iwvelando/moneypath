@@ -154,6 +154,41 @@ describe('the comparison entry', () => {
     expect(compare.getAttribute('aria-controls')).toBe(panel.id);
   });
 
+  it('adds the difference between two scenarios when the engine reports one', () => {
+    const results: ForecastResults = {
+      version: 'test',
+      scenarios: ['a', 'b'],
+      rows: [{ date: '2026-01', values: [{ liquid: 1, total: 2 }, { liquid: 1, total: 2 }] }],
+      csv: '',
+      metrics: [{}, {}],
+      comparisons: [
+        { scenario: 0, against: 1, cash: { difference: [5], breakEven: [] }, total: { difference: [7], breakEven: [] } },
+        { scenario: 1, against: 0, cash: { difference: [-5], breakEven: [] }, total: { difference: [-7], breakEven: [] } },
+      ],
+      warnings: [],
+      configYaml: '',
+    };
+    act(() => {
+      render(
+        <ResultsView
+          results={results}
+          durationMs={1}
+          optimizerRan={false}
+          onDownloadCsv={() => {}}
+          statusOf={(_: Adjustment) => 'missing'}
+          onApply={() => {}}
+        />,
+        host,
+      );
+    });
+    // It belongs to the comparison, not to any one scenario.
+    expect(host.querySelector('.difference')).toBeNull();
+    act(() => tabs()[2]!.click());
+    expect(host.querySelector('[role="tabpanel"] .difference')).not.toBeNull();
+    act(() => tabs()[0]!.click());
+    expect(host.querySelector('.difference')).toBeNull();
+  });
+
   it('returns to a scenario from the comparison', () => {
     showScenarios(['a', 'b']);
     act(() => tabs()[2]!.click());

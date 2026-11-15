@@ -22,6 +22,8 @@ interface ChartProps {
   liquid: Series;
   total: Series;
   scenarioName: string;
+  /** What the two lines show, for the chart's title; a scenario's net worth unless given. */
+  subject?: string;
 }
 
 /**
@@ -29,7 +31,7 @@ interface ChartProps {
  * tooltip, both axes ticked, tinted regions where a series is negative,
  * responsive, with an empty state. No charting library.
  */
-export function Chart({ dates, liquid, total, scenarioName }: ChartProps) {
+export function Chart({ dates, liquid, total, scenarioName, subject }: ChartProps) {
   const { containerRef, width } = useChartWidth();
   const titleId = useId();
 
@@ -108,7 +110,7 @@ export function Chart({ dates, liquid, total, scenarioName }: ChartProps) {
           {...handlers}
         >
           <title id={titleId}>
-            {`Liquid and total net worth for ${scenarioName}, ${dates[0]} to ${dates[count - 1]}. Use the arrow keys to read individual months.`}
+            {`Liquid and total net worth ${subject ?? `for ${scenarioName}`}, ${dates[0]} to ${dates[count - 1]}. Use the arrow keys to read individual months.`}
           </title>
 
           <defs>

@@ -37,6 +37,7 @@ export function decodeForecast(raw: string): ForecastResults {
     rows: results.rows,
     csv: results.csv ?? '',
     metrics: Array.isArray(results.metrics) ? results.metrics : [],
+    comparisons: Array.isArray(results.comparisons) ? results.comparisons : [],
     warnings: Array.isArray(results.warnings) ? results.warnings : [],
     configYaml: results.configYaml ?? '',
   };

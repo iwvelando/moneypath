@@ -117,6 +117,23 @@ async function toggleCard(name: string) {
 }
 
 describe('summary-first editors', () => {
+  it('allows a negative annual return with a phone keyboard', async () => {
+    const onChange = vi.fn<(investments: InvestmentModel[]) => void>();
+    await act(async () => render(
+      <InvestmentList investments={[{ ...emptyInvestment(), name: 'Fund' }]} simulation={simulation} onChange={onChange} />,
+      container,
+    ));
+    await toggleCard('Fund');
+    const label = [...card('Fund').querySelectorAll('label')].find((element) => element.textContent?.trim() === 'Annual return')!;
+    const input = card('Fund').querySelector<HTMLInputElement>(`#${label.htmlFor}`)!;
+    expect(input.inputMode).toBe('text');
+    await act(async () => {
+      input.value = '-2.5';
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    expect(onChange.mock.calls.at(-1)?.[0][0]?.annualReturnRate).toBe(-2.5);
+  });
+
   it('starts compact and allows several forms to stay open independently', async () => {
     await act(async () => render(<EventHarness />, container));
     expect(card('Rent').querySelector<HTMLElement>('.editor-card__body')!.hidden).toBe(true);

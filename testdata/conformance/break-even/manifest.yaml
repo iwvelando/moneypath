@@ -1,0 +1,25 @@
+description: "Differences and break-even between two scenarios, in both orders: a level start, a level month before an overtaking (the overtaking month is reported), a lead lost to a level month and regained (nothing reported), a second crossing, and a total that is never overtaken while cash is."
+normative: true
+optimize: false
+tolerance: 0.01
+expectedComparisons:
+  - scenario: take the course
+    against: stay employed
+    cash:
+      breakEven:
+        - {date: "2025-05", leader: take the course}
+        - {date: "2025-08", leader: stay employed}
+      endingDifference: -500.00
+    total:
+      breakEven: []
+      endingDifference: -2900.00
+  - scenario: stay employed
+    against: take the course
+    cash:
+      breakEven:
+        - {date: "2025-05", leader: take the course}
+        - {date: "2025-08", leader: stay employed}
+      endingDifference: 500.00
+    total:
+      breakEven: []
+      endingDifference: 2900.00
