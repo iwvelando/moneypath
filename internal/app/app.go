@@ -6,6 +6,7 @@ package app
 import (
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 
@@ -68,16 +69,65 @@ func RunForecast(in ForecastInput) (*Forecast, error) {
 	}, nil
 }
 
+// CompareScenarios renders one named scenario minus another in both output
+// forms (spec chapter 05). Its errors are for the user: both names must be
+// active scenarios of the plan, and different ones.
+func CompareScenarios(f *Forecast, scenario, against string) (pretty, csv string, err error) {
+	find := func(name string) (*engine.ScenarioResult, error) {
+		names := make([]string, 0, len(f.Result.Scenarios))
+		for _, sc := range f.Result.Scenarios {
+			if sc.Name == name {
+				return sc, nil
+			}
+			names = append(names, sc.Name)
+		}
+		return nil, fmt.Errorf("%q is not an active scenario in this plan; the active scenarios are: %s",
+			name, strings.Join(names, ", "))
+	}
+	a, err := find(scenario)
+	if err != nil {
+		return "", "", err
+	}
+	b, err := find(against)
+	if err != nil {
+		return "", "", err
+	}
+	if a == b {
+		return "", "", fmt.Errorf("a scenario cannot be compared with itself; name two different scenarios")
+	}
+	return render.ComparisonPretty(f.Result, a, b), render.ComparisonCSV(f.Result, a, b), nil
+}
+
 // --- Results JSON (normative shape, spec chapter 02) ---
 
 type resultsJSON struct {
-	Version    string       `json:"version"`
-	Scenarios  []string     `json:"scenarios"`
-	Rows       []rowJSON    `json:"rows"`
-	CSV        string       `json:"csv"`
-	Metrics    []metricJSON `json:"metrics"`
-	Warnings   []string     `json:"warnings"`
-	ConfigYaml string       `json:"configYaml"`
+	Version     string           `json:"version"`
+	Scenarios   []string         `json:"scenarios"`
+	Rows        []rowJSON        `json:"rows"`
+	CSV         string           `json:"csv"`
+	Metrics     []metricJSON     `json:"metrics"`
+	Comparisons []comparisonJSON `json:"comparisons"`
+	Warnings    []string         `json:"warnings"`
+	ConfigYaml  string           `json:"configYaml"`
+}
+
+// comparisonJSON is one ordered pair: Scenario minus Against, both indexes
+// into the scenarios array.
+type comparisonJSON struct {
+	Scenario int                  `json:"scenario"`
+	Against  int                  `json:"against"`
+	Cash     seriesComparisonJSON `json:"cash"`
+	Total    seriesComparisonJSON `json:"total"`
+}
+
+type seriesComparisonJSON struct {
+	Difference []float64       `json:"difference"`
+	BreakEven  []breakEvenJSON `json:"breakEven"`
+}
+
+type breakEvenJSON struct {
+	Date   string `json:"date"`
+	Leader int    `json:"leader"`
 }
 
 type rowJSON struct {
@@ -134,13 +184,14 @@ type optJSON struct {
 // ResultsJSON renders the normative WASM results shape (spec chapter 02).
 func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 	out := resultsJSON{
-		Version:    version,
-		Scenarios:  []string{},
-		Rows:       []rowJSON{},
-		CSV:        f.CSV,
-		Metrics:    []metricJSON{},
-		Warnings:   f.Warnings,
-		ConfigYaml: f.ConfigYAML,
+		Version:     version,
+		Scenarios:   []string{},
+		Rows:        []rowJSON{},
+		CSV:         f.CSV,
+		Metrics:     []metricJSON{},
+		Comparisons: []comparisonJSON{},
+		Warnings:    f.Warnings,
+		ConfigYaml:  f.ConfigYAML,
 	}
 	if out.Warnings == nil {
 		out.Warnings = []string{}
@@ -204,6 +255,31 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 			})
 		}
 		out.Metrics = append(out.Metrics, m)
+	}
+	for i, a := range res.Scenarios {
+		for j, b := range res.Scenarios {
+			if i == j {
+				continue
+			}
+			cmp := res.Compare(a, b)
+			series := func(sc engine.SeriesComparison) seriesComparisonJSON {
+				s := seriesComparisonJSON{Difference: sc.Difference, BreakEven: []breakEvenJSON{}}
+				for _, be := range sc.BreakEven {
+					leader := j
+					if be.FirstAhead {
+						leader = i
+					}
+					s.BreakEven = append(s.BreakEven, breakEvenJSON{Date: be.Month.String(), Leader: leader})
+				}
+				return s
+			}
+			out.Comparisons = append(out.Comparisons, comparisonJSON{
+				Scenario: i,
+				Against:  j,
+				Cash:     series(cmp.Cash),
+				Total:    series(cmp.Total),
+			})
+		}
 	}
 	return json.Marshal(out)
 }

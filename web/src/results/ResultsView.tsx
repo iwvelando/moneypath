@@ -4,6 +4,7 @@ import type { ForecastResults, ScenarioMetrics } from '../engine/types';
 import { formatDuration, formatMoney, formatMonths } from '../util/format';
 import { Chart } from './Chart';
 import { Comparison } from './Comparison';
+import { Difference } from './Difference';
 import { MonthlyTable, type MonthlyRow } from './MonthlyTable';
 import { EmergencyFundGauge } from './Gauge';
 import { OverlaySparkline, Sparkline } from './Sparkline';
@@ -293,7 +294,10 @@ export function ResultsView({
 
       <div id="scenario-panel" role="tabpanel" aria-labelledby={tabId(current)} tabIndex={0}>
         {comparing ? (
-          <Comparison results={results} onOpenScenario={openScenario} />
+          <>
+            <Comparison results={results} onOpenScenario={openScenario} />
+            <Difference results={results} />
+          </>
         ) : (
           <>
         <div class="results__overview">

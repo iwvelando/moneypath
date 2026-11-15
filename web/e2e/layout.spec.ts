@@ -22,6 +22,10 @@ test('no view scrolls sideways on a narrow phone', async ({ page }) => {
     const compare = (await tab.textContent())?.trim() === 'Compare';
     await page.locator(compare ? '.figures-table' : '.results-table').scrollIntoViewIfNeeded();
     expect(await overflow(page), `results, tab ${i + 1}`).toBeLessThanOrEqual(0);
+    if (compare) {
+      await page.locator('.difference .chart__svg').scrollIntoViewIfNeeded();
+      expect(await overflow(page), 'difference between two scenarios').toBeLessThanOrEqual(0);
+    }
   }
 
   await page.getByRole('tab', { name: 'Planning Workspace' }).click();
@@ -653,6 +657,110 @@ scenarios:
   await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
   await expect(tabs.first()).toBeFocused();
   await expect(page.getByRole('heading', { name: 'Month by month' })).toBeVisible();
+});
+
+test('the difference between two scenarios names the months the lead changes hands', async ({ page }, testInfo) => {
+  const phone = testInfo.project.name === 'phone';
+  await openApp(page);
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'difference.yaml',
+    mimeType: 'application/yaml',
+    buffer: Buffer.from(`version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2025-09
+  startingCash: 5000
+scenarios:
+  - name: Stay employed and keep building the retirement match for the whole year
+    events:
+      - {name: Savings from salary, amount: 500}
+    investments:
+      - name: Employer retirement match
+        startingValue: 0
+        annualReturnRate: 0
+        contributions:
+          - {amount: 300}
+  - name: Take the course
+    events:
+      - {name: Savings from salary, amount: 500}
+      - {name: Course fee, amount: -2000, startDate: 2025-02, endDate: 2025-02}
+      - {name: Freelance work, amount: 500, frequency: 2, startDate: 2025-03, endDate: 2025-09}
+      - {name: First contract, amount: 1500, startDate: 2025-04, endDate: 2025-04}
+      - {name: Equipment, amount: -500, startDate: 2025-06, endDate: 2025-06}
+      - {name: Conference, amount: -1500, startDate: 2025-08, endDate: 2025-08}
+  - name: Coast
+`),
+  });
+  await runForecast(page);
+  const employed = 'Stay employed and keep building the retirement match for the whole year';
+  const tabs = page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab');
+  // A single scenario's view has no difference to show.
+  await expect(page.locator('.difference')).toHaveCount(0);
+  if (phone) await tabs.last().tap();
+  else await tabs.last().click();
+
+  const difference = page.locator('.difference');
+  await expect(difference.getByRole('heading', { name: 'Difference between two scenarios' })).toBeVisible();
+  const first = difference.getByLabel('Compare');
+  const second = difference.getByLabel('against');
+  const chosen = async () => [
+    await first.locator('option:checked').textContent(),
+    await second.locator('option:checked').textContent(),
+  ];
+  expect(await chosen()).toEqual([employed, 'Take the course']);
+
+  // The engine's months: a level month is skipped, a lead that is lost to a
+  // level month and regained is not a change, and the total is never overtaken.
+  const rows = difference.locator('.difference__breakeven > div');
+  await expect(rows.nth(0)).toContainText('Total break-even');
+  await expect(rows.nth(0).locator('dd')).toHaveText('The lead never changes hands.');
+  await expect(rows.nth(1)).toContainText('Liquid break-even');
+  await expect(rows.nth(1).locator('li')).toHaveText([
+    '2025-05: Take the course moves ahead',
+    `2025-08: ${employed} moves ahead`,
+  ]);
+  await expect(difference.locator('.difference__reading')).toHaveText(
+    `Above zero, ${employed} is ahead of Take the course; below zero, it is behind.`,
+  );
+
+  // The chart reads the engine's difference for a month.
+  const chart = difference.locator('.chart__svg');
+  await expect(chart.locator('.chart__line')).toHaveCount(2);
+  await chart.focus();
+  await chart.press('End');
+  await expect(difference.getByRole('status')).toHaveText('2025-09: liquid $500.00, total $2,900.00');
+
+  // Long names stay inside the page, and inside their pickers.
+  await chart.scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'difference').toBeLessThanOrEqual(0);
+  const card = (await difference.locator('.results__projection').boundingBox())!;
+  for (const select of [first, second]) {
+    const box = (await select.boundingBox())!;
+    expect(box.x, 'picker left edge').toBeGreaterThanOrEqual(card.x);
+    expect(box.x + box.width, 'picker right edge').toBeLessThanOrEqual(card.x + card.width + 0.5);
+    // The arrow is the page's own, set in from the edge, with room kept for it.
+    const style = await select.evaluate((el) => {
+      const computed = getComputedStyle(el);
+      return { appearance: computed.appearance, room: parseFloat(computed.paddingRight), arrow: computed.backgroundImage };
+    });
+    expect(style.appearance).toBe('none');
+    expect(style.room).toBeGreaterThanOrEqual(32);
+    expect(style.arrow).toContain('linear-gradient');
+  }
+
+  // Either picker changes the pair; choosing the scenario the other holds swaps them.
+  await second.selectOption({ label: 'Coast' });
+  expect(await chosen()).toEqual([employed, 'Coast']);
+  await expect(rows.nth(1).locator('dd')).toHaveText('The lead never changes hands.');
+  await chart.focus();
+  await chart.press('End');
+  await expect(difference.getByRole('status')).toHaveText('2025-09: liquid $4,000.00, total $6,400.00');
+  await first.selectOption({ label: 'Coast' });
+  expect(await chosen()).toEqual(['Coast', employed]);
+  await chart.focus();
+  await chart.press('End');
+  await expect(difference.getByRole('status')).toHaveText('2025-09: liquid -$4,000.00, total -$6,400.00');
+  expect(await overflow(page), 'difference after choosing').toBeLessThanOrEqual(0);
 });
 
 test('the key figures leave out the emergency fund when it is switched off', async ({ page }) => {

@@ -14,6 +14,7 @@ stderr. Exit codes: `0` success, `1` runtime/config error, `2` usage error.
 moneypath forecast --config plan.yaml [--output-format pretty|csv]
                    [--optimize] [--write-config FILE]
                    [--emergency-months N] [--now YYYY-MM] [--log-level L]
+                   [--compare SCENARIO --against SCENARIO]
 ```
 
 - `--config` (required): path to a v2 YAML config. A v1 config (detected by a missing
@@ -32,6 +33,13 @@ moneypath forecast --config plan.yaml [--output-format pretty|csv]
   absent (primarily for reproducible runs and testing).
 - `--log-level`: `debug|info|warn|error` (default `warn`); logs to stderr. Config
   validation warnings print at `warn`.
+
+- `--compare A --against B`: print scenario A minus scenario B (chapter 04 §9) in
+  place of the per-scenario output, in the chosen `--output-format` (see "Comparison
+  output" below). The two flags go together, and each names an active scenario of the
+  plan; one flag without the other, a name that is not an active scenario, or the same
+  name twice is a usage error (exit 2) that prints no results. Every other flag keeps
+  its meaning: with `--optimize` the comparison is of the final forecast.
 
 ### `moneypath migrate`
 
@@ -101,6 +109,35 @@ ____    | ________________ | _______________ | _____
 - The optimization block appears only when the optimizer ran and produced summaries.
 - Notes column: notes joined with `, `.
 - Blank line after each scenario block.
+
+## Comparison output
+
+What `--compare A --against B` prints instead of the formats above.
+
+With `pretty`:
+
+```
+--- <A> minus <B> ---
+Cash break-even: 2026-03 (<B> moves ahead), 2031-08 (<A> moves ahead)
+Total break-even: none
+Date    | Cash difference | Total difference
+____    | _______________ | ________________
+2025-06 | $0.00 | $0.00
+2025-07 | -$1,200.50 | -$1,430.75
+```
+
+- One break-even line per series, listing every break-even month in order with the
+  scenario that moves ahead in it, or `none` when the lead never changes hands.
+- Differences use the currency display above; a negative amount means A is behind B.
+
+With `csv`, in the conventions of the CSV format above (every field quoted, plain
+`%.2f`, rows ending in `\n`):
+
+```
+"date","liquid (<A> minus <B>)","total (<A> minus <B>)"
+"2025-06","0.00","0.00"
+"2025-07","-1200.50","-1430.75"
+```
 
 Pretty output is normative in structure but conformance-tested only loosely (chapter 08);
 CSV is the byte-exact surface.

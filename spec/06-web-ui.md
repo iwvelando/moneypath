@@ -87,7 +87,14 @@ The app covers, at a coarse grain:
   shortfall or surplus. The emergency-fund column is left out when the recommendation
   is disabled, never shown as zero. A row leads to its scenario's own view: choosing
   the scenario's name, or anywhere on its row, selects that scenario's tab and moves
-  focus to it. The comparison shows only figures the engine reported.
+  focus to it. Under the key figures, the difference between two scenarios: two
+  pickers choose one scenario and the scenario to subtract from it, starting with the
+  plan's first two, and choosing the scenario the other picker holds swaps them, so a
+  scenario is never compared with itself. For the total and for liquid it lists the
+  break-even months, each with the scenario that moves ahead, or says that the lead
+  never changes hands; a chart draws both differences over time with the same month
+  readout as a scenario's own chart, tinting the months a difference is below zero.
+  The comparison shows only figures the engine reported.
   Editing the config
   marks all of these as describing an earlier version of the plan; they stay readable,
   being the baseline the next run will be compared against.

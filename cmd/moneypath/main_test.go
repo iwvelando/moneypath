@@ -152,3 +152,123 @@ func TestForecastHonoursAndWritesCashInterestRate(t *testing.T) {
 		t.Errorf("default rate should not be written:\n%s", written2)
 	}
 }
+
+const twoPaths = `version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2025-04
+  startingCash: 1000.00
+scenarios:
+  - name: rent
+    events:
+      - name: Savings
+        amount: 500.00
+  - name: buy a flat
+    events:
+      - name: Savings
+        amount: 500.00
+      - name: Deposit
+        amount: -1100.00
+        startDate: 2025-02
+        endDate: 2025-02
+      - name: Rebate
+        amount: 1800.00
+        startDate: 2025-04
+        endDate: 2025-04
+`
+
+// runCaptured runs the CLI and returns its exit code, stdout and stderr.
+func runCaptured(t *testing.T, args ...string) (int, string, string) {
+	t.Helper()
+	dir := t.TempDir()
+	outFile, err := os.Create(filepath.Join(dir, "stdout"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	errFile, err := os.Create(filepath.Join(dir, "stderr"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	realOut, realErr := os.Stdout, os.Stderr
+	os.Stdout, os.Stderr = outFile, errFile
+	code := run(args)
+	os.Stdout, os.Stderr = realOut, realErr
+	outFile.Close()
+	errFile.Close()
+	stdout, _ := os.ReadFile(outFile.Name())
+	stderr, _ := os.ReadFile(errFile.Name())
+	return code, string(stdout), string(stderr)
+}
+
+func writeTwoPaths(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "plan.yaml")
+	if err := os.WriteFile(path, []byte(twoPaths), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// Spec chapter 05: --compare with --against prints one scenario minus the
+// other in place of the per-scenario output, in either output format.
+func TestForecastCompareTwoScenarios(t *testing.T) {
+	in := writeTwoPaths(t)
+
+	code, stdout, _ := runCaptured(t, "forecast", "--config", in, "--compare", "buy a flat", "--against", "rent")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	want := `--- buy a flat minus rent ---
+Cash break-even: 2025-04 (buy a flat moves ahead)
+Total break-even: 2025-04 (buy a flat moves ahead)
+Date    | Cash difference | Total difference
+____    | _______________ | ________________
+2025-01 | $0.00 | $0.00
+2025-02 | -$1,100.00 | -$1,100.00
+2025-03 | -$1,100.00 | -$1,100.00
+2025-04 | $700.00 | $700.00
+`
+	if stdout != want {
+		t.Errorf("pretty comparison =\n%s\nwant\n%s", stdout, want)
+	}
+
+	code, stdout, _ = runCaptured(t, "forecast", "--config", in, "--output-format", "csv", "--compare", "rent", "--against", "buy a flat")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	want = `"date","liquid (rent minus buy a flat)","total (rent minus buy a flat)"
+"2025-01","0.00","0.00"
+"2025-02","1100.00","1100.00"
+"2025-03","1100.00","1100.00"
+"2025-04","-700.00","-700.00"
+`
+	if stdout != want {
+		t.Errorf("csv comparison =\n%s\nwant\n%s", stdout, want)
+	}
+}
+
+// Spec chapter 05: a comparison that cannot be made is a usage error that
+// says what to do, and prints no results.
+func TestForecastCompareUsageErrors(t *testing.T) {
+	in := writeTwoPaths(t)
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--compare", "rent"}, "--compare and --against go together: name the scenario to subtract with --against"},
+		{[]string{"--against", "rent"}, "--compare and --against go together: name the scenario to subtract from with --compare"},
+		{[]string{"--compare", "rent", "--against", "lease"}, `"lease" is not an active scenario in this plan; the active scenarios are: rent, buy a flat`},
+		{[]string{"--compare", "rent", "--against", "rent"}, "a scenario cannot be compared with itself; name two different scenarios"},
+	} {
+		code, stdout, stderr := runCaptured(t, append([]string{"forecast", "--config", in}, c.args...)...)
+		if code != 2 {
+			t.Errorf("%v: exit code = %d, want 2", c.args, code)
+		}
+		if stdout != "" {
+			t.Errorf("%v: printed results:\n%s", c.args, stdout)
+		}
+		if !strings.Contains(stderr, c.want) {
+			t.Errorf("%v: stderr = %q, want it to contain %q", c.args, stderr, c.want)
+		}
+	}
+}

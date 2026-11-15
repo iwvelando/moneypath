@@ -107,3 +107,53 @@ func Pretty(res *engine.Result) string {
 	}
 	return b.String()
 }
+
+// ComparisonCSV renders scenario a minus scenario b in the conventions of the
+// forecast CSV (spec chapter 05).
+func ComparisonCSV(res *engine.Result, a, b *engine.ScenarioResult) string {
+	cmp := res.Compare(a, b)
+	pair := fmt.Sprintf("%s minus %s", a.Name, b.Name)
+	var sb strings.Builder
+	writeCSVRow(&sb, []string{"date", fmt.Sprintf("liquid (%s)", pair), fmt.Sprintf("total (%s)", pair)})
+	for idx, m := range res.Dates() {
+		writeCSVRow(&sb, []string{
+			m.String(),
+			money.Fixed(cmp.Cash.Difference[idx]),
+			money.Fixed(cmp.Total.Difference[idx]),
+		})
+	}
+	return sb.String()
+}
+
+// ComparisonPretty renders scenario a minus scenario b for a reader: the
+// break-even months of each series, then the differences month by month
+// (spec chapter 05).
+func ComparisonPretty(res *engine.Result, a, b *engine.ScenarioResult) string {
+	cmp := res.Compare(a, b)
+	var sb strings.Builder
+	fmt.Fprintf(&sb, "--- %s minus %s ---\n", a.Name, b.Name)
+	for _, series := range []struct {
+		label string
+		cmp   engine.SeriesComparison
+	}{{"Cash", cmp.Cash}, {"Total", cmp.Total}} {
+		months := make([]string, 0, len(series.cmp.BreakEven))
+		for _, be := range series.cmp.BreakEven {
+			leader := b.Name
+			if be.FirstAhead {
+				leader = a.Name
+			}
+			months = append(months, fmt.Sprintf("%s (%s moves ahead)", be.Month.String(), leader))
+		}
+		if len(months) == 0 {
+			months = []string{"none"}
+		}
+		fmt.Fprintf(&sb, "%s break-even: %s\n", series.label, strings.Join(months, ", "))
+	}
+	sb.WriteString("Date    | Cash difference | Total difference\n")
+	sb.WriteString("____    | _______________ | ________________\n")
+	for idx, m := range res.Dates() {
+		fmt.Fprintf(&sb, "%s | %s | %s\n",
+			m.String(), Currency(cmp.Cash.Difference[idx]), Currency(cmp.Total.Difference[idx]))
+	}
+	return sb.String()
+}

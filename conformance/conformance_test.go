@@ -9,6 +9,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strconv"
 	"strings"
 	"testing"
@@ -26,6 +27,25 @@ type manifest struct {
 	Optimize        bool             `yaml:"optimize"`
 	Tolerance       float64          `yaml:"tolerance"`
 	ExpectedMetrics []scenarioMetric `yaml:"expectedMetrics"`
+	// ExpectedComparisons pins ordered pairs of scenarios (spec chapter 04 §9).
+	ExpectedComparisons []pairComparison `yaml:"expectedComparisons"`
+}
+
+type pairComparison struct {
+	Scenario string            `yaml:"scenario"`
+	Against  string            `yaml:"against"`
+	Cash     *seriesComparison `yaml:"cash"`
+	Total    *seriesComparison `yaml:"total"`
+}
+
+type seriesComparison struct {
+	BreakEven        []breakEvenMonth `yaml:"breakEven"`
+	EndingDifference float64          `yaml:"endingDifference"`
+}
+
+type breakEvenMonth struct {
+	Date   string `yaml:"date"`
+	Leader string `yaml:"leader"`
 }
 
 type scenarioMetric struct {
@@ -113,6 +133,75 @@ func runCase(t *testing.T, dir string) {
 	}
 	compareCSV(t, string(wantBytes), got, mf.Tolerance)
 	compareMetrics(t, mf.ExpectedMetrics, res)
+	compareComparisons(t, mf.ExpectedComparisons, res, string(wantBytes), mf.Tolerance)
+}
+
+// compareComparisons checks each pinned pair: its break-even months exactly,
+// its ending differences within 0.01, and every month's difference against
+// the expected.csv columns it derives from (spec chapter 08).
+func compareComparisons(t *testing.T, want []pairComparison, res *engine.Result, wantCSV string, tol float64) {
+	index := map[string]int{}
+	for i, sc := range res.Scenarios {
+		index[sc.Name] = i
+	}
+	rows := parseCSV(t, wantCSV)
+	for _, wp := range want {
+		pair := wp.Scenario + " minus " + wp.Against
+		a, aok := index[wp.Scenario]
+		b, bok := index[wp.Against]
+		if !aok || !bok {
+			t.Errorf("expectedComparisons %s: scenario missing from results", pair)
+			continue
+		}
+		got := res.Compare(res.Scenarios[a], res.Scenarios[b])
+		for _, series := range []struct {
+			name   string
+			want   *seriesComparison
+			got    engine.SeriesComparison
+			column int // offset of the series within a scenario's CSV columns
+		}{
+			{"cash", wp.Cash, got.Cash, 1},
+			{"total", wp.Total, got.Total, 2},
+		} {
+			if series.want == nil {
+				t.Errorf("expectedComparisons %s: %s is not pinned", pair, series.name)
+				continue
+			}
+			gotMonths := []breakEvenMonth{}
+			for _, be := range series.got.BreakEven {
+				leader := wp.Against
+				if be.FirstAhead {
+					leader = wp.Scenario
+				}
+				gotMonths = append(gotMonths, breakEvenMonth{Date: be.Month.String(), Leader: leader})
+			}
+			wantMonths := append([]breakEvenMonth{}, series.want.BreakEven...)
+			if !reflect.DeepEqual(gotMonths, wantMonths) {
+				t.Errorf("%s: %s break-even want %v, got %v", pair, series.name, wantMonths, gotMonths)
+			}
+			diff := series.got.Difference
+			if len(diff) != len(rows)-1 {
+				t.Errorf("%s: %s difference has %d months, expected.csv has %d", pair, series.name, len(diff), len(rows)-1)
+				continue
+			}
+			if last := diff[len(diff)-1]; math.Abs(last-series.want.EndingDifference) > 0.01 {
+				t.Errorf("%s: %s endingDifference want %.4f, got %.4f", pair, series.name, series.want.EndingDifference, last)
+			}
+			for i, d := range diff {
+				row := rows[i+1]
+				av, aerr := strconv.ParseFloat(row[a*3+series.column], 64)
+				bv, berr := strconv.ParseFloat(row[b*3+series.column], 64)
+				if aerr != nil || berr != nil {
+					t.Errorf("%s: %s in %s: non-numeric expected.csv cell", pair, series.name, row[0])
+					continue
+				}
+				// Each of the two cells may be off by the tolerance.
+				if math.Abs(d-(av-bv)) > 2*tol {
+					t.Errorf("%s: %s in %s: want %.2f, got %.4f", pair, series.name, row[0], av-bv, d)
+				}
+			}
+		}
+	}
 }
 
 func parseCSV(t *testing.T, s string) [][]string {

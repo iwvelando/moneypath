@@ -48,6 +48,26 @@ export interface ScenarioMetrics {
   optimizations?: OptimizationSummary[] | null;
 }
 
+/** A month in which the lead changes hands; `leader` indexes `scenarios`. */
+export interface BreakEvenMonth {
+  date: string;
+  leader: number;
+}
+
+/** `difference` is index-aligned with `rows`. */
+export interface SeriesComparison {
+  difference: number[];
+  breakEven: BreakEvenMonth[];
+}
+
+/** `scenario` minus `against`, both indexes into `scenarios`; decided by the engine. */
+export interface ScenarioComparison {
+  scenario: number;
+  against: number;
+  cash: SeriesComparison;
+  total: SeriesComparison;
+}
+
 export interface ScenarioValue {
   liquid?: number | null;
   total?: number | null;
@@ -65,6 +85,8 @@ export interface ForecastResults {
   rows: ResultRow[];
   csv: string;
   metrics: ScenarioMetrics[];
+  /** Every ordered pair of scenarios; empty with fewer than two. */
+  comparisons?: ScenarioComparison[] | null;
   warnings?: string[] | null;
   configYaml: string;
 }

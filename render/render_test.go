@@ -157,3 +157,64 @@ func TestPrettyListsKeyFigures(t *testing.T) {
 		t.Errorf("pretty output missing %q\n--- got ---\n%s", want, got)
 	}
 }
+
+func crossingResult() *engine.Result {
+	start, _ := config.ParseMonth("2025-01")
+	return &engine.Result{
+		Start: start,
+		End:   start + 3,
+		Scenarios: []*engine.ScenarioResult{
+			{Name: "rent", Liquid: []float64{1000, 1500, 2000, 2500}, Total: []float64{1000, 1500, 2000, 2500}},
+			{Name: "buy", Liquid: []float64{1000, 400, 2000, 3734.5}, Total: []float64{1000, 1400, 1900, 2400}},
+		},
+	}
+}
+
+// Spec chapter 05: the comparison's pretty form is a heading, one break-even
+// line per series naming the scenario that moves ahead, and the differences
+// month by month.
+func TestComparisonPretty(t *testing.T) {
+	res := crossingResult()
+	got := ComparisonPretty(res, res.Scenarios[1], res.Scenarios[0])
+	want := `--- buy minus rent ---
+Cash break-even: 2025-04 (buy moves ahead)
+Total break-even: none
+Date    | Cash difference | Total difference
+____    | _______________ | ________________
+2025-01 | $0.00 | $0.00
+2025-02 | -$1,100.00 | -$100.00
+2025-03 | $0.00 | -$100.00
+2025-04 | $1,234.50 | -$100.00
+`
+	if got != want {
+		t.Errorf("ComparisonPretty =\n%s\nwant\n%s", got, want)
+	}
+}
+
+// Spec chapter 05: several break-even months are listed in order on one line.
+func TestComparisonPrettyListsEveryBreakEvenMonth(t *testing.T) {
+	start, _ := config.ParseMonth("2025-01")
+	res := &engine.Result{Start: start, End: start + 2, Scenarios: []*engine.ScenarioResult{
+		{Name: "a", Liquid: []float64{1, 3, 1}, Total: []float64{1, 3, 1}},
+		{Name: "b", Liquid: []float64{2, 2, 2}, Total: []float64{2, 2, 2}},
+	}}
+	got := ComparisonPretty(res, res.Scenarios[0], res.Scenarios[1])
+	if want := "Cash break-even: 2025-02 (a moves ahead), 2025-03 (b moves ahead)\n"; !strings.Contains(got, want) {
+		t.Errorf("ComparisonPretty =\n%s\nwant a line %q", got, want)
+	}
+}
+
+// Spec chapter 05: the comparison's CSV keeps the forecast CSV's conventions.
+func TestComparisonCSV(t *testing.T) {
+	res := crossingResult()
+	got := ComparisonCSV(res, res.Scenarios[1], res.Scenarios[0])
+	want := `"date","liquid (buy minus rent)","total (buy minus rent)"
+"2025-01","0.00","0.00"
+"2025-02","-1100.00","-100.00"
+"2025-03","0.00","-100.00"
+"2025-04","1234.50","-100.00"
+`
+	if got != want {
+		t.Errorf("ComparisonCSV =\n%s\nwant\n%s", got, want)
+	}
+}

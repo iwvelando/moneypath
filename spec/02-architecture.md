@@ -76,6 +76,12 @@ The WASM module exposes to JavaScript (names normative):
         "iterations": 0, "converged": true, "notes": ["…"]}
      ]}
   ],
+  "comparisons": [
+    {"scenario": 0, "against": 1,
+     "cash":  {"difference": [0.0, …],
+               "breakEven": [{"date": "2026-03", "leader": 1}]},
+     "total": {"difference": [0.0, …], "breakEven": []}}
+  ],
   "warnings": ["…validation warnings…"],
   "configYaml": "…the config as run (reflects optimizer adjustments when enabled)…"
 }
@@ -88,6 +94,15 @@ no value for. Numbers are raw float64 values; formatting is the consumer's job.
 `keyFigures` (chapter 04 §8) is present for every scenario; `lowestCashDate` is a
 `YYYY-MM` string. `emergencyFund` is absent when the recommendation is disabled, and
 `optimizations` when the optimizer produced no summary for the scenario.
+
+`comparisons` (chapter 04 §9) holds one entry for every ordered pair of distinct
+scenarios, `scenario` minus `against`, both given as indexes into `scenarios`. Entries
+are ordered by `scenario` and then by `against`, so both orders of a pair are present and
+a consumer never negates a difference. It is an empty array when there are fewer than two
+scenarios. For `cash` and for `total`, `difference` is index-aligned with `rows`, and
+`breakEven` lists the break-even months in ascending order, each with its `YYYY-MM`
+`date` and the index of the scenario that moves ahead as `leader`; it is an empty array
+when the lead never changes hands.
 
 In `optimizations`, `original` and `value` are the raw numbers the optimizer searched over
 — currency for `amount`, a count for `frequency`, a month index (`year·12 + month − 1`)

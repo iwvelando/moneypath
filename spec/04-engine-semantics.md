@@ -405,3 +405,41 @@ When `start ≥ end` only the initial row is recorded (§1), so all four describ
 The figures describe the forecast that is reported: with the optimizer (§7), the final
 forecast on the adjusted config. They do not depend on the emergency-fund
 recommendation (§5) and are reported when it is disabled.
+
+## 9. Differences and break-even
+
+Two active scenarios can be compared as an ordered pair (A, B), read "A minus B". Like
+the key figures (§8), the comparison is read from the recorded series (§1) and adds
+nothing to the simulation. It is made for cash and for total separately:
+
+- **Difference** — for every recorded month `m`, `liquid_A[m] − liquid_B[m]` and
+  `total_A[m] − total_B[m]`, unrounded like every other reported number. The pair
+  (B, A) reports the same amounts with the opposite sign.
+- **Who leads a month** — the scenario whose value is greater in whole cents: A leads
+  `m` when `round2(A[m]) > round2(B[m])`, B leads when it is less, and otherwise the
+  month is **level**. A gap under half a cent is float noise, not a lead.
+- **Break-even months** — walk the recorded months in order, remembering the scenario
+  that most recently led. A month led by the *other* scenario is a break-even month,
+  reported with the scenario that moves ahead in it; that scenario is then the one
+  remembered.
+
+What follows from the rule, each deliberate:
+
+- A level month is never a break-even month and does not forget who led before it. A
+  scenario that is caught but not passed, and then pulls away again, has not been
+  overtaken: nothing is reported.
+- When a level month does precede an overtaking, the month reported is the first one
+  the other scenario is actually ahead, not the level month.
+- The first lead taken from a level start is not a break-even month, because nobody
+  was overtaken. Scenarios usually start level: they share `startingCash`.
+- Every change of lead is reported, in month order, so two paths that cross twice
+  report two months.
+- A series with one scenario ahead in every month it is not level reports no
+  break-even months, as does a plan with only its initial row (§1).
+
+The cash and total series are walked independently, so a path can catch up in cash in a
+month in which it is still behind in total. The break-even months of (B, A) are those of
+(A, B), each with the same scenario moving ahead.
+
+The comparison describes the forecast that is reported: with the optimizer (§7), the
+final forecast on the adjusted config.

@@ -21,7 +21,29 @@ expectedMetrics: […]     # optional: per-scenario key-figure, emergency-fund a
                          # Metrics reflect the FINAL forecast — after optimizer
                          # adjustments. The last optimization's `floor` is that
                          # forecast's emergency-fund target (chapter 04 §7).
+expectedComparisons: […] # optional: differences and break-even months for named
+                         # ordered pairs (chapter 04 §9); see below.
 ```
+
+An `expectedComparisons` entry pins one ordered pair, `scenario` minus `against`, for
+`cash` and for `total`:
+
+```yaml
+expectedComparisons:
+  - scenario: take the course
+    against: stay employed
+    cash:
+      breakEven:                 # exact, in order; [] when the lead never changes
+        - {date: "2025-05", leader: take the course}
+      endingDifference: -500.00  # the last month's difference, within 0.01
+    total:
+      breakEven: []
+      endingDifference: -2900.00
+```
+
+Beyond what the entry states, every month's difference must equal the difference of that
+pair's `expected.csv` columns, within the case's `tolerance` for each of the two cells.
+`expected.csv` itself carries no comparison columns.
 
 A case passes when every numeric cell matches within `tolerance` (compare parsed values,
 not strings), and all dates, headers, and note strings match
