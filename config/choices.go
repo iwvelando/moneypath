@@ -86,6 +86,12 @@ func canonicalNode(n *yaml.Node) {
 			n.Content[i] = &cp
 		}
 	case yaml.ScalarNode:
+		// A timestamp keeps its text: every date field is a string, which takes
+		// the text as written, and Go's spelling of the time would not be it.
+		if n.ShortTag() == "!!timestamp" {
+			n.Style = 0
+			return
+		}
 		var v any
 		var plain yaml.Node
 		if n.Decode(&v) == nil && plain.Encode(v) == nil {

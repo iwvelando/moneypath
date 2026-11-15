@@ -374,6 +374,19 @@ func TestChangedEntryIsValidatedEvenWhenUnselected(t *testing.T) {
 	}
 }
 
+// A value under set is reported as written. YAML reads a full date as a
+// timestamp, and re-spelling it as one would quote a value the user never wrote.
+func TestSetValueIsQuotedAsWritten(t *testing.T) {
+	doc := with(t, "- name: Stay\n", "- name: Stay\n        change: {loans: [{name: Mortgage, set: {earlyPayoffDate: 2027-06-15}}]}\n")
+	_, _, err := load(t, doc)
+	if err == nil {
+		t.Fatal("expected an error: a payoff date names a month, not a day")
+	}
+	if !strings.Contains(err.Error(), `"2027-06-15"`) {
+		t.Errorf("error %q should quote the date as written, \"2027-06-15\"", err)
+	}
+}
+
 // A scenario's own investments and those its selected options add share one
 // list, where names are unique. Two options of one choice never meet.
 func TestInvestmentNamesAreUniqueInAResolvedScenario(t *testing.T) {
