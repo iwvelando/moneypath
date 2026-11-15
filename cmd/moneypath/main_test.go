@@ -257,6 +257,9 @@ func TestForecastCompareUsageErrors(t *testing.T) {
 	}{
 		{[]string{"--compare", "rent"}, "--compare and --against go together: name the scenario to subtract with --against"},
 		{[]string{"--against", "rent"}, "--compare and --against go together: name the scenario to subtract from with --compare"},
+		{[]string{"--compare", ""}, "--compare and --against go together: name the scenario to subtract with --against"},
+		{[]string{"--against", ""}, "--compare and --against go together: name the scenario to subtract from with --compare"},
+		{[]string{"--compare", "", "--against", ""}, `"" is not an active scenario in this plan`},
 		{[]string{"--compare", "rent", "--against", "lease"}, `"lease" is not an active scenario in this plan; the active scenarios are: rent, buy a flat`},
 		{[]string{"--compare", "rent", "--against", "rent"}, "a scenario cannot be compared with itself; name two different scenarios"},
 	} {

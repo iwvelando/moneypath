@@ -107,11 +107,20 @@ func cmdForecast(args []string) int {
 		return 2
 	}
 
-	if *compare != "" && *against == "" {
+	compareSet, againstSet := false, false
+	fs.Visit(func(f *flag.Flag) {
+		switch f.Name {
+		case "compare":
+			compareSet = true
+		case "against":
+			againstSet = true
+		}
+	})
+	if compareSet && !againstSet {
 		fmt.Fprintln(os.Stderr, "--compare and --against go together: name the scenario to subtract with --against")
 		return 2
 	}
-	if *against != "" && *compare == "" {
+	if againstSet && !compareSet {
 		fmt.Fprintln(os.Stderr, "--compare and --against go together: name the scenario to subtract from with --compare")
 		return 2
 	}
@@ -161,7 +170,7 @@ func cmdForecast(args []string) int {
 	log.logf(1, "info: ", "forecast completed in %s", time.Since(started).Round(time.Millisecond))
 
 	pretty, csv := f.Pretty, f.CSV
-	if *compare != "" {
+	if compareSet {
 		if pretty, csv, err = app.CompareScenarios(f, *compare, *against); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			return 2

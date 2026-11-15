@@ -85,13 +85,34 @@ func TestCompareTheFirstLeadFromALevelStartIsNotABreakEven(t *testing.T) {
 	}
 }
 
-// Spec chapter 04 §9: the lead is decided in whole cents, so a gap under half
-// a cent is level and float noise never reports a crossing.
+// Spec chapter 04 §9: the lead is decided by rounding both balances to whole
+// cents, so values that round to the same amount never report a crossing.
 func TestCompareDecidesTheLeadInWholeCents(t *testing.T) {
 	got := breakEvens(t, []float64{10, 5, 10.004, 9.996, 10.01}, []float64{10, 10, 10, 10, 10})
 	want := []BreakEven{{Month: month(t, "2025-05"), FirstAhead: true}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("break-even = %v, want %v", got, want)
+	}
+}
+
+// Rounding the difference instead of both balances loses a real lead across
+// a rounding boundary, even when the raw gap is smaller than half a cent.
+func TestCompareRoundsBothBalancesAtTheCentBoundary(t *testing.T) {
+	for _, c := range []struct {
+		name string
+		last float64
+		want []BreakEven
+	}{
+		{"below", 10.0049, []BreakEven{}},
+		{"at", 10.005, []BreakEven{{Month: month(t, "2025-03"), FirstAhead: true}}},
+		{"above", 10.0051, []BreakEven{{Month: month(t, "2025-03"), FirstAhead: true}}},
+	} {
+		t.Run(c.name, func(t *testing.T) {
+			got := breakEvens(t, []float64{10.004, 9, c.last}, []float64{10.004, 10.004, 10.004})
+			if !reflect.DeepEqual(got, c.want) {
+				t.Errorf("break-even = %v, want %v", got, c.want)
+			}
+		})
 	}
 }
 

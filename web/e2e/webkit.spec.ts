@@ -53,6 +53,23 @@ test('a pointer selection works after keyboard focus in the workbar', async ({ p
 
 test('the comparison tab and its series control answer taps and keys', async ({ page }) => {
   const found = problems(page);
+  // WebKit styles a select's internal text with a blocked inline declaration.
+  // Match that event's target, rather than ignoring all stylesheet errors.
+  await page.addInitScript(() => {
+    const violations: { nativeSelect: boolean; directive: string; blocked: string }[] = [];
+    Object.assign(window, { comparisonPolicyViolations: violations });
+    document.addEventListener('securitypolicyviolation', (event) => {
+      violations.push({
+        nativeSelect:
+          event.target instanceof HTMLSelectElement &&
+          !event.target.hasAttribute('style') &&
+          event.effectiveDirective === 'style-src-attr' &&
+          event.blockedURI === 'inline',
+        directive: event.effectiveDirective,
+        blocked: event.blockedURI,
+      });
+    });
+  });
   await openApp(page);
   await runForecast(page);
   const tabs = page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab');
@@ -147,9 +164,10 @@ test('the comparison tab and its series control answer taps and keys', async ({ 
   await page.locator('.comparison').scrollIntoViewIfNeeded();
   await table.locator('tbody').getByRole('row').first().getByRole('cell').first().tap();
   await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
-  // Playwright's WebKit builds a visible <select> with a stylesheet of its own,
-  // which the page's policy refuses and the browser reports. The pickers draw
-  // and work regardless, as the steps above show; nothing else may be refused.
-  const ownSelectStyle = /^Refused to apply a stylesheet\b/;
-  expect(found.filter((problem) => !ownSelectStyle.test(problem))).toEqual([]);
+  const violations: { nativeSelect: boolean; directive: string; blocked: string }[] =
+    await page.evaluate(() => Reflect.get(window, 'comparisonPolicyViolations'));
+  expect(violations.filter((violation) => !violation.nativeSelect)).toEqual([]);
+  const selectMessage = "Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in the style-src directive of the Content Security Policy.";
+  expect(found.filter((problem) => problem !== selectMessage)).toEqual([]);
+  expect(found.filter((problem) => problem === selectMessage)).toHaveLength(violations.length);
 });

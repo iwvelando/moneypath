@@ -417,7 +417,8 @@ nothing to the simulation. It is made for cash and for total separately:
   (B, A) reports the same amounts with the opposite sign.
 - **Who leads a month** — the scenario whose value is greater in whole cents: A leads
   `m` when `round2(A[m]) > round2(B[m])`, B leads when it is less, and otherwise the
-  month is **level**. A gap under half a cent is float noise, not a lead.
+  month is **level**. Values that round to the same whole-cent amount are level;
+  even a sub-cent gap can establish a lead when the values straddle a rounding boundary.
 - **Break-even months** — walk the recorded months in order, remembering the scenario
   that most recently led. A month led by the *other* scenario is a break-even month,
   reported with the scenario that moves ahead in it; that scenario is then the one
