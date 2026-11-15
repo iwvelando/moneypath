@@ -101,5 +101,28 @@ test('the comparison tab and its series control answer taps and keys', async ({ 
   await compare.tap();
   await expect(comparison).toBeVisible();
   expect(await overflow(page), 'comparison after switching').toBeLessThanOrEqual(0);
+
+  // A scenario's row in the key figures opens it. The tap moves focus to the
+  // scenario's tab, and a phone would ring that tab unless told otherwise.
+  const table = comparison.getByRole('table', { name: 'Key figures for each scenario' });
+  await table.scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'key figures').toBeLessThanOrEqual(0);
+  await table.getByRole('button', { name: 'save more aggressively' }).tap();
+  await expect(tabs.nth(1)).toHaveAttribute('aria-selected', 'true');
+  await expect(tabs.nth(1)).toBeFocused();
+  await expect(tabs.nth(1)).toBeInViewport({ ratio: 1 });
+  expect((await tabs.nth(1).boundingBox())!.y, 'room above the tab').toBeGreaterThanOrEqual(8);
+  expect(await tabs.nth(1).evaluate((tab) => getComputedStyle(tab).outlineStyle)).toBe('none');
+  await expect(page.locator('.results-table')).toBeVisible();
+  // Reached with the keyboard afterwards, the same tab shows its ring again.
+  await tabs.nth(1).press('ArrowLeft');
+  await tabs.first().press('ArrowRight');
+  await expect(tabs.nth(1)).toBeFocused();
+  expect(await tabs.nth(1).evaluate((tab) => getComputedStyle(tab).outlineStyle)).not.toBe('none');
+
+  // Tapping anywhere else on a row works too.
+  await compare.tap();
+  await table.locator('tbody').getByRole('row').first().getByRole('cell').first().tap();
+  await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
   expect(found).toEqual([]);
 });

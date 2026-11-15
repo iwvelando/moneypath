@@ -92,8 +92,16 @@ type valueJSON struct {
 }
 
 type metricJSON struct {
-	EmergencyFund *efJSON   `json:"emergencyFund,omitempty"`
-	Optimizations []optJSON `json:"optimizations,omitempty"`
+	KeyFigures    keyFiguresJSON `json:"keyFigures"`
+	EmergencyFund *efJSON        `json:"emergencyFund,omitempty"`
+	Optimizations []optJSON      `json:"optimizations,omitempty"`
+}
+
+type keyFiguresJSON struct {
+	LowestCash     float64 `json:"lowestCash"`
+	LowestCashDate string  `json:"lowestCashDate"`
+	EndingCash     float64 `json:"endingCash"`
+	EndingTotal    float64 `json:"endingTotal"`
 }
 
 type efJSON struct {
@@ -157,7 +165,12 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 		out.Rows = append(out.Rows, row)
 	}
 	for _, sc := range res.Scenarios {
-		m := metricJSON{}
+		m := metricJSON{KeyFigures: keyFiguresJSON{
+			LowestCash:     sc.KeyFigures.LowestCash,
+			LowestCashDate: sc.KeyFigures.LowestCashDate.String(),
+			EndingCash:     sc.KeyFigures.EndingCash,
+			EndingTotal:    sc.KeyFigures.EndingTotal,
+		}}
 		if sc.EmergencyFund != nil {
 			ef := sc.EmergencyFund
 			m.EmergencyFund = &efJSON{

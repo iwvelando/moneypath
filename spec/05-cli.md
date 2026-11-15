@@ -81,6 +81,7 @@ Per scenario, in config order:
 
 ```
 --- Results for scenario <name> ---
+Lowest cash: $28,410.00 in 2026-03 | Ending cash: $41,870.25 | Ending total: $96,512.40
 Emergency fund target (6.0 months): $12,345.67 | Avg monthly expenses: $2,057.61 | Starting coverage: 14.6 months | Surplus: $17,654.33
 Optimization adjustments:
  - <event> (<field>): <original> -> <value> | floor $… | min cash $… | headroom $… | iterations N (converged|not converged)
@@ -93,6 +94,8 @@ ____    | ________________ | _______________ | _____
 
 - Currency display: `$` + thousands separators + 2 decimals; negative as `-$1,234.56`;
   an amount that rounds to zero is `$0.00`, never `-$0.00`.
+- The key-figures line always appears (chapter 04 §8): the lowest cash and the month it
+  is reached, then cash and total at the end of the plan.
 - The emergency-fund line appears only when the recommendation is enabled; `Starting
   coverage` only when > 0; exactly one of `Shortfall`/`Surplus`, only when > 0.
 - The optimization block appears only when the optimizer ran and produced summaries.

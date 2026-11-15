@@ -48,7 +48,7 @@ const three = () =>
 
 function show(data: ForecastResults): void {
   act(() => {
-    render(<Comparison results={data} />, host);
+    render(<Comparison results={data} onOpenScenario={() => {}} />, host);
   });
 }
 
@@ -269,6 +269,19 @@ describe('the scenario comparison', () => {
     show(data);
     expect(legend().map((entry) => entry.name)).toEqual(['twin', 'twin', 'other']);
     expect(host.querySelectorAll('.chart__line')).toHaveLength(3);
+  });
+
+  it('lists each scenario’s key figures in a table under the chart', () => {
+    show(three());
+    const chart = host.querySelector('.comparison .chart')!;
+    const table = host.querySelector('.comparison table')!;
+    expect(table.querySelector('caption')?.textContent).toBe('Key figures for each scenario');
+    expect(chart.compareDocumentPosition(table) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect([...table.querySelectorAll('tbody th')].map((th) => th.textContent?.trim())).toEqual([
+      'steady',
+      'buy the house',
+      'sabbatical',
+    ]);
   });
 
   it('says so when there is nothing to draw', () => {

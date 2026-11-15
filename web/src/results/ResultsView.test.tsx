@@ -178,6 +178,37 @@ describe('the comparison entry', () => {
     expect(document.activeElement).toBe(tabs()[2]);
   });
 
+  it('opens a scenario from its row in the key figures, taking focus to its tab', () => {
+    showScenarios(['a', 'b', 'c']);
+    act(() => tabs()[3]!.click());
+    const open = host.querySelectorAll<HTMLButtonElement>('.comparison tbody th button')[1]!;
+    // A click no pointer press counted: the keyboard.
+    act(() => {
+      open.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 0 }));
+    });
+    expect(host.querySelector('.comparison')).toBeNull();
+    expect(host.querySelector('.results-table')).not.toBeNull();
+    expect(tabs().map((tab) => tab.getAttribute('aria-selected'))).toEqual(['false', 'true', 'false', 'false']);
+    expect(document.activeElement).toBe(tabs()[1]);
+    // Reached from the keyboard, the tab shows its focus ring as usual.
+    expect(tabs()[1]!.classList.contains('is-focus-quiet')).toBe(false);
+  });
+
+  it('draws no focus ring on the tab when a tap or click opened the scenario', () => {
+    showScenarios(['a', 'b']);
+    act(() => tabs()[2]!.click());
+    const open = host.querySelectorAll<HTMLButtonElement>('.comparison tbody th button')[1]!;
+    act(() => {
+      open.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    });
+    expect(document.activeElement).toBe(tabs()[1]);
+    expect(tabs()[1]!.classList.contains('is-focus-quiet')).toBe(true);
+    // The ring comes back once focus has left and returned.
+    act(() => tabs()[1]!.blur());
+    act(() => tabs()[1]!.focus());
+    expect(tabs()[1]!.classList.contains('is-focus-quiet')).toBe(false);
+  });
+
   it('falls back to the first scenario when a new run has only one', () => {
     showScenarios(['a', 'b']);
     act(() => tabs()[2]!.click());
