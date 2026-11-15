@@ -18,13 +18,12 @@ tolerance: 0.01          # max |actual − expected| per numeric cell; notes/dat
 expectedMetrics: […]     # optional: per-scenario emergency-fund and optimization
                          # metrics (rounded to 4 decimals; compare within 0.01).
                          # Metrics reflect the FINAL forecast — after optimizer
-                         # adjustments — while each optimization's `floor` is
-                         # snapshotted from the baseline run per chapter 04 §7,
-                         # so the two can legitimately disagree.
+                         # adjustments. The last optimization's `floor` is that
+                         # forecast's emergency-fund target (chapter 04 §7).
 ```
 
 A case passes when every numeric cell matches within `tolerance` (compare parsed values,
-not strings, to stay robust to `-0.00`), and all dates, headers, and note strings match
+not strings), and all dates, headers, and note strings match
 exactly. Tolerances absorb float64 formatting edge cases, not semantic slack.
 
 ## `testdata/migration/<case>/`

@@ -19,6 +19,14 @@ A moneypath config is a single YAML document. This chapter is normative. See
   tax the engine applies is on investment growth and withdrawals (`taxRate`,
   `withdrawalTaxRate`), and any user-facing help for an amount field SHOULD say so.
 - **Rates** are percentages (e.g. `6.5` means 6.5 % per year), never fractions.
+- **Annual rates are APRs.** `interestRate`, `annualReturnRate` and `cashInterestRate`
+  are nominal yearly rates: the engine applies one twelfth each month (chapter 04
+  preamble). For a loan that is the rate on the statement. For cash and investments the
+  monthly compounding yields slightly more over a year than the number entered — the
+  APY: `4.0` yields about 4.07 %, `7.0` about 7.23 %. A figure quoted as an APY (most
+  savings accounts) or as an average annual return can be entered exactly as
+  `1200 · ((1 + APY/100)^(1/12) − 1)`; for an APY of 7 that is `6.78`. User-facing help
+  for these fields SHOULD name the convention.
 - Unknown top-level or nested keys SHOULD produce a validation warning naming the key
   (catches typos), but MUST NOT be a hard error.
 
@@ -32,8 +40,8 @@ simulation:
   endDate: 2090-01    # required; the simulation stops at this month (inclusive)
   startingCash: 30000.00   # required; cash balance as of the END of the month
                            # preceding startDate
-  cashInterestRate: 4.0    # optional; default 0; annual percent earned on positive
-                           # cash, compounded monthly (chapter 04 §1)
+  cashInterestRate: 4.0    # optional; default 0; APR earned on positive cash,
+                           # compounded monthly — about 4.07 % a year (chapter 04 §1)
 
 recommendations:      # optional block
   emergencyFundMonths: 6   # optional; default 6; 0 disables the recommendation
@@ -101,7 +109,7 @@ Per-context rules:
 - name: 1234 Street Address   # required, non-empty
   principal: 150000.00        # required; original principal before down payment
   downPayment: 10000.00       # optional; default 0; paid at startDate
-  interestRate: 3.75          # required; annual percentage; 0 is allowed
+  interestRate: 3.75          # required; APR (annual percentage rate); 0 is allowed
   term: 360                   # required; months; ≥ 1
   startDate: 2018-01          # required; month of the first payment
   escrow: 500.00              # optional; monthly escrow added to each payment
@@ -109,7 +117,8 @@ Per-context rules:
                               # remaining/original principal ratio exceeds the cutoff
   mortgageInsuranceCutoff: 78.0  # optional; percent; see chapter 04 §Loans
   earlyPayoffThreshold: 5000.00  # optional; see chapter 04 §Early payoff by threshold
-  earlyPayoffDate: 2022-06    # optional; pay the loan off at this month
+  earlyPayoffDate: 2022-06    # optional; pay the loan off at this month (the balance
+                              # plus that month's interest)
   sellProperty: true          # optional; only meaningful with an early payoff
   sellPrice: 153000.00        # optional; default: principal
   sellCostsNet: 9500.00       # optional; signed; positive = costs paid at sale
@@ -131,7 +140,8 @@ mechanism is a warning (it has no effect). `mortgageInsurance > 0` with no
 ```yaml
 - name: Brokerage account    # required, unique within its list
   startingValue: 25000.00    # optional; default 0; balance at simulation start
-  annualReturnRate: 6.5      # optional; default 0; annual percent, compounded monthly
+  annualReturnRate: 6.5      # optional; default 0; APR, compounded monthly — about
+                             # 6.70 % a year; may be negative
   taxRate: 15.0              # optional; default 0; percent applied to positive monthly
                              # growth (models tax drag on gains)
   withdrawalTaxRate: 15.0    # optional; default 0; percent applied to the growth

@@ -138,8 +138,10 @@ export function segments(series: Series): { index: number; value: number }[][] {
 /**
  * Fractional index spans where the series is below zero, with linearly
  * interpolated crossings so the tinted region meets the line exactly at zero.
+ * A value within `tolerance` of zero counts as zero, so a caller can keep
+ * float noise from reading as a dip below it.
  */
-export function negativeSpans(series: Series): Span[] {
+export function negativeSpans(series: Series, tolerance = 0): Span[] {
   const spans: Span[] = [];
   let start: number | null = null;
 
@@ -150,7 +152,7 @@ export function negativeSpans(series: Series): Span[] {
 
   for (let i = 0; i < series.length; i += 1) {
     const value = at(i);
-    const negative = value !== null && value < 0;
+    const negative = value !== null && value < -tolerance;
 
     if (negative && start === null) {
       const previous = i > 0 ? at(i - 1) : null;

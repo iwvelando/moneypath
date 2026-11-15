@@ -8,9 +8,20 @@ function group(digits: string): string {
   return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 }
 
+/**
+ * Amounts closer to zero than this display as 0.00. Sums of cent amounts pick
+ * up float noise (0.3 − 0.1 − 0.1 − 0.1 is −2.8e-17), and that is not a debt.
+ */
+export const HALF_CENT = 0.005;
+
+/** True when the amount displays as negative; one that rounds to zero does not. */
+export function isNegativeMoney(value: number): boolean {
+  return value < 0 && Math.abs(value).toFixed(2) !== '0.00';
+}
+
 export function formatMoney(value: number): string {
   if (!Number.isFinite(value)) return '—';
-  const negative = value < 0 || Object.is(value, -0);
+  const negative = isNegativeMoney(value);
   const fixed = Math.abs(value).toFixed(2);
   const dot = fixed.indexOf('.');
   const whole = fixed.slice(0, dot);

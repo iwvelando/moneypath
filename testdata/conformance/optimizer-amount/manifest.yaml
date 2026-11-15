@@ -1,4 +1,4 @@
-description: Optimizer adjusts an infeasible expense amount to the largest affordable spending against the emergency-fund floor. The chosen amount lands on a whole cent, snapped up so the reported headroom is the headroom the plan actually has.
+description: Optimizer adjusts an infeasible expense amount to the largest affordable spending against the emergency-fund floor, which is the chosen plan's own emergency-fund target. The chosen amount lands on a whole cent, snapped up so the reported headroom is the headroom the plan actually has.
 normative: true
 optimize: true
 tolerance: 0.01
@@ -6,21 +6,21 @@ expectedMetrics:
   - scenario: base plan
     emergencyFund:
       targetMonths: 3.00
-      averageMonthlyExpenses: 1907.7506
-      targetAmount: 5723.2517
+      averageMonthlyExpenses: 1924.0458
+      targetAmount: 5772.1375
       initialLiquid: 5000.00
-      fundedMonths: 2.6209
-      shortfall: 723.2517
+      fundedMonths: 2.5987
+      shortfall: 772.1375
       surplus: 0.00
     optimizations:
       - targetName: New expense
         field: amount
         original: -500.00
-        value: -184.72
+        value: -212.65
         originalDisplay: "-$500.00"
-        valueDisplay: "-$184.72"
-        floor: 6275.00
-        minimumCash: 6275.04
-        headroom: 0.04
+        valueDisplay: "-$212.65"
+        floor: 5772.1375
+        minimumCash: 5772.30
+        headroom: 0.1625
         iterations: 16
         converged: true

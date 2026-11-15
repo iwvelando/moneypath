@@ -53,7 +53,7 @@ func TestForecastWriteConfigCapturesOptimizedValues(t *testing.T) {
 	if err != nil {
 		t.Fatalf("--write-config produced no file: %v", err)
 	}
-	if !strings.Contains(string(written), "-184.72") {
+	if !strings.Contains(string(written), "-212.65") {
 		t.Errorf("written config does not carry the optimized amount:\n%s", written)
 	}
 	// The source config must be left exactly as the user wrote it.
@@ -81,7 +81,7 @@ func TestForecastWriteConfigWithoutOptimize(t *testing.T) {
 	if !strings.Contains(string(written), "-500") {
 		t.Errorf("canonical config lost the configured amount:\n%s", written)
 	}
-	if strings.Contains(string(written), "-184.72") {
+	if strings.Contains(string(written), "-212.65") {
 		t.Errorf("no optimizer was asked for, but the config was adjusted:\n%s", written)
 	}
 }

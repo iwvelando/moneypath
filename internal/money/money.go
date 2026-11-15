@@ -7,9 +7,19 @@ import (
 	"strings"
 )
 
+// Fixed renders x with two decimals and no symbol or separators. An amount
+// that rounds to zero is 0.00, never -0.00.
+func Fixed(x float64) string {
+	s := fmt.Sprintf("%.2f", x)
+	if s == "-0.00" {
+		return "0.00"
+	}
+	return s
+}
+
 // Format renders x as $1,234.56 (negative: -$1,234.56).
 func Format(x float64) string {
-	s := fmt.Sprintf("%.2f", x)
+	s := Fixed(x)
 	neg := strings.HasPrefix(s, "-")
 	s = strings.TrimPrefix(s, "-")
 	dot := strings.IndexByte(s, '.')

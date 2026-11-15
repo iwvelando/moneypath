@@ -71,11 +71,11 @@ func TestResultsJSONCarriesRawOptimizerValues(t *testing.T) {
 	if !ok {
 		t.Fatalf("optimization has no numeric \"value\": %v", opt["value"])
 	}
-	if value != -184.72 {
-		t.Errorf("value = %v, want -184.72", value)
+	if value != -212.65 {
+		t.Errorf("value = %v, want -212.65", value)
 	}
 	// The display strings stay, and describe the same numbers.
-	if opt["originalDisplay"] != "-$500.00" || opt["valueDisplay"] != "-$184.72" {
+	if opt["originalDisplay"] != "-$500.00" || opt["valueDisplay"] != "-$212.65" {
 		t.Errorf("displays = %v / %v", opt["originalDisplay"], opt["valueDisplay"])
 	}
 }

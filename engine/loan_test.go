@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"fmt"
 	"math"
 	"testing"
 
@@ -226,5 +227,67 @@ func TestEarlyPayoffDateSell(t *testing.T) {
 		if _, ok := ls.payments[m]; ok {
 			t.Errorf("payment at %s after sale", m)
 		}
+	}
+}
+
+// Spec chapter 04 §3.5 (by date): a payoff retires the balance left after the
+// previous month plus the interest that balance accrued since — the same
+// interest a regular payment that month would have carried.
+func TestEarlyPayoffDateChargesAccruedInterest(t *testing.T) {
+	l := validLoan(t, &config.Loan{
+		Name: "P", Principal: 120000, InterestRate: 6, Term: 12, StartDate: "2025-01",
+		EarlyPayoffDate: "2025-04",
+	}, "2025-01", "2026-12")
+	ls := buildLoanSchedule(l, month(t, "2026-12"))
+	remaining := ls.remainAfter[month(t, "2025-03")]
+	want := remaining * 1.005
+	if p := ls.payments[month(t, "2025-04")]; math.Abs(p-want) > 1e-6 {
+		t.Errorf("payoff payment = %.2f, want %.2f (balance %.2f plus a month of interest)", p, want, remaining)
+	}
+	if got := ls.remainingAsOf(month(t, "2025-04")); got != 0 {
+		t.Errorf("remaining after payoff = %.2f, want 0", got)
+	}
+}
+
+// Spec chapter 04 §3.5 (by threshold): the payoff amount measured against the
+// threshold and charged to cash is the balance plus the month's interest.
+func TestThresholdPayoffChargesAccruedInterest(t *testing.T) {
+	loan := validLoan(t, &config.Loan{
+		Name: "Loan", Principal: 1200, InterestRate: 12, Term: 120, StartDate: "2024-01",
+	}, "2025-01", "2025-04")
+	remaining := buildLoanSchedule(loan, month(t, "2025-04")).remainAfter[month(t, "2025-01")]
+	payoff := remaining * 1.01
+
+	plan := func(cash float64) *config.Config {
+		return loadConfig(t, fmt.Sprintf(`
+version: 2
+simulation: {startDate: 2025-01, endDate: 2025-04, startingCash: %.6f}
+recommendations: {emergencyFundMonths: 0}
+scenarios:
+  - name: a
+    loans:
+      - {name: Loan, principal: 1200, interestRate: 12, term: 120, startDate: 2024-01, earlyPayoffThreshold: 100}
+`, cash))
+	}
+
+	// Enough to clear the bare balance by the margin, but not the interest.
+	short, err := Run(plan(remaining+100+(payoff-remaining)/2), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if notes := short.Scenarios[0].Notes[1]; len(notes) != 0 {
+		t.Errorf("payoff fired without covering the month's interest: %q", notes)
+	}
+
+	exact, err := Run(plan(payoff+100), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantNote := fmt.Sprintf("paying off asset Loan for %.2f", payoff)
+	if notes := exact.Scenarios[0].Notes[1]; len(notes) != 1 || notes[0] != wantNote {
+		t.Fatalf("notes = %q, want [%q]", notes, wantNote)
+	}
+	if got := exact.Scenarios[0].Liquid[1]; math.Abs(got-100) > 1e-6 {
+		t.Errorf("cash after payoff = %.4f, want the 100.00 margin", got)
 	}
 }

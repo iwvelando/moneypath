@@ -52,17 +52,23 @@ scenarios:
 }
 
 // Spec chapter 04 §7: negative amount targets maximize affordable spending,
-// using the baseline floor even when the original is already feasible.
+// even when the original is already feasible. Each candidate is held to its
+// own emergency-fund target, so the chosen plan reports no shortfall against
+// the floor it was optimized for.
 func TestOptimizerLargestAffordableExpense(t *testing.T) {
 	for _, tc := range []struct {
 		name                     string
 		original, min, max, want float64
 	}{
-		{"feasible original", -100, -5000, 0, -3475},
-		{"infeasible original", -4000, -5000, 0, -2500},
+		// Car spending c lands twice (2025-04, 2025-10): the floor is
+		// 3·(12·1000 + 2c)/12 = 3000 + c/2 and cash bottoms out at 10000 − 2c
+		// in a year (10000 − 3c with the third occurrence in 2026-04 outside
+		// the window), so the largest c with 10000 − 2c ≥ 3000 + c/2 is 2800.
+		{"feasible original", -100, -5000, 0, -2800},
+		{"infeasible original", -4000, -5000, 0, -2800},
 		{"affordable lower bound", -100, -200, 0, -200},
-		{"negative upper bound", -100, -5000, -50, -3475},
-		{"bounds cross zero", -100, -5000, 100, -3475},
+		{"negative upper bound", -100, -5000, -50, -2800},
+		{"bounds cross zero", -100, -5000, 100, -2800},
 		{"original outside bounds", -100, -2000, -1000, -2000},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -81,7 +87,6 @@ scenarios:
         startDate: 2025-04
         optimize: {field: amount, min: %g, max: %g}
 `, tc.original, tc.min, tc.max))
-			baselineFloor := forecast(cfg, Options{}).Scenarios[0].EmergencyFund.TargetAmount
 			res, err := Run(cfg, Options{Optimize: true})
 			if err != nil {
 				t.Fatal(err)
@@ -90,20 +95,22 @@ scenarios:
 			if !opt.Converged || math.Abs(opt.Value-tc.want) > 0.010001 {
 				t.Fatalf("want affordable expense %v, got %+v", tc.want, opt)
 			}
-			if opt.Original != tc.original || opt.Floor != baselineFloor {
-				t.Errorf("original or baseline floor changed: %+v", opt)
+			finalFloor := res.Scenarios[0].EmergencyFund.TargetAmount
+			if opt.Original != tc.original || opt.Floor != finalFloor {
+				t.Errorf("original changed, or floor is not the chosen plan's own target %v: %+v", finalFloor, opt)
 			}
 			ev := cfg.Scenarios[0].Events[2]
 			if *ev.Amount != opt.Value || opt.ValueDisplay != money.Format(opt.Value) {
 				t.Errorf("chosen amount must match config and display: %+v", opt)
 			}
-			if e := feasibility(res.Scenarios[0].Liquid, baselineFloor); !e.feasible || e.minCash != opt.MinimumCash {
+			if e := feasibility(res.Scenarios[0].Liquid, finalFloor); !e.feasible || e.minCash != opt.MinimumCash {
 				t.Errorf("chosen expense does not preserve the reported cash floor: %+v", opt)
 			}
 			if opt.Value > tc.min {
 				// More spending beyond the search tolerance must breach the floor.
 				setEventField(ev, "amount", opt.Value-0.02)
-				if feasibility(forecast(cfg, Options{}).Scenarios[0].Liquid, baselineFloor).feasible {
+				more := forecast(cfg, Options{}).Scenarios[0]
+				if feasibility(more.Liquid, more.EmergencyFund.TargetAmount).feasible {
 					t.Errorf("larger expense %v is still feasible", *ev.Amount)
 				}
 			} else if opt.Iterations != 0 {
@@ -328,4 +335,53 @@ func mustM(t *testing.T, s string) config.Month {
 		t.Fatal(err)
 	}
 	return m
+}
+
+// Spec chapter 04 preamble and §7: feasibility compares in whole cents, so
+// float noise in a sum of cent amounts cannot cost a cent of the answer. Rent
+// and food total 1000.10; income of exactly 1000.10 holds cash at the 6000.60
+// floor it starts on.
+func TestOptimizerFeasibilityComparesInCents(t *testing.T) {
+	cfg := loadConfig(t, `
+version: 2
+simulation: {startDate: 2025-01, endDate: 2027-01, startingCash: 6000.60}
+scenarios:
+  - name: plan
+    events:
+      - {name: Rent, amount: -333.33}
+      - {name: Food, amount: -666.77}
+      - name: Salary
+        amount: 0
+        optimize: {field: amount, min: 0, max: 5000}
+`)
+	res, err := Run(cfg, Options{Optimize: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	opt := res.Scenarios[0].Optimizations[0]
+	if !opt.Converged || opt.Value != 1000.10 {
+		t.Errorf("want income 1000.10, got %+v", opt)
+	}
+	if got := money.Format(opt.Headroom); got != "$0.00" {
+		t.Errorf("headroom displays as %q, want $0.00", got)
+	}
+}
+
+// Spec chapter 04 §5: a starting balance that equals the target to the cent
+// has neither a shortfall nor a surplus, whatever float noise the average
+// expense picked up.
+func TestEmergencyFundExactlyFundedHasNoShortfall(t *testing.T) {
+	cfg := loadConfig(t, `
+version: 2
+simulation: {startDate: 2025-01, endDate: 2027-01, startingCash: 6000.60}
+scenarios:
+  - name: plan
+    events:
+      - {name: Rent, amount: -333.33}
+      - {name: Food, amount: -666.77}
+`)
+	ef := forecast(cfg, Options{}).Scenarios[0].EmergencyFund
+	if ef.Shortfall != 0 || ef.Surplus != 0 {
+		t.Errorf("shortfall %g, surplus %g; want both 0", ef.Shortfall, ef.Surplus)
+	}
 }

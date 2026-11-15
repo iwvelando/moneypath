@@ -52,11 +52,12 @@ func buildLoanSchedule(l *config.Loan, simEnd config.Month) *loanSim {
 		// Early payoff by date replaces the regular payment (§3.5).
 		if idx >= 2 && cur == l.ResolvedEarlyPayoffDate {
 			refund := escrowYear // payoff payments contain no escrow of their own
+			payoff := payoffAmount(remaining, r)
 			var pay float64
 			if l.SellProperty {
-				pay = remaining - l.ResolvedSellPrice + l.SellCostsNet - refund
+				pay = payoff - l.ResolvedSellPrice + l.SellCostsNet - refund
 			} else {
-				pay = remaining - refund
+				pay = payoff - refund
 			}
 			ls.record(cur, pay, 0, 0)
 			ls.endLoan(cur, !l.SellProperty, simEnd)
@@ -92,6 +93,11 @@ func buildLoanSchedule(l *config.Loan, simEnd config.Month) *loanSim {
 	}
 	return ls
 }
+
+// payoffAmount is what retiring a loan costs in a month: the balance left
+// after the previous month plus the interest it accrued since, the same
+// interest a regular payment that month would carry (§3.5).
+func payoffAmount(remaining, r float64) float64 { return remaining * (1 + r) }
 
 func (ls *loanSim) record(m config.Month, pay, escrow, remaining float64) {
 	ls.payments[m] = pay
@@ -179,13 +185,14 @@ func (ls *loanSim) checkThresholdPayoff(m config.Month, projectedLiquid float64,
 	if round2(remaining) <= 0 {
 		return false, nil, 0, 0
 	}
+	payoff := payoffAmount(remaining, l.InterestRate/100/12)
 	eligible := projectedLiquid
 	for _, iv := range invs {
 		if iv.inv.FundLoanPayoffs {
 			eligible += iv.netLiquidationValue()
 		}
 	}
-	if round2(eligible-remaining) < T {
+	if round2(eligible-payoff) < T {
 		return false, nil, 0, 0
 	}
 
@@ -195,12 +202,12 @@ func (ls *loanSim) checkThresholdPayoff(m config.Month, projectedLiquid float64,
 	var pay float64
 	var notes []string
 	if l.SellProperty {
-		pay = remaining - l.ResolvedSellPrice + l.SellCostsNet - refund
+		pay = payoff - l.ResolvedSellPrice + l.SellCostsNet - refund
 		notes = append(notes, fmt.Sprintf("paying off asset %s for %.2f and selling for %.2f with %.2f selling costs",
-			l.Name, remaining, l.ResolvedSellPrice, l.SellCostsNet))
+			l.Name, payoff, l.ResolvedSellPrice, l.SellCostsNet))
 	} else {
-		pay = remaining - refund
-		notes = append(notes, fmt.Sprintf("paying off asset %s for %.2f", l.Name, remaining))
+		pay = payoff - refund
+		notes = append(notes, fmt.Sprintf("paying off asset %s for %.2f", l.Name, payoff))
 	}
 	for k := range ls.payments {
 		if k > m {

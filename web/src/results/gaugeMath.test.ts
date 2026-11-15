@@ -22,6 +22,13 @@ describe('gaugeTone', () => {
     expect(gaugeTone(1.7)).toBe('ok');
   });
 
+  it('is ok when float noise leaves an exactly funded target a hair short', () => {
+    // 6000.60 of cash over 1000.10 of monthly expenses is 6 months, but the
+    // division lands just under it.
+    expect(gaugeTone(gaugeRatio(6000.6 / 1000.1000000000001, 6)!)).toBe('ok');
+    expect(gaugeTone(0.999999)).toBe('warn');
+  });
+
   it('is warn from half coverage up to the target', () => {
     expect(gaugeTone(0.5)).toBe('warn');
     expect(gaugeTone(0.99)).toBe('warn');

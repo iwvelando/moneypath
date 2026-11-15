@@ -12,7 +12,8 @@ import (
 )
 
 // runOptimized implements spec chapter 04 §7: adjust each event carrying an
-// optimize block while keeping cash at or above the emergency-fund floor.
+// optimize block while keeping cash at or above the emergency-fund floor,
+// which is each candidate plan's own emergency-fund target.
 // Negative amount targets maximize affordable spending within their bounds;
 // other targets require the smallest adjustment from the configured original.
 // Chosen values are written back into cfg before the final forecast.
@@ -46,11 +47,10 @@ func runOptimized(cfg *config.Config, opts Options) (*Result, error) {
 	for _, tr := range targets {
 		sc := cfg.Scenarios[tr.scIdx]
 		ev := sc.Events[tr.evIdx]
-		floor, ok := floors[sc.Name]
-		if !ok || floor <= 0 {
+		if floor, ok := floors[sc.Name]; !ok || floor <= 0 {
 			return nil, fmt.Errorf("optimization failed: scenario %q has no positive emergency-fund floor", sc.Name)
 		}
-		summary, err := optimizeTarget(cfg, opts, tr.scIdx, tr.evIdx, floor)
+		summary, err := optimizeTarget(cfg, opts, tr.scIdx, tr.evIdx)
 		if err != nil {
 			return nil, err
 		}
@@ -67,12 +67,17 @@ func runOptimized(cfg *config.Config, opts Options) (*Result, error) {
 	return final, nil
 }
 
+// evalResult is one candidate's outcome. floor is the candidate plan's own
+// emergency-fund target, the level its cash was held to.
 type evalResult struct {
 	feasible bool
 	minCash  float64
+	floor    float64
 }
 
-func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int, floor float64) (*Optimization, error) {
+func (e evalResult) headroom() float64 { return e.minCash - e.floor }
+
+func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int) (*Optimization, error) {
 	sc := cfg.Scenarios[scIdx]
 	ev := sc.Events[evIdx]
 	o := ev.Optimize
@@ -101,7 +106,7 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int, floor fl
 		res := forecast(cp, opts)
 		for _, sr := range res.Scenarios {
 			if sr.Name == sc.Name {
-				return feasibility(sr.Liquid, floor), nil
+				return feasibility(sr.Liquid, sr.EmergencyFund.TargetAmount), nil
 			}
 		}
 		return evalResult{}, fmt.Errorf("scenario %q missing from optimizer evaluation", sc.Name)
@@ -112,7 +117,11 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int, floor fl
 		Field:           field,
 		Original:        original,
 		OriginalDisplay: displayValue(field, original),
-		Floor:           floor,
+	}
+	report := func(e evalResult) {
+		sum.Floor = e.floor
+		sum.MinimumCash = e.minCash
+		sum.Headroom = e.headroom()
 	}
 
 	anchor := snapClamp(original)
@@ -128,8 +137,7 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int, floor fl
 	if anchorEval.feasible {
 		sum.Value = anchor
 		sum.ValueDisplay = displayValue(field, anchor)
-		sum.MinimumCash = anchorEval.minCash
-		sum.Headroom = anchorEval.minCash - floor
+		report(anchorEval)
 		sum.Converged = true
 		return sum, nil
 	}
@@ -146,17 +154,16 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int, floor fl
 	if !loEval.feasible && !hiEval.feasible {
 		// Keep the original value; report the higher-headroom bound.
 		best := loEval
-		if hiEval.minCash > loEval.minCash {
+		if hiEval.headroom() > loEval.headroom() {
 			best = hiEval
 		}
 		sum.Value = original
 		sum.ValueDisplay = displayValue(field, original)
-		sum.MinimumCash = best.minCash
-		sum.Headroom = best.minCash - floor
+		report(best)
 		sum.Converged = false
 		sum.Notes = append(sum.Notes, fmt.Sprintf(
 			"unable to satisfy minimum cash %s within bounds %s to %s",
-			money.Format(floor), displayValue(field, lo), displayValue(field, hi)))
+			money.Format(best.floor), displayValue(field, lo), displayValue(field, hi)))
 		return sum, nil
 	}
 
@@ -202,21 +209,22 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int, floor fl
 	}
 	sum.Value = best.value
 	sum.ValueDisplay = displayValue(field, best.value)
-	sum.MinimumCash = best.eval.minCash
-	sum.Headroom = best.eval.minCash - floor
+	report(best.eval)
 	sum.Iterations = iterations
 	sum.Converged = true
 	return sum, nil
 }
 
 // feasibility: find the first month where liquid >= floor; feasible iff it
-// exists and liquid stays >= floor from there through the end. minCash is
-// the minimum over that suffix (over the whole series when the floor is
+// exists and liquid stays >= floor from there through the end. Both sides
+// compare in whole cents, so float noise cannot decide the outcome. minCash
+// is the minimum over that suffix (over the whole series when the floor is
 // never reached, for failure reporting).
 func feasibility(liquid []float64, floor float64) evalResult {
+	centFloor := round2(floor)
 	first := -1
 	for i, v := range liquid {
-		if v >= floor {
+		if round2(v) >= centFloor {
 			first = i
 			break
 		}
@@ -226,13 +234,13 @@ func feasibility(liquid []float64, floor float64) evalResult {
 		for _, v := range liquid {
 			min = math.Min(min, v)
 		}
-		return evalResult{feasible: false, minCash: min}
+		return evalResult{feasible: false, minCash: min, floor: floor}
 	}
 	min := math.Inf(1)
 	for _, v := range liquid[first:] {
 		min = math.Min(min, v)
 	}
-	return evalResult{feasible: min >= floor, minCash: min}
+	return evalResult{feasible: round2(min) >= centFloor, minCash: min, floor: floor}
 }
 
 // fieldBounds returns the numeric search bounds (dates as month indexes).
