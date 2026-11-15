@@ -275,3 +275,94 @@ func TestForecastCompareUsageErrors(t *testing.T) {
 		}
 	}
 }
+
+const planWithChoices = `version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2025-06
+  startingCash: 1000.00
+common:
+  events:
+    - name: Income
+      amount: 3000.00
+    - name: Rent
+      amount: -1500.00
+choices:
+  - name: Home
+    options:
+      - name: Stay
+      - name: Move
+        change:
+          events:
+            - name: Rent
+              set:
+                amount: -1200.00
+scenarios:
+  - name: stay
+    select:
+      Home: Stay
+  - name: move
+    select:
+      Home: Move
+`
+
+func writeNamedPlan(t *testing.T, doc string) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "plan.yaml")
+	if err := os.WriteFile(path, []byte(doc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	return path
+}
+
+// Spec chapter 05: a plan with choices needs no flags of its own. forecast,
+// --compare and --write-config treat its scenarios as any others, and the
+// written plan keeps choices and select.
+func TestForecastAPlanWithChoices(t *testing.T) {
+	in := writeNamedPlan(t, planWithChoices)
+	out := filepath.Join(t.TempDir(), "written.yaml")
+
+	code, stdout, stderr := runCaptured(t, "forecast", "--config", in, "--output-format", "csv", "--write-config", out)
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0; stderr: %s", code, stderr)
+	}
+	// Five months: 1500 a month staying, 1800 a month moving.
+	if !strings.Contains(stdout, `"2025-06","8500.00","8500.00","","10000.00","10000.00",""`) {
+		t.Errorf("CSV does not show the two paths:\n%s", stdout)
+	}
+	written, err := os.ReadFile(out)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"choices:", "select:", "Home: Move", "change:", "set:"} {
+		if !strings.Contains(string(written), want) {
+			t.Errorf("the written plan should carry %q:\n%s", want, written)
+		}
+	}
+
+	code, stdout, stderr = runCaptured(t, "forecast", "--config", in, "--output-format", "csv", "--compare", "move", "--against", "stay")
+	if code != 0 {
+		t.Fatalf("--compare: exit code = %d, want 0; stderr: %s", code, stderr)
+	}
+	if !strings.Contains(stdout, `"2025-06","1500.00","1500.00"`) {
+		t.Errorf("comparison CSV:\n%s", stdout)
+	}
+}
+
+// A plan whose choices are refused prints no results, and the message names
+// what it concerns.
+func TestForecastRefusesABrokenChoice(t *testing.T) {
+	in := writeNamedPlan(t, strings.Replace(planWithChoices, "Home: Move", "Home: Relocate", 1))
+	code, stdout, stderr := runCaptured(t, "forecast", "--config", in, "--output-format", "csv")
+	if code != 1 {
+		t.Errorf("exit code = %d, want 1", code)
+	}
+	if stdout != "" {
+		t.Errorf("a refused plan must print no results; got:\n%s", stdout)
+	}
+	for _, want := range []string{`scenario "move"`, `choice "Home"`, `"Relocate"`} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr should mention %s; got:\n%s", want, stderr)
+		}
+	}
+}

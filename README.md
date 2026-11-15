@@ -29,6 +29,7 @@ the repository's milestones and issues.
 # CLI only (no frontend toolchain needed):
 go build -o bin/moneypath ./cmd/moneypath
 ./bin/moneypath forecast --config examples/example.yaml
+./bin/moneypath forecast --config examples/choices.yaml   # scenarios as selections
 ./bin/moneypath forecast --config plan.yaml --output-format csv --optimize
 
 # Convert a legacy finance-forecast config:

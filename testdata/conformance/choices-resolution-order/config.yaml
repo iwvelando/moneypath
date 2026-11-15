@@ -1,0 +1,76 @@
+version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2026-06
+  startingCash: 9000.00
+common:
+  events:
+    - name: Income
+      amount: 3600.00
+    - name: Spending
+      amount: -2000.00
+  loans:
+    - name: House loan
+      principal: 14000.00
+      interestRate: 4.00
+      term: 120
+      startDate: 2024-01
+      earlyPayoffThreshold: 5000.00
+  investments:
+    - name: Brokerage
+      startingValue: 9000.00
+      annualReturnRate: 5.00
+      withdrawalTaxRate: 15.00
+      fundLoanPayoffs: true
+choices:
+  - name: Study
+    options:
+      - name: Skip it
+      - name: Enroll
+        events:
+          - name: Tuition
+            amount: -6000.00
+            startDate: 2025-02
+            endDate: 2025-02
+        loans:
+          - name: Student loan
+            principal: 9000.00
+            interestRate: 5.00
+            term: 96
+            startDate: 2024-09
+            earlyPayoffThreshold: 5000.00
+  - name: Car
+    options:
+      - name: Pay cash
+        events:
+          - name: Car purchase
+            amount: -12000.00
+            startDate: 2025-03
+            endDate: 2025-03
+      - name: Finance it
+        loans:
+          - name: Car loan
+            principal: 12000.00
+            interestRate: 6.00
+            term: 60
+            startDate: 2024-07
+            earlyPayoffThreshold: 5000.00
+scenarios:
+  - name: study and finance
+    # Written against the order of the choices on purpose: the order of the
+    # keys here has no effect.
+    select:
+      Car: Finance it
+      Study: Enroll
+    events:
+      - name: Stipend
+        amount: 400.00
+    investments:
+      - name: Side fund
+        startingValue: 4000.00
+        annualReturnRate: 3.00
+        fundLoanPayoffs: true
+  - name: neither
+    select:
+      Study: Skip it
+      Car: Pay cash

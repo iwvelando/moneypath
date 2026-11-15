@@ -68,6 +68,10 @@ func collectUnknownKeys(node *yaml.Node, t reflect.Type, path string, warnings *
 			return
 		}
 		fields := knownFields(t)
+		// The keys under a change's set are those of the entry it changes.
+		if c, ok := reflect.New(t).Interface().(interface{ setType() reflect.Type }); ok {
+			fields["set"] = c.setType()
+		}
 		for i := 0; i+1 < len(node.Content); i += 2 {
 			keyNode, valNode := node.Content[i], node.Content[i+1]
 			key := keyNode.Value

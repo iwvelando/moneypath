@@ -4,7 +4,8 @@
 Change this chapter before the code. See SPEC.md.*
 
 A moneypath config is a single YAML document. This chapter is normative. See
-`examples/example.yaml` for a commented example.
+`examples/example.yaml` for a commented example, and `examples/choices.yaml` for one
+with choices.
 
 ## Conventions
 
@@ -46,14 +47,17 @@ simulation:
 recommendations:      # optional block
   emergencyFundMonths: 6   # optional; default 6; 0 disables the recommendation
 
-common:               # optional; shared by every scenario
+common:               # optional; shared by every scenario (the baseline)
   events: []
   loans: []
   investments: []
 
+choices: []           # optional; decisions with named options — see Choices
+
 scenarios:            # required; at least one
   - name: current path     # required, must be unique among scenarios
     active: true           # optional; default true; inactive scenarios are skipped
+    select: {}             # one option for every choice in the plan — see Choices
     events: []
     loans: []
     investments: []
@@ -84,7 +88,7 @@ Used in `events` lists, and (same shape, minus `optimize`) for loan
   frequency: 1            # optional; months between occurrences; default 1; must be ≥ 1
   startDate: 2050-01      # optional; default: simulation start month
   endDate: 2060-01        # optional; default: simulation end month
-  optimize: {…}           # optional; events in scenarios only — see below
+  optimize: {…}           # optional; a scenario's own events only — see below
 ```
 
 Occurrence rule (normative): the event occurs at `startDate`, then every `frequency`
@@ -94,7 +98,8 @@ regardless of `frequency`.
 
 Per-context rules:
 
-- **Cash-flow events** (`common.events`, scenario `events`): `amount` is signed, and
+- **Cash-flow events** (`common.events`, scenario `events`, an option's `events`):
+  `amount` is signed, and
   post-tax like every other amount (see Conventions).
 - **Extra principal payments** (in loans): `amount` must be > 0; it is money paid toward
   loan principal (cash out).
@@ -165,7 +170,143 @@ Validation: `taxRate` and `withdrawalTaxRate` must be in `[0, 100)` (the payoff-
 gross-up in chapter 04 divides by `1 − withdrawalTaxRate/100`); `annualReturnRate` may
 be negative; `startingValue ≥ 0`.
 
-## Optimizer block (events in scenarios only)
+## Choices
+
+A choice is a decision the plan faces, and its options are the ways it can go. A scenario
+is then a selection, one option per choice, in place of a copy of every entry that the
+paths share. `choices` and `select` are optional. A plan without them resolves to
+itself: each scenario is its own entries and `common`.
+
+```yaml
+choices:
+  - name: Housing          # required, unique among choices
+    options:               # required, at least one
+      - name: Keep the house        # required, unique within the choice
+      - name: Sell and rent
+        events: []         # entries this option adds
+        loans: []
+        investments: []
+        change:            # common entries this option alters
+          loans:
+            - name: Mortgage        # which common loan
+              set:                  # required; the fields to replace
+                earlyPayoffDate: 2027-06
+                sellProperty: true
+        remove:            # common entries this option takes away
+          events: [Gym]
+
+scenarios:
+  - name: sell
+    select:                # one option for every choice in the plan
+      Housing: Sell and rent
+    events: []             # a scenario's own entries
+```
+
+- `common` is the baseline: what holds on every path unless an option says otherwise.
+- An option with no key but its `name` is valid. It is the option that changes nothing.
+- An option's `events`, `loans` and `investments` take the same entries, under the same
+  rules, as a scenario's, except that an event cannot carry an `optimize` block.
+- `select` maps a choice's name to the name of one of its options. Names match exactly.
+  A choice named twice in one `select` is an error.
+- A scenario keeps its own `events`, `loans` and `investments` for what belongs to that
+  path alone.
+
+### Resolution
+
+Each scenario resolves to the two lists the engine simulates (chapter 04 §1). Its
+selected options are taken **in the order the choices are listed in the plan**; the
+order of the keys in `select` has no effect.
+
+1. **The resolved shared list** starts as `common`. Each selected option's `change` and
+   `remove` are applied to it. A changed entry keeps its place in the list; a removed
+   one is dropped.
+2. **The resolved scenario list** is the scenario's own entries in the order written,
+   followed by each selected option's added entries in the order written.
+
+So entries are processed in the order: the scenario's own, then the selected options'
+in choice order, then the baseline, from the most specific to the most general. The
+order decides numbers, not only presentation: it is the order loans are checked for a
+threshold payoff and the order accounts are tapped to fund one (chapter 04 §3.5).
+
+Only the scenarios the plan names are resolved and simulated, never every combination
+of options.
+
+### `change` and `remove`
+
+Both name a `common` entry by its kind (`events`, `loans`, `investments`) and its
+`name`. Nothing is overridden by a matching name alone: an entry an option adds never
+replaces a baseline entry, whatever it is called.
+
+- **`remove`** drops the entry for the scenarios that select the option.
+- **`change`** replaces the fields listed under `set` and keeps the rest.
+  - A nested list (`extraPrincipalPayments`, `contributions`, `withdrawals`) is replaced
+    as a whole.
+  - A field set to null (`~`) is taken away, so it falls back to its default.
+  - `name` and `optimize` cannot be set.
+  - `set` is required and is a mapping; an empty one changes nothing. A value of the
+    wrong type for its field is an error.
+- Replacing an entry outright is a `remove` and an added entry, both written out.
+- Only `common` entries can be targeted, never an entry another option adds, so every
+  option is valid on its own, whatever it is selected with.
+
+**When a value depends on more than one choice.** One baseline entry can be changed or
+removed by the options of one choice only (see the errors below); otherwise a scenario
+selecting two such options would have two answers for one field and only the order of
+the choices to pick between them. The format expresses the case in other ways:
+
+- *Make the entry its own choice.* Take it out of `common` and let each option of a new
+  choice add its version. Every scenario picks one beside its other selections.
+- *Add instead of change.* Amounts sum, so options of different choices can each add
+  an event of their own (a top-up, a cut) beside the baseline entry, without touching
+  it. This covers amounts only, not a rate or a date.
+
+### Validation
+
+Hard errors:
+
+- A choice with no name, a name another choice has, or no options.
+- An option with no name, or a name another option of its choice has.
+- A scenario that picks no option for one of the plan's choices, names a choice the
+  plan does not have, or names an option its choice does not have. This holds for
+  inactive scenarios too.
+- A `change` or `remove` whose target `common` does not have, or has more than once
+  under that name. A misspelt name is therefore an error, never a silent addition. An
+  event without a name cannot be targeted.
+- One baseline entry changed or removed twice in one option.
+- One baseline entry changed or removed by options of two different choices. This is
+  checked once for the plan, whatever the scenarios select.
+- A `change` without a `set`, or one that sets `name` or `optimize`.
+- An `optimize` block on an option's event.
+- Every rule for an event, loan or investment, applied to each option's added entries
+  and to each baseline entry **as changed**, whether or not any scenario selects the
+  option.
+- Every rule for a scenario's lists, applied to each resolved scenario list, active or
+  not. An investment's name is unique within its list, so a scenario's own investments
+  and those its selected options add cannot share a name. Two options of one choice
+  can, since no scenario selects both.
+
+Warnings: the existing ones, each naming the choice and option it concerns. An unknown
+key inside `set` is warned about like any other. A warning that a baseline entry
+already raises as written in `common` is not repeated for its changed form. An option
+that no scenario selects is not warned about.
+
+### Canonical form
+
+The plan as echoed (`--write-config`, `configYaml`) keeps the written form, with
+`choices` and `select`, never the resolved lists. Top-level keys are written `common`,
+`choices`, `scenarios`; a scenario's keys are `name`, `active`, `select`, then its entry
+lists; an option's are `name`, its entry lists, `change`, `remove`; and `select` is
+written in the order the choices are listed.
+
+### Reading a plan with choices in an older moneypath
+
+A moneypath build that predates choices follows the rule for unknown keys: it warns
+about `choices` and `select`, and forecasts each scenario from `common` and the
+scenario's own entries alone. The format stays at version 2 all the same: a new version
+would refuse such a file in an old build at the price of a migration for every file
+that needs no change.
+
+## Optimizer block (a scenario's own events only)
 
 ```yaml
 optimize:
@@ -181,8 +322,10 @@ optimize:
 Validation: field must be one of the four (accept `startDate`/`start_date`/`start-date`
 case-insensitively, and likewise for `endDate`); the relevant bound pair is required with
 min < max (for `frequency`, min ≥ 1 and integer-valued); dates must parse with
-minDate ≤ maxDate. An `optimize` block on a `common` event is an error. Optimizer
-semantics are in chapter 04 §Optimizer.
+minDate ≤ maxDate. An `optimize` block on a `common` event or on an option's event is an
+error: the optimizer chooses a value against one scenario's floor and writes it into the
+plan, and those entries are shared by more than one scenario. A target goes in a
+scenario's own events. Optimizer semantics are in chapter 04 §Optimizer.
 
 ## What v2 removed relative to v1
 

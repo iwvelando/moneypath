@@ -9,6 +9,7 @@ type Config struct {
 	Simulation      Simulation       `yaml:"simulation"`
 	Recommendations *Recommendations `yaml:"recommendations,omitempty"`
 	Common          Section          `yaml:"common,omitempty"`
+	Choices         []*Choice        `yaml:"choices,omitempty"`
 	Scenarios       []*Scenario      `yaml:"scenarios"`
 
 	// ResolvedEmergencyFundMonths is recommendations.emergencyFundMonths
@@ -42,9 +43,16 @@ type Section struct {
 type Scenario struct {
 	Name    string `yaml:"name"`
 	Active  *bool  `yaml:"active,omitempty"`
+	Select  Select `yaml:"select,omitempty"`
 	Section `yaml:",inline"`
 
 	ResolvedActive bool `yaml:"-"`
+	// Resolved and ResolvedShared are the two lists the engine simulates
+	// (spec chapter 03, Choices): the scenario's own entries followed by
+	// those its selected options add, and common as those options change it.
+	// Without choices they are Section and Config.Common.
+	Resolved       Section `yaml:"-"`
+	ResolvedShared Section `yaml:"-"`
 }
 
 // Event is the shared schedule shape (spec chapter 03 §Event). It is used

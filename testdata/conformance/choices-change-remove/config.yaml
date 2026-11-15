@@ -1,0 +1,82 @@
+version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2029-12
+  startingCash: 30000.00
+common:
+  events:
+    - name: Salary
+      amount: 5200.00
+    - name: Living costs
+      amount: -3100.00
+    - name: Gym
+      amount: -60.00
+  loans:
+    - name: Mortgage
+      principal: 60000.00
+      interestRate: 4.0
+      term: 120
+      startDate: 2021-01
+      escrow: 300.00
+      earlyPayoffThreshold: 10000.00
+      extraPrincipalPayments:
+        - amount: 200.00
+  investments:
+    - name: Brokerage
+      startingValue: 40000.00
+      annualReturnRate: 6.0
+      contributionsFromCash: true
+      contributions:
+        - amount: 400.00
+choices:
+  - name: Housing
+    options:
+      - name: Keep the house
+      - name: Sell and rent
+        events:
+          - name: Rent
+            amount: -1900.00
+            startDate: 2028-06
+        change:
+          loans:
+            - name: Mortgage
+              set:
+                earlyPayoffThreshold: ~
+                earlyPayoffDate: 2028-06
+                sellProperty: true
+                sellPrice: 150000.00
+                sellCostsNet: 11000.00
+                extraPrincipalPayments:
+                  - amount: 500.00
+                    endDate: 2026-12
+  - name: Job
+    options:
+      - name: Stay
+      - name: Go freelance
+        events:
+          - name: Salary until I leave
+            amount: 5200.00
+            endDate: 2026-12
+          - name: Freelance income
+            amount: 6100.00
+            startDate: 2027-03
+        change:
+          investments:
+            - name: Brokerage
+              set:
+                contributions:
+                  - amount: 400.00
+                    endDate: 2026-12
+        remove:
+          events: [Salary, Gym]
+scenarios:
+  - name: as we are
+    select: {Housing: Keep the house, Job: Stay}
+  - name: sell
+    select: {Housing: Sell and rent, Job: Stay}
+  - name: sell and freelance
+    select: {Housing: Sell and rent, Job: Go freelance}
+    events:
+      - name: Health insurance
+        amount: -650.00
+        startDate: 2027-01

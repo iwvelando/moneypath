@@ -87,6 +87,9 @@ The WASM module exposes to JavaScript (names normative):
 }
 ```
 
+`configYaml` is the plan in its written form: a plan with choices carries its `choices`
+and each scenario's `select` (chapter 03, Canonical form), never the resolved lists.
+
 `rows` is sorted ascending by date; `values` and `metrics` are index-aligned with
 `scenarios`. `liquid`/`total` are omitted (JSON `null` or absent) for dates a scenario has
 no value for. Numbers are raw float64 values; formatting is the consumer's job.

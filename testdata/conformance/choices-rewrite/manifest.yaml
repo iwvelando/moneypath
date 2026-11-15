@@ -1,0 +1,4 @@
+description: "A plain plan rewritten with choices forecasts to the same CSV. This is the plan of the 'combined' case with each scenario's body moved into an option of one choice and each scenario reduced to its select; expected.csv is a copy of that case's, byte for byte."
+normative: true
+optimize: false
+tolerance: 0.01

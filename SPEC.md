@@ -49,6 +49,7 @@ normative is guidance.
 Supporting material:
 
 - `examples/example.yaml` — a fully commented v2 configuration exercising most features.
+- `examples/choices.yaml` — a commented plan whose scenarios select options of choices.
 - `testdata/conformance/` — v2 configs with expected outputs; the engine MUST reproduce them.
 - `testdata/migration/` — legacy configs with expected v2 translations (compared semantically).
 
