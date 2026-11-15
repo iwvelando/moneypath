@@ -16,6 +16,9 @@ node_modules/
 # Editor/OS noise
 .DS_Store
 
+# Local agent working files: review notes, validation guides, handoff drafts
+/.codex/
+
 # Claude Code runtime state
 .claude/scheduled_tasks.lock
 .claude/settings.local.json

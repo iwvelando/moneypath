@@ -58,6 +58,7 @@ placeholder that `make dist` overwrites locally).
 | `web/` | static web app (Vite + TypeScript + Preact); `web/e2e/` holds its browser tests |
 | `deploy/` | the production Content-Security-Policy |
 | `.github/` | CI that verifies every change and deploys `main` |
+| `.agents/` | skills for coding agents working in this repo |
 | `conformance/` | fixture harness, CLI↔WASM parity, static-bundle identity checks |
 
 ## Tests
@@ -67,6 +68,8 @@ make test-go   # engine/config/render/legacy units + all conformance fixtures
                # + CLI↔WASM parity (needs node; skipped without it)
 make test-web  # frontend vitest suite
 make test-browser  # Playwright against the production build (see DEVELOPMENT.md)
+make pre-pr    # everything above plus WebKit: the local gate before a pull request
+make preview-lan   # the production build over HTTPS on your network, to try on a phone
 ```
 
 ## Hosting
