@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks';
 import { EmptyChartSketch } from '../components/icons';
-import { formatMoney, formatMoneyShort } from '../util/format';
+import { HALF_CENT, formatMoney, formatMoneyShort } from '../util/format';
 import {
   areaPolygon,
   extentOf,
@@ -189,7 +189,7 @@ export function Chart({ dates, liquid, total, scenarioName }: ChartProps) {
 
           <g aria-hidden="true">
             {seriesSpec.map((series) =>
-              negativeSpans(series.values).map((span, index) => (
+              negativeSpans(series.values, HALF_CENT).map((span, index) => (
                 <rect
                   key={`${series.key}-danger-${index}`}
                   class="chart__danger"

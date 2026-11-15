@@ -12,9 +12,12 @@ export function gaugeRatio(funded: number, target: number): number | null {
   return Math.max(0, funded / target);
 }
 
-/** Reading tone: at target is healthy, half-way is a warning, below is not. */
+/**
+ * Reading tone: at target is healthy, half-way is a warning, below is not. A
+ * ratio within float noise of the target counts as reaching it.
+ */
 export function gaugeTone(ratio: number): GaugeTone {
-  if (ratio >= 1) return 'ok';
+  if (ratio >= 1 - 1e-9) return 'ok';
   if (ratio >= 0.5) return 'warn';
   return 'danger';
 }

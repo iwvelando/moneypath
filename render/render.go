@@ -30,8 +30,8 @@ func CSV(res *engine.Result) string {
 		cells = append(cells, m.String())
 		for _, sc := range res.Scenarios {
 			cells = append(cells,
-				fmt.Sprintf("%.2f", sc.Liquid[idx]),
-				fmt.Sprintf("%.2f", sc.Total[idx]),
+				money.Fixed(sc.Liquid[idx]),
+				money.Fixed(sc.Total[idx]),
 				strings.Join(sc.Notes[idx], ","))
 		}
 		writeCSVRow(&b, cells)

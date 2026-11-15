@@ -15,8 +15,9 @@ export const HELP = {
   startingCash:
     'Required. Cash balance as of the end of the month preceding the start month. It may be zero or negative (debt); leaving it blank is treated as 0.00 with a warning.',
   cashInterestRate:
-    'Optional, default 0. The yearly interest your cash earns, as a percentage (4.5 means 4.5% per year). ' +
-    'It is added every month to the cash you had at the end of the previous month, so it compounds. ' +
+    'Optional, default 0. The yearly interest rate your cash earns, entered as an APR (4.5 means 4.5%). ' +
+    'One twelfth of it is added every month to the cash you had at the end of the previous month, so it ' +
+    'compounds: 4.5 works out to about 4.59% over a year, which is the APY a bank would advertise. ' +
     'Leave it at 0 to assume your cash sits in an account that pays nothing; enter a higher rate to ' +
     'model keeping cash in something like a high-yield savings account. Enter the rate after tax. ' +
     'Only a positive balance earns interest, and it must be at least 0.',
@@ -56,7 +57,7 @@ export const HELP = {
   loanPrincipal: 'Required. The original principal, before the down payment is applied.',
   loanDownPayment:
     'Optional, default 0. Paid at the loan start month; must be at least 0 and less than the principal.',
-  loanInterestRate: 'Required. Annual percentage — 6.5 means 6.5 % per year. Zero is allowed.',
+  loanInterestRate: 'Required. The loan’s APR (annual percentage rate) — 6.5 means 6.5 % per year, charged one twelfth each month. Zero is allowed.',
   loanTerm: 'Required. Loan length in months; at least 1.',
   loanStartDate:
     'Required. Month of the first payment. Loans may start before the simulation window — payments dated before it simply never enter the ledger.',
@@ -66,8 +67,8 @@ export const HELP = {
   loanMortgageInsuranceCutoff:
     'Optional. Percent between 0 and 100. Mortgage insurance stops once remaining principal falls to this share of the original.',
   loanEarlyPayoffThreshold:
-    'Optional, at least 0. Pay the loan off in the first month cash exceeds the remaining principal by at least this much.',
-  loanEarlyPayoffDate: 'Optional. Pay the loan off at this month. It should be after the loan start month.',
+    'Optional, at least 0. Pay the loan off in the first month cash exceeds the payoff amount (the remaining principal plus that month’s interest) by at least this much.',
+  loanEarlyPayoffDate: 'Optional. Pay the loan off at this month, for the remaining principal plus that month’s interest. It should be after the loan start month.',
   loanSellProperty:
     'Optional. Only meaningful together with an early payoff — on its own it has no effect and raises a warning.',
   loanSellPrice: 'Optional. Defaults to the loan principal when omitted.',
@@ -79,7 +80,7 @@ export const HELP = {
   investmentName: 'Required, and unique within its list.',
   investmentStartingValue: 'Optional, default 0. Balance at the simulation start; must be at least 0.',
   investmentAnnualReturnRate:
-    'Optional, default 0. Annual percent, compounded monthly. It may be negative.',
+    'Optional, default 0. The yearly return, entered like an APR: one twelfth is applied each month, so it compounds to slightly more over a year (7 grows about 7.23% a year). To model an average annual return of exactly 7%, enter 6.78. It may be negative.',
   investmentTaxRate:
     'Optional, default 0. Percent applied to positive monthly growth, modelling tax drag on gains. Must be at least 0 and less than 100.',
   investmentWithdrawalTaxRate:

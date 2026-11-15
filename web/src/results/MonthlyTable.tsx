@@ -1,6 +1,6 @@
 import { Fragment } from 'preact';
 import { useEffect, useId, useState } from 'preact/hooks';
-import { formatMoney } from '../util/format';
+import { formatMoney, isNegativeMoney } from '../util/format';
 
 export interface MonthlyRow {
   date: string;
@@ -81,10 +81,10 @@ export function MonthlyTable({ rows, scenarioName }: MonthlyTableProps) {
                         </button>
                       ) : <span class="month-date">{row.date}</span>}
                     </th>
-                    <td class={row.liquid !== null && row.liquid < 0 ? 'numeric is-negative' : 'numeric'}>
+                    <td class={row.liquid !== null && isNegativeMoney(row.liquid) ? 'numeric is-negative' : 'numeric'}>
                       {row.liquid === null ? '' : formatMoney(row.liquid)}
                     </td>
-                    <td class={row.total !== null && row.total < 0 ? 'numeric is-negative' : 'numeric'}>
+                    <td class={row.total !== null && isNegativeMoney(row.total) ? 'numeric is-negative' : 'numeric'}>
                       {row.total === null ? '' : formatMoney(row.total)}
                     </td>
                   </tr>

@@ -67,7 +67,8 @@ scenarios appear in the config (inactive scenarios omitted entirely):
 "2025-07","31200.50","56430.75","scenario Retirement savings: contribution (reduces cash balance) +350.00, growth +43.55",…
 ```
 
-- Money as plain `%.2f` (no symbol, no thousands separators).
+- Money as plain `%.2f` (no symbol, no thousands separators). An amount that rounds to
+  zero is `0.00`, never `-0.00`.
 - Notes joined with `,` inside the quoted field; empty string when none.
 - A date some scenario lacks (different simulation spans cannot happen in v2 — all
   scenarios share the window — but defensive rendering uses `""`).
@@ -90,7 +91,8 @@ ____    | ________________ | _______________ | _____
 2025-07 | $31,200.50 | $56,430.75 | scenario Retirement savings: contribution (reduces cash balance) +350.00, growth +43.55
 ```
 
-- Currency display: `$` + thousands separators + 2 decimals; negative as `-$1,234.56`.
+- Currency display: `$` + thousands separators + 2 decimals; negative as `-$1,234.56`;
+  an amount that rounds to zero is `$0.00`, never `-$0.00`.
 - The emergency-fund line appears only when the recommendation is enabled; `Starting
   coverage` only when > 0; exactly one of `Shortfall`/`Surplus`, only when > 0.
 - The optimization block appears only when the optimizer ran and produced summaries.

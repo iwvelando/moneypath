@@ -104,6 +104,13 @@ describe('segments', () => {
 });
 
 describe('negativeSpans', () => {
+  it('ignores values within the tolerance of zero', () => {
+    const drift = 0.3 - 0.1 - 0.1 - 0.1; // −2.8e-17: zero, not a debt
+    expect(negativeSpans([5, drift, drift, 5], 0.005)).toEqual([]);
+    expect(negativeSpans([5, -0.004, 5], 0.005)).toEqual([]);
+    expect(negativeSpans([5, -5, 5], 0.005)).toHaveLength(1);
+  });
+
   it('finds a fully negative stretch', () => {
     const spans = negativeSpans([5, -5, -5, 5]);
     expect(spans).toHaveLength(1);

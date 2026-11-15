@@ -9,10 +9,18 @@ fixtures encode these rules numerically; when prose and fixture disagree, treat 
 spec bug and flag it rather than silently choosing one.
 
 Throughout: `r` denotes a monthly interest rate derived from an annual percentage `A` as
-`r = A / 100 / 12`. "Month arithmetic" means calendar-month stepping (`2025-11` + 3 =
+`r = A / 100 / 12`. Every annual rate is therefore an **APR** (a nominal rate): a twelfth
+of it applies each month, and for cash and investments the compounding makes the yearly
+yield (the APY, `(1 + r)^12 − 1`) slightly higher than the number entered — 7 % APR yields
+about 7.23 %. This is the convention loans are quoted in, and one convention for every
+rate keeps a loan and an account at the same percentage directly comparable; a user
+holding an APY or a long-run average annual return can convert it (chapter 03,
+Conventions). "Month arithmetic" means calendar-month stepping (`2025-11` + 3 =
 `2026-02`). All internal math is float64; **comparisons that decide behavior** (loan
-reaching zero, threshold triggers) round both sides to 2 decimals first
-(`round2(x) = math.Round(x*100)/100`).
+reaching zero, threshold triggers, the optimizer's cash-floor test, whether an
+emergency fund has a shortfall) round both sides to 2 decimals first
+(`round2(x) = math.Round(x*100)/100`), so float noise in a sum of cent amounts never
+decides an outcome.
 
 ## 1. The simulation loop
 
@@ -39,7 +47,7 @@ For each **active** scenario, independently:
      `withdrawal − withdrawalTax`). Investment activity emits notes (§6).
   3. **Threshold payoff check** (§3.5): for each loan (scenario loans in config order,
      then common loans), check against
-     `projectedLiquid = cash + eventDelta − cashContributions + withdrawalCash`.
+     `projectedLiquid = cash + cashInterest + eventDelta − cashContributions + withdrawalCash`.
      A triggered payoff rewrites that loan's schedule at `m`, emits a note, and — when
      `fundLoanPayoffs` investments cover a cash shortfall — performs their withdrawals
      (the proceeds and value changes join `withdrawalCash` and `investmentDelta` for
@@ -158,12 +166,17 @@ condition fails, MI never resumes for that loan.
 
 Two mechanisms; whichever fires first wins (a payoff removes the loan's future payments).
 
+The **payoff amount** in month `m` is `payoff = remaining_{m−1} · (1 + r)`: the balance
+left after the previous month plus the interest it has accrued since. That interest is
+exactly what a regular payment in `m` would have carried (§3.1), so retiring a loan
+never skips a month of interest.
+
 **By date** (`earlyPayoffDate`, evaluated during schedule generation): at that month,
 instead of a regular payment:
-- With `sellProperty: true`: `payment = remaining − sellPrice + sellCostsNet − refund`
+- With `sellProperty: true`: `payment = payoff − sellPrice + sellCostsNet − refund`
   (§3.6 escrow refund; `sellPrice` defaults to `principal`; a negative payment is cash
   **in**). The asset is gone: no further payments, no post-sale escrow.
-- Without sale: `payment = remaining − refund` (§3.6). Then §3.6 post-loan escrow
+- Without sale: `payment = payoff − refund` (§3.6). Then §3.6 post-loan escrow
   applies.
 
 **By threshold** (`earlyPayoffThreshold` T > 0, evaluated inside the simulation loop —
@@ -178,7 +191,7 @@ liquidation would incur per §4 step 4:
 `value − withdrawalTaxRate/100 · min(value, growthBalance)`.
 
 In month `m`, if the loan started before `m`, still has `round2(remaining) > 0` as of
-the end of `m−1`, and `round2(eligible − remaining_{m−1}) ≥ T`, the loan is paid off at
+the end of `m−1`, and `round2(eligible − payoff) ≥ T`, the loan is paid off at
 `m`: the scheduled payment at `m` (if any) is replaced by the same payoff payment as the
 by-date rule (sale and no-sale variants identical), all later scheduled payments are
 removed, §3.6 applies (refund always; post-loan escrow when not selling), and a note is
@@ -270,17 +283,20 @@ Skipped when the effective target `N` months is 0 (config default 6; CLI can ove
 - `targetAmount = avg · N`; `initialLiquid = liquid[start]`;
   `fundedMonths = initialLiquid / avg` (0 if `avg == 0`);
   `shortfall = max(0, targetAmount − initialLiquid)`;
-  `surplus = max(0, initialLiquid − targetAmount)`.
+  `surplus = max(0, initialLiquid − targetAmount)`. When the two differ by less than
+  half a cent (`round2(targetAmount − initialLiquid) == 0`) both are 0: a fund that
+  matches its target to the cent has no shortfall.
 
 ## 6. Notes (exact formats)
 
 Notes are per-scenario, per-month string lists, emitted in processing order. Formats are
 normative (conformance fixtures include them in CSV):
 
-- Threshold payoff, no sale: `paying off asset <name> for <remaining:%.2f>`
+- Threshold payoff, no sale: `paying off asset <name> for <payoff:%.2f>`
 - Threshold payoff with sale:
-  `paying off asset <name> for <remaining:%.2f> and selling for <sellPrice:%.2f> with <sellCostsNet:%.2f> selling costs`
-  (`<remaining>` is the balance being retired, i.e. end of `m−1`.)
+  `paying off asset <name> for <payoff:%.2f> and selling for <sellPrice:%.2f> with <sellCostsNet:%.2f> selling costs`
+  (`<payoff>` is the §3.5 payoff amount: the balance at the end of `m−1` plus the
+  month's interest.)
 - Payoff-funding withdrawal (§3.5), one per tapped investment, immediately after its
   payoff note: `<scope> <name>: loan payoff withdrawal %+.2f` (the gross withdrawal)
   with the same ` (basis %+.2f, growth %+.2f)` suffix rule as regular withdrawals,
@@ -310,29 +326,38 @@ configured original**. The original amount's sign determines the objective befor
 snapping or clamping, including when the bounds cross zero.
 
 Setup:
-- Run the baseline forecast (original config). For each scenario containing targets, the
-  **floor** = that scenario's baseline `emergencyFund.targetAmount`. If the
-  recommendation is disabled or the floor ≤ 0, optimization fails with an error.
+- The **floor** a candidate is held to is the `emergencyFund.targetAmount` (§5) of the
+  forecast that candidate produces — the plan's own target with the candidate value in
+  place. A value that changes the plan's expenses moves its target with it, so a chosen
+  value never leaves the plan short of the emergency fund it then reports; a floor
+  frozen from the original plan would let a larger expense pass against a target the
+  expense itself has outgrown.
+- Run the baseline forecast (original config). If the recommendation is disabled, or a
+  scenario containing targets has a baseline `emergencyFund.targetAmount` ≤ 0,
+  optimization fails with an error.
 - Field value spaces: `amount` — whole cents; `frequency` — integers ≥ 1; `startDate` /
   `endDate` — month index (`year·12 + month − 1`). Every candidate is snapped to its
   field's space and then clamped to `[min, max]`. `frequency` and the date fields snap by
   rounding to the nearest integer; `amount` snaps **upward** to the next cent,
   `ceilCents(x) = math.Ceil(x*100)/100` with a value already within `1e-9` of a cent
   taken as that cent (so the snap is idempotent). Amount snaps up rather than to nearest
-  because cash rises with an event's amount: rounding up can only add headroom, so a
-  chosen amount always satisfies the floor reported alongside it. A bound that is not
+  because cash rises with an event's amount and the floor never does: rounding up can
+  only add headroom, so a chosen amount always satisfies the floor reported alongside
+  it. A bound that is not
   itself a whole cent is used as written, and a `tolerance` below one cent buys no extra
   precision.
 
 Feasibility of a candidate value `v`: write `v` into the event's field, run the full
-forecast, and in the target scenario find the first month where `liquid ≥ floor`.
-Feasible iff that month exists and `liquid ≥ floor` for **every** month from it through
-the end (i.e. once the floor is first reached, cash never dips below it).
-`minCash` = the minimum liquid over that suffix; `headroom = minCash − floor`.
+forecast, take the target scenario's floor from it, and find the first month where
+`liquid ≥ floor`. Feasible iff that month exists and `liquid ≥ floor` for **every** month
+from it through the end (i.e. once the floor is first reached, cash never dips below
+it). These comparisons are made in whole cents (`round2` on both sides, per the
+preamble). `minCash` = the minimum liquid over that suffix; `headroom = minCash − floor`,
+reported unrounded, so it can sit a fraction of a cent either side of zero.
 
 Search, per target (each target optimized in turn — scenario order, then event order —
-with earlier targets' chosen values left in place; floors stay as snapshotted from the
-baseline):
+with earlier targets' chosen values left in place, so a later target's floor reflects
+them):
 
 1. Set the search anchor to the lower bound for a negative original `amount`, otherwise
    to the original value (snapped, clamped). Evaluate the anchor and both bounds.
@@ -343,7 +368,7 @@ baseline):
    `unable to satisfy minimum cash <floor> within bounds <min> to <max>` (floor as
    currency `$1,234.56`; bounds formatted per field — currency for amount, integer for
    frequency, `YYYY-MM` for dates). Report the higher-headroom bound's
-   `minCash`/`headroom`.
+   `floor`/`minCash`/`headroom`, and name that floor in the note.
 4. Otherwise, for each feasible bound, bisect on the interval between the anchor
    and that bound: maintain (infeasibleSide, feasibleSide), evaluate the midpoint
    (snapped/clamped), narrow toward the boundary, stop when the interval ≤ `tolerance`
@@ -356,4 +381,5 @@ Applying results: chosen values are written into the config (the exported/echoed
 reflects them), the final forecast runs on the adjusted config, and each target yields a
 summary attached to its scenario's metrics: target event name, field, original and chosen
 values (raw numeric and display-formatted — currency for amounts, integer for frequency,
-`YYYY-MM` for dates), floor, minCash, headroom, iterations, converged, notes.
+`YYYY-MM` for dates), the chosen value's floor, minCash, headroom, iterations,
+converged, notes.

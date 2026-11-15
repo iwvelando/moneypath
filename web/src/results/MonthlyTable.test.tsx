@@ -21,6 +21,12 @@ function details(date = '2026-02') {
   return document.getElementById(disclosure(date).getAttribute('aria-controls')!)!;
 }
 
+it('does not flag an amount that rounds to zero as negative', () => {
+  show([{ date: '2026-01', liquid: 0.3 - 0.1 - 0.1 - 0.1, total: -0.004, notes: [] }]);
+  expect(host.querySelector('.is-negative')).toBeNull();
+  expect(host.textContent).not.toContain('-$0.00');
+});
+
 beforeEach(() => {
   host = document.createElement('div');
   document.body.appendChild(host);

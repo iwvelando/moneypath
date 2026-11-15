@@ -9,7 +9,8 @@ simulation:
   endDate: 2090-01
   # Required; cash balance as of the end of the month before startDate.
   startingCash: 30000.00
-  # Optional; annual percent your cash earns, compounded monthly. Default 0 (cash
+  # Optional; the APR your cash earns, compounded monthly (4.0 yields about 4.07%
+  # a year, the APY a bank would advertise). Default 0 (cash
   # in an account that pays nothing). Try 4.0 to model a high-yield savings
   # account. Enter it after tax; only positive cash earns it.
   cashInterestRate: 0
@@ -36,13 +37,13 @@ common:
     - name: Auto loan
       principal: 30000.00     # original principal before the down payment
       downPayment: 5000.00    # paid at startDate
-      interestRate: 3.1       # annual percent
+      interestRate: 3.1       # APR (annual percentage rate)
       term: 72                # months
       startDate: 2020-01      # may predate the simulation window
   investments:
     - name: Brokerage account
       startingValue: 25000.00
-      annualReturnRate: 6.5   # annual percent, compounded monthly
+      annualReturnRate: 6.5   # APR, compounded monthly (about 6.70% a year)
       taxRate: 15.0           # percent of positive monthly growth (tax drag)
       withdrawalTaxRate: 15.0 # percent of the growth portion of withdrawals
       fundLoanPayoffs: true   # let this account's after-tax value count toward (and

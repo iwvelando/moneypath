@@ -231,8 +231,11 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		if ef.AverageMonthlyExpenses != 0 {
 			ef.FundedMonths = ef.InitialLiquid / ef.AverageMonthlyExpenses
 		}
-		ef.Shortfall = math.Max(0, ef.TargetAmount-ef.InitialLiquid)
-		ef.Surplus = math.Max(0, ef.InitialLiquid-ef.TargetAmount)
+		// A gap under half a cent is float noise, not a shortfall (§5).
+		if gap := ef.TargetAmount - ef.InitialLiquid; round2(gap) != 0 {
+			ef.Shortfall = math.Max(0, gap)
+			ef.Surplus = math.Max(0, -gap)
+		}
 		sr.EmergencyFund = ef
 	}
 	return sr

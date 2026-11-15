@@ -18,7 +18,8 @@ func TestCurrency(t *testing.T) {
 		999.999:    "$1,000.00",
 		1000000:    "$1,000,000.00",
 		12345678.9: "$12,345,678.90",
-		-0.004:     "-$0.00",
+		-0.004:     "$0.00", // rounds to zero: no sign
+		-0.005001:  "-$0.01",
 		17654.331:  "$17,654.33",
 	}
 	for in, want := range cases {
@@ -110,5 +111,20 @@ func TestPrettyStructure(t *testing.T) {
 	}
 	if !strings.HasSuffix(got, "\n\n") {
 		t.Error("blank line after scenario block missing")
+	}
+}
+
+// Spec chapter 05: an amount that rounds to zero prints as 0.00, never -0.00.
+func TestCSVNeverPrintsNegativeZero(t *testing.T) {
+	start, _ := config.ParseMonth("2025-06")
+	res := &engine.Result{
+		Start: start, End: start,
+		Scenarios: []*engine.ScenarioResult{{
+			Name: "a", Liquid: []float64{-0.0000001}, Total: []float64{-0.004}, Notes: [][]string{nil},
+		}},
+	}
+	want := "\"date\",\"liquid (a)\",\"total (a)\",\"notes (a)\"\n\"2025-06\",\"0.00\",\"0.00\",\"\"\n"
+	if got := CSV(res); got != want {
+		t.Errorf("CSV = %q, want %q", got, want)
 	}
 }
