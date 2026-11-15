@@ -1,5 +1,5 @@
 import { useMemo } from 'preact/hooks';
-import { sparklinePoints, type Series } from './chartScale';
+import { extentOf, sparklinePoints, type Series } from './chartScale';
 
 interface SparklineProps {
   series: Series;
@@ -24,6 +24,35 @@ export function Sparkline({ series }: SparklineProps) {
       aria-hidden="true"
     >
       <polyline class="sparkline__line" points={points} />
+    </svg>
+  );
+}
+
+interface OverlaySparklineProps {
+  series: Series[];
+}
+
+/**
+ * The comparison tab's counterpart: every scenario's line on one shared scale,
+ * so the tab hints at how far apart the paths end up. Decorative as well.
+ */
+export function OverlaySparkline({ series }: OverlaySparklineProps) {
+  const lines = useMemo(() => {
+    const extent = extentOf(series);
+    return series.map((values) => sparklinePoints(values, WIDTH, HEIGHT - 2, extent)).filter((p) => p !== '');
+  }, [series]);
+  if (lines.length === 0) return null;
+  return (
+    <svg
+      class="sparkline"
+      viewBox={`-1 -2 ${WIDTH + 2} ${HEIGHT + 2}`}
+      width={WIDTH}
+      height={HEIGHT}
+      aria-hidden="true"
+    >
+      {lines.map((points, i) => (
+        <polyline key={i} class="sparkline__line" points={points} />
+      ))}
     </svg>
   );
 }

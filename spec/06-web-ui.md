@@ -74,9 +74,18 @@ The app covers, at a coarse grain:
   with the keyboard, reveals the engine's notes as a list below it. Several months
   can stay open. Months without notes have no disclosure; switching scenarios or
   running a new forecast closes the details. CSV exports still contain all notes.
+  With two or more scenarios, a Compare entry follows the scenario tabs and draws every
+  scenario on one chart, in the plan's order, for one series at a time: the total first,
+  with a control to switch to liquid. Its vertical scale fits every scenario, including
+  one whose cash goes negative. Its legend names each scenario and doubles as the month
+  readout: it lists every scenario's value for the month under the pointer, a tap, or
+  the keyboard cursor, and for the final month otherwise. A plan with one scenario has
+  no Compare entry. An isolated recorded month is drawn as a point so a plan
+  containing only its initial month remains visible. The comparison shows only figures
+  the engine reported.
   Editing the config
-  marks them as describing an earlier version of the plan; they stay readable, being the
-  baseline the next run will be compared against.
+  marks all of these as describing an earlier version of the plan; they stay readable,
+  being the baseline the next run will be compared against.
 - **Getting data in and out** — uploading a config (v2 directly, v1 auto-migrated with
   its notices shown), downloading the engine-serialized v2 YAML, and downloading the
   engine-rendered CSV, which is byte-for-byte what the CLI produces.
@@ -96,7 +105,11 @@ status button shows only On or Off and opens its enable switch and event jump li
 is empty. Only one panel opens at a time; Escape closes it and returns focus to its trigger.
 Run Forecast remains directly accessible, including while either panel is open.
 Introductions and jump targets allow for the bar's height as it wraps or shows errors. Results use the same palette, with distinct
-liquid and total series and separate headings for the chart and monthly table.
+liquid and total series and separate headings for the chart and monthly table. In the
+comparison each scenario's line has its own color and its own dash pattern, so lines
+stay distinguishable in both themes and without relying on color; the scenario tabs
+stay on one row that scrolls sideways within the page when there are more than fit,
+on any screen width, and choosing a tab brings it fully into view.
 System, Light, and Dark themes share this layout. All fonts and illustrations remain
 local, with no additional runtime requests. The branching-path illustration is the
 project logo; a simplified square version serves the masthead and favicons. On

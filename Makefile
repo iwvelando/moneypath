@@ -89,7 +89,7 @@ pre-pr: check test-browser test-webkit
 
 # Serves the production build, under the production CSP, to other devices on
 # the local network (a phone) over HTTPS with a self-signed certificate. Open
-# the https:// Network address it prints. The port stays clear of 4173, which
+# the https:// Network address it prints. The port stays clear of 4181, which
 # the browser tests use.
 PREVIEW_PORT ?= 4180
 preview-lan: dist

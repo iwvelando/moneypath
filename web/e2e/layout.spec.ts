@@ -15,10 +15,13 @@ test('no view scrolls sideways on a narrow phone', async ({ page }) => {
   await runForecast(page);
   expect(await overflow(page), 'results').toBeLessThanOrEqual(0);
   const scenarios = page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab');
+  // The last tab is the comparison, which has a chart and legend but no table.
   for (let i = 0; i < (await scenarios.count()); i += 1) {
-    await scenarios.nth(i).click();
-    await page.locator('.results-table').scrollIntoViewIfNeeded();
-    expect(await overflow(page), `results, scenario ${i + 1}`).toBeLessThanOrEqual(0);
+    const tab = scenarios.nth(i);
+    await tab.click();
+    const compare = (await tab.textContent())?.trim() === 'Compare';
+    await page.locator(compare ? '.comparison__legend' : '.results-table').scrollIntoViewIfNeeded();
+    expect(await overflow(page), `results, tab ${i + 1}`).toBeLessThanOrEqual(0);
   }
 
   await page.getByRole('tab', { name: 'Planning Workspace' }).click();
@@ -404,4 +407,277 @@ test('every help panel opens inside the viewport', async ({ page }) => {
     expect(await overflow(page), name ?? '').toBeLessThanOrEqual(0);
     await button.click();
   }
+});
+
+test('the comparison overlays every scenario and reads a month for each', async ({ page }, testInfo) => {
+  const phone = testInfo.project.name === 'phone';
+  await openApp(page);
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'compare.yaml',
+    mimeType: 'application/yaml',
+    buffer: Buffer.from(`version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2028-01
+  startingCash: 5000
+common:
+  events:
+    - name: Income
+      amount: 1000
+scenarios:
+  - name: Steady
+  - name: Take the long sabbatical and travel for a year
+    events:
+      - name: Travel
+        amount: -1600
+  - name: Skipped
+    active: false
+  - name: Save
+    events:
+      - name: Side work
+        amount: 700
+`),
+  });
+  await runForecast(page);
+
+  const tabs = page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab');
+  await expect(tabs).toHaveCount(4);
+  const compare = tabs.last();
+  await expect(compare).toHaveText('Compare');
+  await expect(tabs.first()).toHaveAttribute('aria-selected', 'true');
+  if (phone) await compare.tap();
+  else await compare.click();
+  await expect(compare).toHaveAttribute('aria-selected', 'true');
+
+  const comparison = page.locator('.comparison');
+  await expect(comparison.getByRole('heading', { name: 'Scenarios side by side' })).toBeVisible();
+  await expect(comparison.locator('.comparison__name')).toHaveText([
+    'Steady',
+    'Take the long sabbatical and travel for a year',
+    'Save',
+  ]);
+  await expect(comparison.locator('.chart__svg .chart__line')).toHaveCount(3);
+  await expect(page.locator('.results-table')).toHaveCount(0);
+
+  // Each line is told apart by its pattern as well as its color.
+  const strokes = await comparison.locator('.chart__svg .chart__line').evaluateAll((lines) =>
+    lines.map((line) => {
+      const style = getComputedStyle(line);
+      return { color: style.stroke, dash: style.strokeDasharray };
+    }),
+  );
+  expect(new Set(strokes.map((stroke) => stroke.color)).size).toBe(3);
+  expect(new Set(strokes.map((stroke) => stroke.dash)).size).toBe(3);
+
+  const group = comparison.getByRole('group', { name: 'Series to compare' });
+  const total = group.getByRole('button', { name: 'Total' });
+  const liquid = group.getByRole('button', { name: 'Liquid' });
+  await expect(total).toHaveAttribute('aria-pressed', 'true');
+  const month = comparison.locator('.comparison__month');
+  await expect(month).toContainText('Total in 2028-01');
+
+  if (phone) await liquid.tap();
+  else await liquid.click();
+  await expect(liquid).toHaveAttribute('aria-pressed', 'true');
+  await expect(total).toHaveAttribute('aria-pressed', 'false');
+  await expect(month).toContainText('Liquid in 2028-01');
+
+  // The sabbatical spends more than it earns, so the scale reaches below zero.
+  const values = comparison.locator('.comparison__value');
+  await expect(values.nth(1)).toHaveText(/^-\$/);
+  await expect(comparison.locator('.chart__zero')).toHaveCount(1);
+  const frame = (await comparison.locator('.chart__svg').boundingBox())!;
+  for (const box of await comparison.locator('.chart__svg .chart__line').evaluateAll((lines) =>
+    lines.map((line) => line.getBoundingClientRect().toJSON() as { top: number; bottom: number }),
+  )) {
+    expect(box.top).toBeGreaterThanOrEqual(frame.y);
+    expect(box.bottom).toBeLessThanOrEqual(frame.y + frame.height);
+  }
+
+  // Tabs keep their names readable, and the date axis stays inside the chart.
+  const compareBox = (await compare.boundingBox())!;
+  expect(compareBox.width, 'Compare tab width').toBeGreaterThanOrEqual(88);
+  for (const box of await comparison.locator('.chart__axis text').evaluateAll((labels) =>
+    labels.map((label) => label.getBoundingClientRect().toJSON() as { left: number; right: number }),
+  )) {
+    expect(box.right, 'date label').toBeLessThanOrEqual(frame.x + frame.width + 0.5);
+    expect(box.left, 'date label').toBeGreaterThanOrEqual(frame.x - 0.5);
+  }
+
+  // The series control is only as wide as its two choices.
+  expect((await group.boundingBox())!.width, 'series control width').toBeLessThanOrEqual(200);
+
+  // By pointer: a tap or a hover reads the month under it.
+  const before = await month.textContent();
+  await comparison.locator('.chart__svg').scrollIntoViewIfNeeded();
+  const plot = (await comparison.locator('.chart__svg').boundingBox())!;
+  if (phone) await page.touchscreen.tap(plot.x + plot.width * 0.5, plot.y + plot.height * 0.5);
+  else await page.mouse.move(plot.x + plot.width * 0.5, plot.y + plot.height * 0.5);
+  await expect(month).not.toHaveText(before!);
+  await expect(comparison.locator('.chart__cursor circle')).toHaveCount(3);
+  if (phone) await comparison.getByRole('heading', { name: 'Scenarios side by side' }).tap();
+  else await page.mouse.move(2, 2);
+  await expect(month).toHaveText(before!);
+
+  // By keyboard: focus the chart and walk the months.
+  const chart = comparison.locator('.chart__svg');
+  if (!phone) await page.mouse.move(plot.x + plot.width * 0.9, plot.y + plot.height * 0.5);
+  await chart.focus();
+  await chart.press('Home');
+  await expect(month).toContainText('2026-01');
+  const first = await values.allTextContents();
+  await chart.press('ArrowRight');
+  await expect(month).toContainText('2026-02');
+  expect(await values.allTextContents()).not.toEqual(first);
+  await expect(comparison.getByRole('status')).toContainText('2026-02, liquid: Steady');
+  await chart.press('End');
+  await expect(month).toContainText('2028-01');
+
+  await comparison.locator('.comparison__legend').scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'comparison').toBeLessThanOrEqual(0);
+  const legend = (await comparison.locator('.comparison__legend').boundingBox())!;
+  for (const box of await values.evaluateAll((nodes) =>
+    nodes.map((node) => node.getBoundingClientRect().toJSON() as { right: number }),
+  )) {
+    expect(box.right, 'value stays inside the legend').toBeLessThanOrEqual(legend.x + legend.width + 1);
+  }
+
+  // The comparison is left the same way it was entered.
+  await tabs.first().click();
+  await expect(page.locator('.results-table')).toBeVisible();
+  await expect(comparison).toHaveCount(0);
+});
+
+for (const theme of ['Light', 'Dark'] as const) {
+  test(`${theme} theme keeps every scenario line clear of its background`, async ({ page }) => {
+    await openApp(page);
+    await page.getByRole('radio', { name: theme, exact: true }).check();
+    await expect(page.locator('html')).toHaveAttribute('data-theme', theme.toLowerCase());
+    await runForecast(page);
+    await page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab', { name: 'Compare' }).click();
+    const contrasts = await page.locator('.comparison .chart__svg .chart__line').evaluateAll((lines) => {
+      const channel = (v: number) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4);
+      const luminance = (color: string) => {
+        const [r, g, b] = (color.match(/[\d.]+/g) ?? []).map((n) => channel(Number(n) / 255));
+        return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+      };
+      const card = lines[0]!.closest('.results__projection')!;
+      const surface = luminance(getComputedStyle(card).backgroundColor);
+      return lines.map((line) => {
+        const stroke = luminance(getComputedStyle(line).stroke);
+        return (Math.max(stroke, surface) + 0.05) / (Math.min(stroke, surface) + 0.05);
+      });
+    });
+    expect(contrasts).toHaveLength(2);
+    for (const contrast of contrasts) expect(contrast).toBeGreaterThanOrEqual(3);
+  });
+}
+
+test('many scenarios stay on one row of tabs that scrolls sideways', async ({ page }, testInfo) => {
+  const phone = testInfo.project.name === 'phone';
+  await openApp(page);
+  const names = Array.from({ length: 12 }, (_, i) => `A possible path number ${i + 1}`);
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'many.yaml',
+    mimeType: 'application/yaml',
+    buffer: Buffer.from(`version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2027-01
+  startingCash: 5000
+scenarios:
+${names.map((name, i) => `  - name: ${name}\n    events:\n      - name: Income\n        amount: ${100 * (i + 1)}`).join('\n')}
+`),
+  });
+  await runForecast(page);
+
+  const tablist = page.getByRole('tablist', { name: 'Scenarios' });
+  const tabs = tablist.getByRole('tab');
+  await expect(tabs).toHaveCount(13);
+  const boxes = () =>
+    tabs.evaluateAll((nodes) =>
+      nodes.map((node) => node.getBoundingClientRect().toJSON() as { top: number; left: number; right: number }),
+    );
+  const strip = async () => (await tablist.boundingBox())!;
+
+  // One row, wider than its strip, and the page itself still does not scroll sideways.
+  expect(new Set((await boxes()).map((box) => Math.round(box.top))).size, 'rows of tabs').toBe(1);
+  expect(await tablist.evaluate((el) => el.scrollWidth - el.clientWidth), 'strip scrolls').toBeGreaterThan(0);
+  expect(await overflow(page), 'results with many scenarios').toBeLessThanOrEqual(0);
+  const viewport = page.viewportSize()!;
+  expect((await strip()).x + (await strip()).width, 'strip stays in the page').toBeLessThanOrEqual(viewport.width);
+  // The run details and the download stay on screen beside or below the strip.
+  await expect(page.getByRole('button', { name: 'Download CSV' })).toBeInViewport();
+
+  // The shadows that hint at more tabs sit flush with the edges the tabs are cut off at.
+  const hintOffsets = await tablist.evaluate((el) => getComputedStyle(el).backgroundPositionX);
+  expect(hintOffsets, 'edge hints start at the very edge').not.toMatch(/[1-9][\d.]*px/);
+
+  // Choosing a tab that is only partly showing brings all of it into the strip.
+  const edge = (await strip()).x + (await strip()).width;
+  const cut = (await boxes()).findIndex((box) => box.left < edge - 12 && box.right > edge + 1);
+  if (cut >= 0) {
+    const box = (await boxes())[cut]!;
+    const y = (await strip()).y + 20;
+    if (phone) await page.touchscreen.tap(box.left + 6, y);
+    else await page.mouse.click(box.left + 6, y);
+    await expect(tabs.nth(cut)).toHaveAttribute('aria-selected', 'true');
+    await expect
+      .poll(async () => (await boxes())[cut]!.right - ((await strip()).x + (await strip()).width))
+      .toBeLessThanOrEqual(1);
+  }
+
+  // The arrow keys do the same for a neighbour that is showing only a sliver.
+  await tablist.evaluate((el) => {
+    const sixth = el.querySelectorAll('[role="tab"]')[5]!.getBoundingClientRect();
+    el.scrollLeft += sixth.left + 6 - el.getBoundingClientRect().right;
+  });
+  await tabs.nth(4).focus();
+  await tabs.nth(4).press('ArrowRight');
+  await expect(tabs.nth(5)).toBeFocused();
+  await expect
+    .poll(async () => (await boxes())[5]!.right - ((await strip()).x + (await strip()).width))
+    .toBeLessThanOrEqual(1);
+
+  // The arrow keys wrap round to the comparison at the far end and bring it into view.
+  await tablist.evaluate((el) => el.scrollTo({ left: 0 }));
+  await tabs.first().focus();
+  await tabs.first().press('ArrowLeft');
+  const compare = tabs.last();
+  await expect(compare).toBeFocused();
+  await expect(compare).toHaveAttribute('aria-selected', 'true');
+  await expect
+    .poll(async () => (await boxes())[12]!.right - ((await strip()).x + (await strip()).width))
+    .toBeLessThanOrEqual(1);
+  await expect(page.locator('.comparison')).toBeVisible();
+  expect(await overflow(page), 'comparison with many scenarios').toBeLessThanOrEqual(0);
+});
+
+test('a comparison with only the initial month still draws every scenario', async ({ page }) => {
+  await openApp(page);
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'initial-month.yaml',
+    mimeType: 'application/yaml',
+    buffer: Buffer.from(`version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2026-01
+  startingCash: 5000
+scenarios:
+  - name: First
+  - name: Second
+`),
+  });
+  await runForecast(page);
+  await page.getByRole('tablist', { name: 'Scenarios' }).getByRole('tab', { name: 'Compare' }).click();
+  const comparison = page.locator('.comparison');
+  await expect(comparison.locator('.comparison__value')).toHaveText(['$5,000.00', '$5,000.00']);
+  const points = comparison.locator('.comparison__point');
+  await expect(points).toHaveCount(2);
+  for (const point of await points.all()) {
+    const box = (await point.boundingBox())!;
+    expect(box.width).toBeGreaterThan(0);
+    expect(box.height).toBeGreaterThan(0);
+  }
+  expect(await overflow(page)).toBeLessThanOrEqual(0);
 });

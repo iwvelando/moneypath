@@ -233,10 +233,16 @@ export function spreadLabels(positions: number[], minGap: number, min: number, m
 /**
  * A whole series compressed into a `width` × `height` polyline points string,
  * for the tiny scenario-tab sparklines. Gaps are skipped; x spacing follows
- * the row index so all scenarios' sparklines share a time axis.
+ * the row index so all scenarios' sparklines share a time axis. Lines drawn
+ * together pass the extent they `shared`, so they also share a value axis.
  */
-export function sparklinePoints(series: Series, width: number, height: number): string {
-  const extent = extentOf([series]);
+export function sparklinePoints(
+  series: Series,
+  width: number,
+  height: number,
+  shared: Extent | null = null,
+): string {
+  const extent = shared ?? extentOf([series]);
   if (!extent) return '';
   const count = series.length;
   const points: string[] = [];

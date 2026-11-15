@@ -187,6 +187,10 @@ describe('sparklinePoints', () => {
     expect(sparklinePoints([3, 3], 40, 10)).toBe('0,5 40,5');
   });
 
+  it('places a line on a shared value axis when given one', () => {
+    expect(sparklinePoints([0, 5], 40, 10, { min: 0, max: 10 })).toBe('0,10 40,5');
+  });
+
   it('returns nothing without at least two values', () => {
     expect(sparklinePoints([], 40, 10)).toBe('');
     expect(sparklinePoints([null, 7], 40, 10)).toBe('');

@@ -1,14 +1,11 @@
-import { useEffect, useId, useMemo, useRef, useState } from 'preact/hooks';
+import { useId, useMemo } from 'preact/hooks';
 import { EmptyChartSketch } from '../components/icons';
 import { HALF_CENT, formatMoney, formatMoneyShort } from '../util/format';
+import { CHART_HEIGHT, ChartAxes, plotOf, useChartWidth, useMonthCursor } from './chartParts';
 import {
   areaPolygon,
   extentOf,
-  indexFromPosition,
-  dateTickLimit,
-  indexTicks,
   negativeSpans,
-  normalize,
   segments,
   spreadLabels,
   valueScale,
@@ -17,7 +14,7 @@ import {
 
 // The right pad leaves room for the end-of-line value labels.
 const PAD = { top: 18, right: 64, bottom: 34, left: 72 };
-const HEIGHT = 340;
+const HEIGHT = CHART_HEIGHT;
 const LABEL_GAP = 15;
 
 interface ChartProps {
@@ -33,39 +30,15 @@ interface ChartProps {
  * responsive, with an empty state. No charting library.
  */
 export function Chart({ dates, liquid, total, scenarioName }: ChartProps) {
-  const containerRef = useRef<HTMLDivElement | null>(null);
-  const [width, setWidth] = useState(720);
-  const [hovered, setHovered] = useState<number | null>(null);
-  const [focused, setFocused] = useState<number | null>(null);
+  const { containerRef, width } = useChartWidth();
   const titleId = useId();
-
-  useEffect(() => {
-    const element = containerRef.current;
-    if (!element) return undefined;
-    const measure = () => setWidth(Math.max(320, element.clientWidth));
-    measure();
-    if (typeof ResizeObserver === 'undefined') {
-      window.addEventListener('resize', measure);
-      return () => window.removeEventListener('resize', measure);
-    }
-    const observer = new ResizeObserver(measure);
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, []);
 
   const count = dates.length;
   const extent = useMemo(() => extentOf([liquid, total]), [liquid, total]);
   const scale = useMemo(() => (extent ? valueScale(extent) : null), [extent]);
-
-  const plotWidth = Math.max(1, width - PAD.left - PAD.right);
-  const plotHeight = HEIGHT - PAD.top - PAD.bottom;
-
-  const x = (index: number) =>
-    PAD.left + (count <= 1 ? plotWidth / 2 : (index / (count - 1)) * plotWidth);
-  const y = (value: number) =>
-    scale ? PAD.top + (1 - normalize(value, scale.domain)) * plotHeight : PAD.top;
-
-  const active = hovered ?? focused;
+  const plot = plotOf(width, PAD, count, scale);
+  const { plotHeight, x, y } = plot;
+  const { active, handlers } = useMonthCursor(count, plot);
 
   if (count === 0 || !scale) {
     return (
@@ -109,13 +82,6 @@ export function Chart({ dates, liquid, total, scenarioName }: ChartProps) {
     return ends.map((end, i) => ({ ...end, labelY: laidOut[i] ?? y(end.value) }));
   })();
 
-  const move = (delta: number) => {
-    setFocused((current) => {
-      const base = current ?? 0;
-      return Math.min(count - 1, Math.max(0, base + delta));
-    });
-  };
-
   return (
     <div class="chart" ref={containerRef}>
       <ul class="chart__legend">
@@ -139,33 +105,7 @@ export function Chart({ dates, liquid, total, scenarioName }: ChartProps) {
           height={HEIGHT}
           role="img"
           aria-labelledby={titleId}
-          tabIndex={0}
-          onFocus={() => setFocused((current) => current ?? 0)}
-          onBlur={() => setFocused(null)}
-          onKeyDown={(event) => {
-            if (event.key === 'ArrowRight') {
-              event.preventDefault();
-              move(1);
-            } else if (event.key === 'ArrowLeft') {
-              event.preventDefault();
-              move(-1);
-            } else if (event.key === 'Home') {
-              event.preventDefault();
-              setFocused(0);
-            } else if (event.key === 'End') {
-              event.preventDefault();
-              setFocused(count - 1);
-            } else if (event.key === 'Escape') {
-              setFocused(null);
-            }
-          }}
-          onPointerMove={(event) => {
-            const rect = (event.currentTarget as SVGSVGElement).getBoundingClientRect();
-            const scaleX = rect.width === 0 ? 1 : width / rect.width;
-            const localX = (event.clientX - rect.left) * scaleX - PAD.left;
-            setHovered(indexFromPosition(localX, plotWidth, count));
-          }}
-          onPointerLeave={() => setHovered(null)}
+          {...handlers}
         >
           <title id={titleId}>
             {`Liquid and total net worth for ${scenarioName}, ${dates[0]} to ${dates[count - 1]}. Use the arrow keys to read individual months.`}
@@ -202,27 +142,7 @@ export function Chart({ dates, liquid, total, scenarioName }: ChartProps) {
             )}
           </g>
 
-          <g class="chart__grid" aria-hidden="true">
-            {scale.ticks.map((tick) => (
-              <g key={tick}>
-                <line x1={PAD.left} x2={width - PAD.right} y1={y(tick)} y2={y(tick)} />
-                <text class="chart__tick" x={PAD.left - 10} y={y(tick)} text-anchor="end" dy="0.32em">
-                  {formatMoneyShort(tick)}
-                </text>
-              </g>
-            ))}
-            {scale.domain.min < 0 && scale.domain.max > 0 ? (
-              <line class="chart__zero" x1={PAD.left} x2={width - PAD.right} y1={y(0)} y2={y(0)} />
-            ) : null}
-          </g>
-
-          <g class="chart__axis" aria-hidden="true">
-            {indexTicks(count, dateTickLimit(plotWidth)).map((index) => (
-              <text key={index} class="chart__tick" x={x(index)} y={HEIGHT - 12} text-anchor="middle">
-                {dates[index]}
-              </text>
-            ))}
-          </g>
+          <ChartAxes plot={plot} scale={scale} dates={dates} />
 
           <g aria-hidden="true">
             {seriesSpec.map((series) =>

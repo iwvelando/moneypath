@@ -22,6 +22,26 @@ afterEach(() => {
 });
 
 describe('Chart graphics', () => {
+  it('lets the keyboard replace a month under the pointer', () => {
+    act(() => renderChart([100, 200, 300, 400], [150, 260, 380, 500]));
+    const chart = host.querySelector('.chart__svg')!;
+    act(() => {
+      const event = new MouseEvent('pointermove', { bubbles: true, clientX: 256 });
+      Object.defineProperty(event, 'pointerType', { value: 'mouse' });
+      chart.dispatchEvent(event);
+    });
+    expect(host.querySelector('.chart__tooltip-date')?.textContent).toBe('2026-04');
+    act(() => {
+      chart.dispatchEvent(new FocusEvent('focus'));
+      chart.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    });
+    expect(host.querySelector('.chart__tooltip-date')?.textContent).toBe('2026-01');
+    act(() => {
+      chart.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }));
+    });
+    expect(host.querySelector('.chart__tooltip-date')?.textContent).toBe('2026-02');
+  });
+
   it('points every area fill at a gradient that exists in the same svg', () => {
     renderChart([100, 200, 300, 400], [150, 260, 380, 500]);
     const defined = new Set(
