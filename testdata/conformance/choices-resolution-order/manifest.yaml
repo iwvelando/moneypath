@@ -1,0 +1,4 @@
+description: "Resolution order (chapter 03, Choices): the scenario's own entries, then the selected options' entries in the order the choices are listed, then common. Three threshold loans (two from options, one common) and two payoff-funding accounts (the scenario's own, one common) make the order decide the numbers: the Student loan is retired before the Car loan because Study is listed before Car, whatever the order of the keys in select, and both before the common House loan; the scenario's Side fund is tapped before the common Brokerage."
+normative: true
+optimize: false
+tolerance: 0.01

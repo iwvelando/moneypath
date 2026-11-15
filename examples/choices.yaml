@@ -1,0 +1,94 @@
+# moneypath example: choices (format v2)
+#
+# Two decisions, and three of the four paths they allow. A scenario picks one
+# option for each choice, so a new path is a few lines and an option is
+# edited once for every scenario that selects it.
+# Field-by-field reference: spec/03-config-v2.md, "Choices".
+version: 2
+
+simulation:
+  startDate: 2026-01
+  endDate: 2031-01
+  startingCash: 20000.00
+
+# The baseline: what holds on every path unless an option says otherwise.
+common:
+  events:
+    - name: Salary
+      amount: 5200.00
+    - name: Living costs
+      amount: -3100.00
+    - name: Gym
+      amount: -60.00
+  loans:
+    - name: Mortgage
+      principal: 240000.00
+      interestRate: 4.0
+      term: 360
+      startDate: 2021-01
+      escrow: 450.00
+  investments:
+    - name: Brokerage
+      startingValue: 40000.00
+      annualReturnRate: 6.0
+      contributionsFromCash: true
+      contributions:
+        - amount: 400.00
+
+choices:
+  - name: Housing
+    options:
+      # An option with only a name changes nothing.
+      - name: Keep the house
+      - name: Sell and rent
+        # `change` replaces the listed fields of a baseline entry and keeps
+        # the rest. Set a field to ~ to take it away.
+        change:
+          loans:
+            - name: Mortgage
+              set:
+                earlyPayoffDate: 2027-06
+                sellProperty: true
+                sellPrice: 310000.00
+                sellCostsNet: 21000.00
+        # Entries the option adds.
+        events:
+          - name: Rent
+            amount: -1900.00
+            startDate: 2027-06
+  - name: Job
+    options:
+      - name: Stay
+      - name: Go freelance
+        # `remove` takes baseline entries away, by name.
+        remove:
+          events: [Salary, Gym]
+        events:
+          - name: Salary until I leave
+            amount: 5200.00
+            endDate: 2026-12
+          - name: Freelance income
+            amount: 6100.00
+            startDate: 2027-03
+        change:
+          investments:
+            - name: Brokerage
+              set:
+                # A list is replaced as a whole.
+                contributions:
+                  - amount: 400.00
+                    endDate: 2026-12
+
+scenarios:
+  # Every scenario picks one option for every choice.
+  - name: as we are
+    select: {Housing: Keep the house, Job: Stay}
+  - name: sell
+    select: {Housing: Sell and rent, Job: Stay}
+  - name: sell and freelance
+    select: {Housing: Sell and rent, Job: Go freelance}
+    # A scenario's own entries: what belongs to this path alone.
+    events:
+      - name: Health insurance
+        amount: -650.00
+        startDate: 2027-01

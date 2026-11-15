@@ -1,5 +1,6 @@
 # moneypath example configuration (format v2)
 # Copy and adapt. Field-by-field reference: spec/03-config-v2.md
+# For scenarios that pick options instead of repeating entries, see choices.yaml.
 version: 2
 
 simulation:

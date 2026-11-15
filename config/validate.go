@@ -92,37 +92,30 @@ func Validate(cfg *Config, now Month) ([]string, error) {
 		sc.ResolvedActive = sc.Active == nil || *sc.Active
 	}
 
-	if err := validateSection(&cfg.Common, "common", true, start, end, &warns); err != nil {
+	if err := validateSection(&cfg.Common, "common", "optimize is not allowed on common events", start, end, &warns); err != nil {
+		return nil, err
+	}
+	if err := validateChoices(cfg, start, end, &warns); err != nil {
 		return nil, err
 	}
 	for _, sc := range cfg.Scenarios {
 		where := fmt.Sprintf("scenario %q", sc.Name)
-		if err := validateSection(&sc.Section, where, false, start, end, &warns); err != nil {
+		if err := validateSection(&sc.Section, where, "", start, end, &warns); err != nil {
 			return nil, err
 		}
+	}
+	if err := resolveScenarios(cfg); err != nil {
+		return nil, err
 	}
 	return warns, nil
 }
 
-func validateSection(s *Section, where string, isCommon bool, start, end Month, warns *[]string) error {
+// validateSection checks one list of entries. noOptimize, when set, is why an
+// event of this list cannot carry an optimize block.
+func validateSection(s *Section, where, noOptimize string, start, end Month, warns *[]string) error {
 	for i, ev := range s.Events {
-		name := eventLabel(ev, i)
-		if ev.Amount == nil {
-			return fmt.Errorf("%s: event %s: amount is required", where, name)
-		}
-		if ev.Percentage != nil {
-			return fmt.Errorf("%s: event %s: percentage is only valid on investment withdrawals", where, name)
-		}
-		if err := resolveEvent(ev, fmt.Sprintf("%s: event %s", where, name), start, end, warns); err != nil {
+		if err := validateEvent(ev, where, i, noOptimize, start, end, warns); err != nil {
 			return err
-		}
-		if ev.Optimize != nil {
-			if isCommon {
-				return fmt.Errorf("%s: event %s: optimize is not allowed on common events", where, name)
-			}
-			if err := validateOptimize(ev, fmt.Sprintf("%s: event %s", where, name)); err != nil {
-				return err
-			}
 		}
 	}
 	for i, l := range s.Loans {
@@ -139,6 +132,28 @@ func validateSection(s *Section, where string, isCommon bool, start, end Month, 
 			return fmt.Errorf("%s: duplicate investment name %q", where, inv.Name)
 		}
 		names[inv.Name] = true
+	}
+	return nil
+}
+
+func validateEvent(ev *Event, where string, i int, noOptimize string, start, end Month, warns *[]string) error {
+	name := eventLabel(ev, i)
+	if ev.Amount == nil {
+		return fmt.Errorf("%s: event %s: amount is required", where, name)
+	}
+	if ev.Percentage != nil {
+		return fmt.Errorf("%s: event %s: percentage is only valid on investment withdrawals", where, name)
+	}
+	if err := resolveEvent(ev, fmt.Sprintf("%s: event %s", where, name), start, end, warns); err != nil {
+		return err
+	}
+	if ev.Optimize != nil {
+		if noOptimize != "" {
+			return fmt.Errorf("%s: event %s: %s", where, name, noOptimize)
+		}
+		if err := validateOptimize(ev, fmt.Sprintf("%s: event %s", where, name)); err != nil {
+			return err
+		}
 	}
 	return nil
 }

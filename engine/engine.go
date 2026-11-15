@@ -148,23 +148,28 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		Notes:  make([][]string, n+1),
 	}
 
-	events := make([]*config.Event, 0, len(sc.Events)+len(cfg.Common.Events))
-	events = append(events, sc.Events...)
-	events = append(events, cfg.Common.Events...)
+	// The scenario's two resolved lists (spec chapter 04 §1): its own entries
+	// with those its selected options add, then common as those options
+	// change it. The shared list is the scenario's own, not one for the plan.
+	own, shared := sc.Resolved, sc.ResolvedShared
+
+	events := make([]*config.Event, 0, len(own.Events)+len(shared.Events))
+	events = append(events, own.Events...)
+	events = append(events, shared.Events...)
 
 	var loans []*loanSim
-	for _, l := range sc.Loans {
+	for _, l := range own.Loans {
 		loans = append(loans, buildLoanSchedule(l, end))
 	}
-	for _, l := range cfg.Common.Loans {
+	for _, l := range shared.Loans {
 		loans = append(loans, buildLoanSchedule(l, end))
 	}
 
 	var invs []*invSim
-	for _, inv := range sc.Investments {
+	for _, inv := range own.Investments {
 		invs = append(invs, newInvSim(inv, "scenario"))
 	}
-	for _, inv := range cfg.Common.Investments {
+	for _, inv := range shared.Investments {
 		invs = append(invs, newInvSim(inv, "common"))
 	}
 

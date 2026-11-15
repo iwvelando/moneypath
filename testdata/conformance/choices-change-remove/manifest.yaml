@@ -1,0 +1,4 @@
+description: "change and remove (chapter 03, Choices). 'Sell and rent' changes six fields of the common Mortgage: a null takes the payoff threshold away (so the threshold payoff of 2026-11 in 'as we are' does not happen), a payoff date and sale are set, and the list of extra principal payments is replaced whole. 'Go freelance' removes two common events and replaces the Brokerage contributions. Each scenario simulates its own shared list, and a changed common entry keeps the scope word common in notes."
+normative: true
+optimize: false
+tolerance: 0.01

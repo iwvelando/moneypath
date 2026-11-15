@@ -24,6 +24,14 @@ decides an outcome.
 
 ## 1. The simulation loop
 
+Every scenario is simulated from two ordered lists of entries: its **resolved scenario
+list** and its **resolved shared list** (chapter 03, Choices). In a plan without choices
+these are the scenario's own entries and `common`. With choices, the scenario list is
+the scenario's own entries followed by those its selected options add, and the shared
+list is `common` as those options change it, so the shared list can differ from one
+scenario to the next. In this chapter "scenario" and "common" entries mean the entries
+of those two resolved lists, and "scenario, then common" means that order.
+
 For each **active** scenario, independently:
 
 - Let `start` = `simulation.startDate` (or the caller-supplied current month when
@@ -32,21 +40,22 @@ For each **active** scenario, independently:
   NOT loop or error.
 - State: `cash = simulation.startingCash`; `r_cash` = the monthly rate derived from
   `simulation.cashInterestRate` (0 when unset); per-investment states (§4); loan schedules
-  precomputed (§3) for the scenario's loans and the common loans.
+  precomputed (§3) for the loans of the resolved scenario list and of the resolved
+  shared list.
 - Record the initial row at `start`: `liquid = cash`,
   `total = cash + Σ investment startingValue` (scenario + common investments).
 - For each month `m` = `start+1`, `start+2`, … up to and including `end`:
 
   1. **Events and cash interest**: `eventDelta` = sum of `amount` over every occurrence
-     (§2) at `m` among scenario events and common events. `cashInterest` =
+     (§2) at `m` among the resolved scenario and common events. `cashInterest` =
      `max(0, cash) · r_cash`, where `cash` is the balance recorded at `m−1` (see §1.1).
   2. **Investments** (§4): process every scenario and common investment for `m`,
      yielding `investmentDelta` (net change in combined investment value),
      `cashContributions` (Σ contributions of investments with
      `contributionsFromCash: true`), and `withdrawalCash` (Σ over investments of
      `withdrawal − withdrawalTax`). Investment activity emits notes (§6).
-  3. **Threshold payoff check** (§3.5): for each loan (scenario loans in config order,
-     then common loans), check against
+  3. **Threshold payoff check** (§3.5): for each loan (the resolved scenario list in
+     order, then the resolved shared list), check against
      `projectedLiquid = cash + cashInterest + eventDelta − cashContributions + withdrawalCash`.
      A triggered payoff rewrites that loan's schedule at `m`, emits a note, and — when
      `fundLoanPayoffs` investments cover a cash shortfall — performs their withdrawals
@@ -184,7 +193,7 @@ step 3 of §1 — because it depends on the running balances): let
 
 `eligible = projectedLiquid + Σ netLiquidationValue(i)`
 
-summed over investments `i` (scenario and common) with `fundLoanPayoffs: true`, using
+summed over investments `i` (of both resolved lists) with `fundLoanPayoffs: true`, using
 investment state after step 2 of §1 for month `m`. An investment's
 `netLiquidationValue` is its current `value` minus the withdrawal tax a full
 liquidation would incur per §4 step 4:
@@ -200,7 +209,8 @@ already ended.
 
 **Funding the payoff**: with payoff payment `P`, the cash shortfall is
 `S = max(0, P − projectedLiquid)`. Walk the `fundLoanPayoffs` investments in processing
-order (scenario list order, then common) and withdraw from each until net proceeds
+order (the resolved scenario list in order, then the resolved shared list) and withdraw
+from each until net proceeds
 cover `S`: for an investment with available growth `g = min(value, growthBalance)` and
 tax fraction `t = withdrawalTaxRate/100`, the gross withdrawal that nets `n` is
 `n / (1 − t)` when `n ≤ g·(1 − t)`, else `n + t·g`; cap at the full `value` (which nets
@@ -302,8 +312,10 @@ normative (conformance fixtures include them in CSV):
   with the same ` (basis %+.2f, growth %+.2f)` suffix rule as regular withdrawals,
   then `, withdrawal tax %.2f` when nonzero.
 - Investment activity: one note per investment per month with any nonzero part:
-  `<scope> <name>: <parts joined by ", ">` where `<scope>` is `scenario` or `common`
-  and parts, in order, are (skipping zero-valued ones):
+  `<scope> <name>: <parts joined by ", ">` where `<scope>` is `scenario` for an
+  investment of the resolved scenario list (the scenario's own, or one a selected option
+  adds) and `common` for one of the resolved shared list (a baseline investment, changed
+  or not), and parts, in order, are (skipping zero-valued ones):
   - `contribution %+.2f` — or `contribution (reduces cash balance) %+.2f` when
     `contributionsFromCash`
   - `withdrawal %+.2f` — or `withdrawal (%.2f%%) %+.2f` for percentage style — with a
@@ -317,7 +329,7 @@ Date-based early payoffs emit no note (the configured date is the user's own doi
 ## 7. Optimizer
 
 Activated by the `--optimize` flag / `optimize: true` option. Adjusts each event carrying
-an `optimize` block (scenario events only) while keeping cash at or above the
+an `optimize` block while keeping cash at or above the
 emergency-fund floor. When the optimized field is `amount` and the configured original
 amount is negative, choose the **smallest feasible signed amount within the bounds**:
 the largest affordable expense, even if the original expense is already feasible.
@@ -354,6 +366,10 @@ from it through the end (i.e. once the floor is first reached, cash never dips b
 it). These comparisons are made in whole cents (`round2` on both sides, per the
 preamble). `minCash` = the minimum liquid over that suffix; `headroom = minCash − floor`,
 reported unrounded, so it can sit a fraction of a cent either side of zero.
+
+A target is one of a scenario's own events. It cannot sit in `common` or in an option
+(chapter 03): both are shared between scenarios, and a chosen value is found against one
+scenario's floor and written back to one place in the plan.
 
 Search, per target (each target optimized in turn — scenario order, then event order —
 with earlier targets' chosen values left in place, so a later target's floor reflects

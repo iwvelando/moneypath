@@ -19,12 +19,16 @@ moneypath forecast --config plan.yaml [--output-format pretty|csv]
 
 - `--config` (required): path to a v2 YAML config. A v1 config (detected by a missing
   `version` field or `common.deathDate` present) MUST produce an error suggesting
-  `moneypath migrate`.
+  `moneypath migrate`. A plan with choices (chapter 03, Choices) takes no flags of its
+  own: its scenarios are forecast, optimized, compared and named like any others. A
+  plan the validation refuses prints its error and no results (exit 1).
 - `--output-format`: `pretty` (default) or `csv`.
 - `--optimize`: run the optimizer (chapter 04 §7) before forecasting.
 - `--write-config FILE`: write the config as run to `FILE` — the same YAML the WASM
   results carry as `configYaml`, so with `--optimize` it holds the optimizer's chosen
   values. Without `--optimize` it is simply the config re-serialized in canonical form.
+  A plan with choices is written with its `choices` and each scenario's `select`
+  (chapter 03, Canonical form), never as the resolved lists.
   `--config` is never modified unless `FILE` names it. A target the optimizer could not
   improve is still written (the values are then the originals). Errors writing the file
   are runtime errors (exit 1), reported after the forecast has printed.
@@ -67,7 +71,8 @@ Prints the build version string (injected via `-ldflags "-X ...=v"`; default `de
 ## CSV output format (normative — conformance fixtures match byte-for-byte)
 
 All fields double-quoted. Dates ascending. One column triple per scenario, ordered as
-scenarios appear in the config (inactive scenarios omitted entirely):
+scenarios appear in the config (inactive scenarios omitted entirely). A scenario defined
+by a `select` is a column triple like any other; choices and options do not appear:
 
 ```
 "date","liquid (<scenario1>)","total (<scenario1>)","notes (<scenario1>)",…
