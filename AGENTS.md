@@ -111,6 +111,30 @@ When reviewing a PR, branch or diff, follow [REVIEWING.md](REVIEWING.md). The
 [moneypath-review skill](.agents/skills/moneypath-review/SKILL.md) is a short entry
 point to it for a fresh-context review; the procedure is the same without skill support.
 
+## Roadmap assignments
+
+[ROADMAP.md](ROADMAP.md) is the accepted product direction. The work is tracked in
+GitHub issues: wave milestones, one parent issue per feature, and native sub-issues for
+slices. DEVELOPMENT.md, "Roadmap assignments", has the procedure. The rules:
+
+- **Read before starting.** The issue and its comments, its parent, the feature's entry
+  in `ROADMAP.md` and the outcomes of its prerequisites, rechecked against current
+  `main`. A closed prerequisite is not proof the capability exists.
+- **Claim it.** Comment with a short plan and the working branch, and set
+  `stage:active`. A `stage:ready` label is not an assignment and waives nothing: the
+  planning, test-first, spec and verification rules here still apply.
+- **`stage:needs-design` is not implementable.** Settle the design with the owner and
+  rewrite the issue body first.
+- **Each kind of information has one home.** Direction in `ROADMAP.md`; current scope
+  and acceptance in issue bodies; discussion in comments; specified behavior in
+  `spec/`; verification in the PR. `ROADMAP.md` is not a status log.
+- **Keep bodies true.** When agreed scope changes, update the slice, its parent and the
+  affected downstream bodies before relying on it, and leave a short comment.
+- **Children closing does not close a parent.** A parent closes when its own acceptance
+  is met. Required scope is never dropped silently.
+- **Finish with one outcome comment** after merge, and refresh the issues that depend
+  on the result with what was delivered.
+
 ## Safari and iOS
 
 Playwright's WebKit uses macOS rules, so `make test-webkit` misses some of what an

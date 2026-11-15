@@ -20,6 +20,9 @@ deliberately changed on the way.
 [SPEC.md](SPEC.md) is where the config format and engine semantics are pinned down, with
 `testdata/` wired into `go test` as conformance gates.
 
+[ROADMAP.md](ROADMAP.md) records where the tool is headed; the work itself is tracked in
+the repository's milestones and issues.
+
 ## Quick start
 
 ```sh
