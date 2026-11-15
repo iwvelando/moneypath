@@ -16,7 +16,7 @@ LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 # CI passes NPM_INSTALL="npm ci" so the lockfile is used exactly.
 NPM_INSTALL ?= npm install --no-fund --no-audit
 
-.PHONY: all build dist wasm notices fmt fmt-check vet typecheck test test-go test-web test-browser test-webkit share-card clean serve dev-setup
+.PHONY: all build dist wasm notices fmt fmt-check vet typecheck test test-go test-web test-browser test-webkit check pre-pr preview-lan share-card clean serve dev-setup
 
 all: build
 
@@ -76,6 +76,24 @@ test-browser: dist
 
 test-webkit: dist
 	cd web && WEBKIT=1 npx playwright test --project=webkit
+
+# What CI's `check` job runs short of the browser: formatting, vet, the
+# production build (which typechecks), then the Go and frontend suites. dist
+# comes before test-go so its parity and bundle checks see the real build.
+check: fmt-check vet dist test-go test-web
+
+# Everything a pull request needs locally (AGENTS.md, "Delivering a change"):
+# `check`, then the full Chromium and WebKit browser suites on that build.
+pre-pr: check test-browser test-webkit
+	@echo "pre-pr: check and the full Chromium and WebKit browser suites passed"
+
+# Serves the production build, under the production CSP, to other devices on
+# the local network (a phone) over HTTPS with a self-signed certificate. Open
+# the https:// Network address it prints. The port stays clear of 4173, which
+# the browser tests use.
+PREVIEW_PORT ?= 4180
+preview-lan: dist
+	cd web && npm run preview:lan -- --port $(PREVIEW_PORT) --strictPort
 
 # Re-render the link-preview card from the built site. Check it by eye and
 # commit web/public/og-image.png; it changes only when the site's look does.

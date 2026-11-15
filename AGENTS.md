@@ -51,6 +51,9 @@ make test-browser   # Playwright against the production build, under the product
 make test-webkit    # the same on Safari's engine (iPhone profile)
 make typecheck      # tsc --noEmit over web/ — see below; test-web does NOT do this
 make build          # wasm → web/dist → binary with embedded web app
+make check          # fmt-check, vet, production build, Go and frontend suites
+make pre-pr         # check + the full Chromium and WebKit browser suites
+make preview-lan    # production build over HTTPS on the local network, for a phone
 go build ./cmd/moneypath   # CLI-only build, no Node needed
 ```
 
@@ -65,6 +68,64 @@ with the offending file list, so use it to confirm before staging. The
 pre-commit hook in `.githooks/` also refuses any staged Go file that isn't
 gofmt-clean (it checks the staged content, not the worktree), so a forgotten
 `make fmt` fails the commit rather than landing.
+
+## Delivering a change
+
+DEVELOPMENT.md, "Delivering a change", has the full procedure. The rules:
+
+- **Iterate on targeted checks.** While developing and taking owner feedback, run the
+  red/green tests and the checks for the paths you touched. Do not run `make pre-pr`
+  between feedback iterations.
+- **Stop at the exploration checkpoint.** For a new feature, or any change a user can
+  see or feel in the web app, once the work is otherwise ready for `make pre-pr`: run
+  `make preview-lan` and give the owner, in private chat, the `https://` Network
+  address it prints together with a short list of things to try. Never hand over
+  `127.0.0.1` or `localhost`: a phone cannot open it. Then wait for the go-ahead,
+  unless the owner has waived the checkpoint or the work is unattended, in which case
+  the handoff says the exploration is still owed. CLI-only and documentation
+  changes have no checkpoint, nor does an engine change whose numbers the fixtures pin.
+- **Then verify once.** Run `make pre-pr` on the final changes, after the checkpoint
+  and before the PR. A change made after that run needs it again. The exception is a
+  change only to Markdown (and instruction-only skills under `.agents/skills/`), which
+  no test or build step reads.
+- **Hand off at the PR.** Push, open the PR, and state the revision tested, the checks
+  actually run and anything still pending. Report CI as pending; whoever reviews reads
+  it. A request for a PR is not permission to merge it, and merging deploys.
+- **Report what ran.** Never imply an unrun check passed. Anything only a phone can
+  show is reported as needing an on-device check, never as passing.
+- **Keep public records portable.** Issues, PRs and comments name branches, commits and
+  repository-relative paths. They carry no local preview addresses, machine paths,
+  session details or quoted private chat. Those stay in private chat with the owner.
+- **Stop what you started.** Before handing work to another session or ending it, stop
+  the preview and dev servers you started and confirm they stopped. A preview stays up
+  while the owner is still exploring it.
+- **Keep working notes out of the tree.** Do not commit PR-specific review reports,
+  validation guides or handoff notes. `.codex/` is ignored for them; final status goes
+  in the PR description.
+- **A failure you did not cause gets an issue before a rerun.** Search for the test's
+  name, record the occurrence there (or open one), then rerun and write only
+  `Reran for #<issue>` in the PR. The same goes for a bug outside the change that is
+  too large to fix in passing.
+
+When reviewing a PR, branch or diff, follow [REVIEWING.md](REVIEWING.md). The
+[moneypath-review skill](.agents/skills/moneypath-review/SKILL.md) is a short entry
+point to it for a fresh-context review; the procedure is the same without skill support.
+
+## Safari and iOS
+
+Playwright's WebKit uses macOS rules, so `make test-webkit` misses some of what an
+iPhone does:
+
+- iOS draws a focus ring on a programmatic `focus()` that follows a tap. Code that
+  moves focus after a pointer action suppresses the ring itself; `:focus-visible`
+  alone does not.
+- iOS gives radios and checkboxes a small fixed size. One stretched over its label
+  sets `width: 100%; height: 100%` explicitly.
+- Safari does not focus a button when it is clicked, so a blur's `relatedTarget` is
+  null. Cover click, focus and blur behavior in `web/e2e/webkit.spec.ts`.
+
+When a change touches controls, touch, focus or layout at phone width, list what to
+check on a phone in the PR and at the exploration checkpoint, as pending.
 
 ## Deployment
 

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { defineConfig } from 'vitest/config';
 import preact from '@preact/preset-vite';
+import basicSsl from '@vitejs/plugin-basic-ssl';
 
 // Production sends this policy from CloudFront; preview sends it too so the
 // browser tests (e2e/) run under it. See e2e/csp.spec.ts.
@@ -10,9 +11,14 @@ const csp = readFileSync('../deploy/content-security-policy.txt', 'utf8').trim()
 // relative to index.html. Asset inlining is disabled so the wasm module (and
 // everything else the app fetches at runtime) always lands in dist/assets with
 // a content-derived filename.
-export default defineConfig({
+//
+// `make preview-lan` serves over HTTPS with a self-signed certificate. A
+// plain-HTTP address other than localhost is no secure context, which the live
+// site always is, and Safari runs JavaScript and WebAssembly several times
+// slower without one.
+export default defineConfig(({ mode }) => ({
   base: './',
-  plugins: [preact()],
+  plugins: [preact(), ...(mode === 'lan' ? [basicSsl()] : [])],
   build: {
     target: 'es2022',
     assetsInlineLimit: 0,
@@ -26,4 +32,4 @@ export default defineConfig({
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },
-});
+}));
