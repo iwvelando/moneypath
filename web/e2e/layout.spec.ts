@@ -380,3 +380,28 @@ test('new and duplicated entries open for editing and all entries remain expanda
     expect(await overflow(page), `new ${kind}`).toBeLessThanOrEqual(0);
   }
 });
+
+// A help button can sit anywhere in a row, including at the right edge, so its
+// panel is placed against the viewport rather than against the button.
+test('every help panel opens inside the viewport', async ({ page }) => {
+  await openApp(page);
+  const expand = page.getByRole('button', { name: 'Expand all' });
+  while ((await expand.count()) > 0) await expand.first().click();
+  const buttons = page.getByRole('button', { name: /^Help: / });
+  const count = await buttons.count();
+  expect(count).toBeGreaterThan(20);
+  for (let i = 0; i < count; i += 1) {
+    const button = buttons.nth(i);
+    if (!(await button.isVisible())) continue;
+    const name = await button.getAttribute('aria-label');
+    await button.click();
+    const box = await button.evaluate((el) => {
+      const rect = el.parentElement!.querySelector('.helptip__text')!.getBoundingClientRect();
+      return { left: rect.left, right: rect.right, viewport: document.documentElement.clientWidth };
+    });
+    expect(box.left, `${name} left edge`).toBeGreaterThanOrEqual(0);
+    expect(box.right, `${name} right edge`).toBeLessThanOrEqual(box.viewport);
+    expect(await overflow(page), name ?? '').toBeLessThanOrEqual(0);
+    await button.click();
+  }
+});
