@@ -23,6 +23,12 @@
   --ok: #326d5e;
   --series-liquid: #b07040;
   --series-total: #326d5e;
+  --scenario-0: #0d7f66;
+  --scenario-1: #cc7430;
+  --scenario-2: #3f6fb5;
+  --scenario-3: #a8457c;
+  --scenario-4: #8f7d12;
+  --scenario-5: #6a55b0;
   --danger-band: rgba(200, 60, 55, 0.13);
   --grid: #e0e4da;
   --focus: #326d5e;
@@ -52,6 +58,12 @@
     --ok: #95c8ad;
     --series-liquid: #ddb180;
     --series-total: #95c8ad;
+    --scenario-0: #239a85;
+    --scenario-1: #d27c3a;
+    --scenario-2: #5f8fdc;
+    --scenario-3: #cf6a9e;
+    --scenario-4: #a39330;
+    --scenario-5: #8d7be0;
     --danger-band: rgba(255, 120, 112, 0.16);
     --grid: #35483c;
     --focus: #b0d7bc;
@@ -79,6 +91,12 @@
   --ok: #95c8ad;
   --series-liquid: #ddb180;
   --series-total: #95c8ad;
+  --scenario-0: #239a85;
+  --scenario-1: #d27c3a;
+  --scenario-2: #5f8fdc;
+  --scenario-3: #cf6a9e;
+  --scenario-4: #a39330;
+  --scenario-5: #8d7be0;
   --danger-band: rgba(255, 120, 112, 0.16);
   --grid: #35483c;
   --focus: #b0d7bc;
@@ -1514,6 +1532,137 @@ nav.sectionnav {
   font-variant-numeric: tabular-nums;
 }
 
+/* ------------------------------------------------------------ comparison */
+
+/*
+ * One color and one line pattern per scenario. The six colors were checked as
+ * a set against each theme's surface for contrast and for separation under
+ * color-vision deficiency; the pattern keeps neighbours apart without color.
+ */
+.chart__scenario--0 { stroke: var(--scenario-0); }
+.chart__scenario--1 { stroke: var(--scenario-1); }
+.chart__scenario--2 { stroke: var(--scenario-2); }
+.chart__scenario--3 { stroke: var(--scenario-3); }
+.chart__scenario--4 { stroke: var(--scenario-4); }
+.chart__scenario--5 { stroke: var(--scenario-5); }
+
+.chart__dash--1 { stroke-dasharray: 7 5; }
+.chart__dash--2 { stroke-dasharray: 1 5; }
+.chart__dash--3 { stroke-dasharray: 11 5 1 5; }
+.chart__dash--4 { stroke-dasharray: 16 6; }
+
+.chart__scenario-dot--0 { fill: var(--scenario-0); }
+.chart__scenario-dot--1 { fill: var(--scenario-1); }
+.chart__scenario-dot--2 { fill: var(--scenario-2); }
+.chart__scenario-dot--3 { fill: var(--scenario-3); }
+.chart__scenario-dot--4 { fill: var(--scenario-4); }
+.chart__scenario-dot--5 { fill: var(--scenario-5); }
+
+.chart__cursor .chart__dot {
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.results__comparison {
+  margin-top: 24px;
+}
+
+.results__projection .comparison__heading {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.comparison__series {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.comparison__choice {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-weight: 500;
+  min-width: 72px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.comparison__choice:hover {
+  color: var(--text);
+}
+
+.comparison__choice.is-active {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.comparison__month {
+  margin: 0 0 8px;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+}
+
+.comparison__month strong {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.comparison__legend {
+  list-style: none;
+  margin: 0 0 18px;
+  padding: 0;
+  max-width: 560px;
+  font-size: 0.88rem;
+}
+
+.comparison__legend li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid var(--grid);
+}
+
+.comparison__legend li:last-child {
+  border-bottom: 0;
+}
+
+.comparison__sample {
+  display: block;
+}
+
+.chart__line-sample {
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+.comparison__name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.comparison__value {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+@media (pointer: coarse) {
+  .comparison__choice {
+    min-height: 44px;
+  }
+}
+
 /* ----------------------------------------------------------------- table */
 
 .table-wrap {
@@ -1863,12 +2012,40 @@ input[type='checkbox'], input[type='radio'] {
   font-size: 0.75rem;
 }
 
+/*
+ * Scenario tabs stay on one row however many there are, and the row scrolls
+ * sideways inside the page. The padding keeps a focus ring from being clipped;
+ * the shadows at either end show only while more tabs lie that way, and sit
+ * flush with the edges the tabs are cut off at.
+ */
 .results__head .tablist {
-  flex-wrap: wrap;
-  background: transparent;
-  padding: 0;
+  flex: 1 1 320px;
+  min-width: 0;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
   border: 0;
+  border-radius: 0;
+  margin: -4px;
+  padding: 4px 4px 8px;
   gap: 10px;
+  background:
+    linear-gradient(to right, var(--bg) 40%, transparent) left / 36px 100% no-repeat local,
+    linear-gradient(to left, var(--bg) 40%, transparent) right / 36px 100% no-repeat local,
+    linear-gradient(to right, color-mix(in srgb, var(--text) 18%, transparent), transparent) left top 4px / 10px
+      calc(100% - 12px) no-repeat scroll,
+    linear-gradient(to left, color-mix(in srgb, var(--text) 18%, transparent), transparent) right top 4px / 10px
+      calc(100% - 12px) no-repeat scroll;
+}
+
+.results__head .tablist__tab {
+  flex: 0 0 auto;
+  max-width: 240px;
+}
+
+.results__actions {
+  flex: none;
 }
 
 .results__head .tablist__tab.is-active {
@@ -2149,14 +2326,19 @@ input[type='checkbox'], input[type='radio'] {
   }
 
   .results__head .tablist {
-    width: 100%;
+    flex-basis: 100%;
   }
 
   .results__head .tablist__tab {
-    flex: 1;
-    min-width: 0;
+    min-width: 88px;
+    max-width: 200px;
     overflow-wrap: anywhere;
     padding: 10px;
+  }
+
+  .comparison__series {
+    width: fit-content;
+    margin-top: 12px;
   }
 
   .results__actions {

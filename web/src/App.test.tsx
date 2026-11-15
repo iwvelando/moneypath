@@ -247,6 +247,16 @@ describe('the app', () => {
     // Still readable: the previous numbers are the baseline for the edit.
     expect(resultsTab().disabled).toBe(false);
     expect(container.querySelector('.results-stale')).not.toBeNull();
+
+    // The comparison is the same earlier run, so it carries the same notice.
+    const compare = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('[aria-label="Scenarios"] [role="tab"]'),
+    ).find((tab) => tab.textContent?.trim() === 'Compare')!;
+    await act(async () => {
+      compare.click();
+    });
+    expect(container.querySelector('.comparison')).not.toBeNull();
+    expect(container.querySelector('.results-stale')).not.toBeNull();
   });
 
   it('does not run from the read-only Results tab', async () => {

@@ -1,7 +1,7 @@
 import { render } from 'preact';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { EmergencyFundGauge } from './Gauge';
-import { Sparkline } from './Sparkline';
+import { OverlaySparkline, Sparkline } from './Sparkline';
 
 let host: HTMLDivElement;
 
@@ -54,5 +54,16 @@ describe('Sparkline', () => {
   it('renders nothing when there is not enough data for a line', () => {
     render(<Sparkline series={[null, 4]} />, host);
     expect(host.querySelector('svg')).toBeNull();
+  });
+});
+
+describe('OverlaySparkline', () => {
+  it('draws every scenario on one scale and stays out of the accessibility tree', () => {
+    render(<OverlaySparkline series={[[0, 10], [0, 5], [null, null]]} />, host);
+    const svg = host.querySelector('svg.sparkline');
+    expect(svg?.getAttribute('aria-hidden')).toBe('true');
+    const lines = [...host.querySelectorAll('polyline')].map((line) => line.getAttribute('points'));
+    // The second line ends halfway up: it is measured against the first one's range.
+    expect(lines).toEqual(['0,12 44,0', '0,12 44,6']);
   });
 });

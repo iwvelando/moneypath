@@ -3,9 +3,10 @@ import type { Adjustment, AdjustmentStatus } from '../config/adjustments';
 import type { ForecastResults, ScenarioMetrics } from '../engine/types';
 import { formatDuration, formatMoney, formatMonths } from '../util/format';
 import { Chart } from './Chart';
+import { Comparison } from './Comparison';
 import { MonthlyTable, type MonthlyRow } from './MonthlyTable';
 import { EmergencyFundGauge } from './Gauge';
-import { Sparkline } from './Sparkline';
+import { OverlaySparkline, Sparkline } from './Sparkline';
 
 interface ResultsViewProps {
   results: ForecastResults;
@@ -160,13 +161,42 @@ export function ResultsView({
   statusOf,
   onApply,
 }: ResultsViewProps) {
-  const [selected, setSelected] = useState(0);
+  // A scenario's position, or the comparison of all of them.
+  const [selected, setSelected] = useState<number | 'compare'>(0);
+  const canCompare = results.scenarios.length > 1;
+  const comparing = selected === 'compare' && canCompare;
+  const index = typeof selected === 'number' && selected < results.scenarios.length ? selected : 0;
 
   useEffect(() => {
-    if (selected >= results.scenarios.length) setSelected(0);
-  }, [results.scenarios.length, selected]);
+    if (!comparing && selected !== index) setSelected(0);
+  }, [comparing, selected, index]);
 
-  const index = selected < results.scenarios.length ? selected : 0;
+  const tabKeys: (number | 'compare')[] = [
+    ...results.scenarios.map((_, i) => i),
+    ...(canCompare ? ['compare' as const] : []),
+  ];
+  const current = comparing ? 'compare' : index;
+  const tabId = (key: number | 'compare') => `scenario-tab-${key}`;
+
+  // Arrow keys take the focus along, so a second press continues from the new tab.
+  const stepTab = (event: KeyboardEvent, from: number | 'compare') => {
+    const delta = event.key === 'ArrowRight' ? 1 : event.key === 'ArrowLeft' ? -1 : 0;
+    if (delta === 0) return;
+    event.preventDefault();
+    const next = tabKeys[(tabKeys.indexOf(from) + delta + tabKeys.length) % tabKeys.length] ?? 0;
+    setSelected(next);
+    const tab = document.getElementById(tabId(next));
+    tab?.focus();
+    // Focus alone leaves a tab where it is when a sliver of it already shows.
+    tab?.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  };
+
+  // A tab that is only partly showing in the scrolling row comes fully into it.
+  const choose = (event: MouseEvent, key: number | 'compare') => {
+    setSelected(key);
+    (event.currentTarget as HTMLElement).scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+  };
+
   const scenarioName = results.scenarios[index] ?? '';
 
   // One Total series per scenario, for the sparkline in each tab.
@@ -207,26 +237,34 @@ export function ResultsView({
               key={name}
               type="button"
               role="tab"
-              id={`scenario-tab-${i}`}
-              aria-selected={i === index}
+              id={tabId(i)}
+              aria-selected={i === current}
               aria-controls="scenario-panel"
-              tabIndex={i === index ? 0 : -1}
-              class={i === index ? 'tablist__tab is-active' : 'tablist__tab'}
-              onClick={() => setSelected(i)}
-              onKeyDown={(event) => {
-                if (event.key === 'ArrowRight') {
-                  event.preventDefault();
-                  setSelected((i + 1) % results.scenarios.length);
-                } else if (event.key === 'ArrowLeft') {
-                  event.preventDefault();
-                  setSelected((i - 1 + results.scenarios.length) % results.scenarios.length);
-                }
-              }}
+              tabIndex={i === current ? 0 : -1}
+              class={i === current ? 'tablist__tab is-active' : 'tablist__tab'}
+              onClick={(event) => choose(event, i)}
+              onKeyDown={(event) => stepTab(event, i)}
             >
               {name}
               <Sparkline series={scenarioTotals[i] ?? []} />
             </button>
           ))}
+          {canCompare ? (
+            <button
+              type="button"
+              role="tab"
+              id={tabId('compare')}
+              aria-selected={comparing}
+              aria-controls="scenario-panel"
+              tabIndex={comparing ? 0 : -1}
+              class={comparing ? 'tablist__tab tablist__tab--compare is-active' : 'tablist__tab tablist__tab--compare'}
+              onClick={(event) => choose(event, 'compare')}
+              onKeyDown={(event) => stepTab(event, 'compare')}
+            >
+              Compare
+              <OverlaySparkline series={scenarioTotals} />
+            </button>
+          ) : null}
         </div>
         <div class="results__actions">
           <span class="results__meta">
@@ -239,7 +277,13 @@ export function ResultsView({
         </div>
       </div>
 
-      <div id="scenario-panel" role="tabpanel" aria-labelledby={`scenario-tab-${index}`} tabIndex={0}>
+      <div id="scenario-panel" role="tabpanel" aria-labelledby={tabId(current)} tabIndex={0}>
+        {comparing ? (
+          <div class="results__projection results__comparison">
+            <Comparison results={results} />
+          </div>
+        ) : (
+          <>
         <div class="results__overview">
           <div class="results__projection">
             <div class="results__section-heading">
@@ -260,6 +304,8 @@ export function ResultsView({
           <p>The numbers behind your path.</p>
         </div>
         <MonthlyTable key={scenarioName} rows={rows} scenarioName={scenarioName} />
+          </>
+        )}
       </div>
     </div>
   );
