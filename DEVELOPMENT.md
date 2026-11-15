@@ -43,7 +43,7 @@ working binary (with a placeholder web app embedded).
 
 ```sh
 make preview-lan              # builds, then serves web/dist/ on port 4180
-make preview-lan PREVIEW_PORT=4181
+make preview-lan PREVIEW_PORT=4190
 ```
 
 It serves the production build, under the production Content-Security-Policy, to
@@ -53,7 +53,7 @@ is self-signed, so the phone warns once before opening the page. HTTPS matters: 
 plain-HTTP address other than localhost is not a secure context, which the live site
 always is, and Safari runs WebAssembly several times slower without one.
 
-The port stays clear of 4173, which the browser tests use, so a preview can stay up
+The port stays clear of 4181, which the browser tests use, so a preview can stay up
 while they run. Stop it with Ctrl-C when the phone check is done.
 
 ## The embedded web tree
@@ -114,9 +114,12 @@ answers (`failed` if it can't load). Tests tagged `@smoke` must stay fast and
 read-only: CI runs them against the live site after every deploy, with `BASE_URL`
 set.
 
-Playwright reuses a server already listening on port 4173 outside CI. A leftover
-`vite preview` from another project will quietly serve the wrong app, so check
-`lsof -nP -iTCP:4173 -sTCP:LISTEN` when results make no sense.
+The browser tests serve the build on port 4181, not Vite's default of 4173, so they
+can run beside another project's tests on the same machine. `E2E_PORT` moves it, for
+two checkouts of this repository testing at once: `E2E_PORT=4191 make test-browser`.
+Playwright reuses a server already listening on that port outside CI. A leftover
+`vite preview` will quietly serve a stale or different build, so check
+`lsof -nP -iTCP:4181 -sTCP:LISTEN` when results make no sense.
 
 ### Distribution files
 
