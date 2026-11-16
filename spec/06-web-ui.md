@@ -127,6 +127,9 @@ The app covers, at a coarse grain:
   run even after the editor has moved on. Reading it changes nothing. The flipped path
   enters the plan only when the reader keeps it, as a copy of the scenario placed after
   it with that one selection changed and a name no other scenario has.
+  Keeping requires the plan to be unchanged since the forecast. After an edit, it is
+  refused with an explanation to run the forecast again, while the earlier comparison
+  remains readable.
   Editing the config
   marks all of these as describing an earlier version of the plan; they stay readable,
   being the baseline the next run will be compared against.

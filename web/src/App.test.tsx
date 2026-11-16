@@ -353,6 +353,60 @@ describe('the app', () => {
     expect(container.querySelector('.toolbar__hint')).toBeNull();
   });
 
+  it('requires a fresh forecast before keeping a flip after the plan changes', async () => {
+    const config = starterConfig();
+    const stay = emptyOption('Stay');
+    const move = emptyOption('Move');
+    const home = { ...emptyChoice('Home'), options: [stay, move] };
+    config.choices = [home];
+    for (const scenario of config.scenarios) scenario.select = { [home.id]: stay.id };
+    window.localStorage.setItem(KEYS.editorState, JSON.stringify({ version: EDITOR_STATE_VERSION, config }));
+
+    await act(async () => render(<App />, container));
+    await settle();
+    await act(async () => button('Run Forecast').click());
+    await settle(500);
+
+    // Change the simulation after running; even an unchanged source scenario
+    // would now produce a different path under these shared settings.
+    await act(async () => button('Planning Workspace').click());
+    const field = container.querySelector<HTMLInputElement>('#section-simulation input')!;
+    await act(async () => {
+      field.value = '2027-01';
+      field.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await act(async () => button('Results').click());
+
+    const pickMove = async () => {
+      await act(async () => {
+        const option = container.querySelectorAll<HTMLSelectElement>('.flip select')[1]!;
+        option.value = [...option.options].find((o) => o.textContent?.trim() === 'Move')!.value;
+        option.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await settle(500);
+    };
+    // Old results remain useful for reading a comparison, but cannot be kept.
+    await pickMove();
+    expect(container.querySelector('.flip .chart')).not.toBeNull();
+    await act(async () => button('Keep as a scenario').click());
+    await settle(500);
+    expect(container.querySelector('.notices')?.textContent).toContain(
+      'Your plan has changed. Run the forecast again before keeping this path.',
+    );
+    const savedScenarios = () =>
+      (JSON.parse(window.localStorage.getItem(KEYS.editorState)!) as { config: ConfigModel }).config.scenarios;
+    expect(savedScenarios()).toHaveLength(config.scenarios.length);
+
+    await act(async () => button('Planning Workspace').click());
+    await act(async () => button('Run Forecast').click());
+    await settle(500);
+    await pickMove();
+    await act(async () => button('Keep as a scenario').click());
+    await settle(500);
+    expect(savedScenarios()).toHaveLength(config.scenarios.length + 1);
+    expect(container.querySelector('.flip')?.textContent).toContain('Added to your plan.');
+  });
+
   it('flips one choice from the results and keeps the path as a scenario when asked', async () => {
     const config = starterConfig();
     const stay = emptyOption('Stay');

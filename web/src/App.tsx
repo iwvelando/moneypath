@@ -241,6 +241,10 @@ export function App() {
   // Like an optimizer adjustment, a flipped path enters the plan only when asked.
   const keepFlip = useCallback(
     (scenarioId: string, choiceId: string, optionId: string, name: string): boolean => {
+      if (config !== ranConfig.current) {
+        pushNotice('error', 'Your plan has changed. Run the forecast again before keeping this path.');
+        return false;
+      }
       const next = keepFlippedScenario(config, scenarioId, choiceId, optionId, name);
       if (!next) {
         pushNotice(
