@@ -141,10 +141,7 @@ export class EngineError extends Error {
   }
 }
 
-export type EngineKind = 'wasm' | 'mock';
-
 export interface Engine {
-  readonly kind: EngineKind;
   /** The build version string from `moneypathVersion()`. */
   version(): string;
   forecast(configYaml: string, options: ForecastOptions): Promise<ForecastResults>;

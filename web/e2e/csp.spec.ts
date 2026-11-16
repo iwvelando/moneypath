@@ -15,8 +15,6 @@ test('preview serves the production Content-Security-Policy', async ({ request }
 test('the engine, a forecast, and both downloads run under the policy', async ({ page }) => {
   const found = problems(page);
   await openApp(page);
-  // No mock-engine notice: production must run the real engine or say it failed.
-  await expect(page.getByText(/mock engine/i)).toHaveCount(0);
   await runForecast(page);
   const csv = page.waitForEvent('download');
   await page.getByRole('button', { name: 'Download CSV' }).click();

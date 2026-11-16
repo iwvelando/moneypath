@@ -1,7 +1,7 @@
 # 02 — Architecture
 
-*Status: **Mixed** — the sections marked normative (Results JSON, Determinism,
-Build artifacts) are Contract; the rest is descriptive. See SPEC.md.*
+*Status: **Mixed** — the sections marked normative (Results JSON, Determinism) are
+Contract; the rest is descriptive. See SPEC.md.*
 
 ## Shape
 
@@ -160,44 +160,40 @@ for the date fields.
   buildable stack MAY substitute — no SSR, no runtime CDN dependencies, all assets
   self-hosted in `dist/`).
 - The chart is inline SVG rendered by the app (chapter 06); no charting library required.
-- The site MUST work when hosted at any sub-path (e.g. `https://host/tools/moneypath/`):
-  use relative asset URLs throughout. No absolute-path assumptions.
+- Asset URLs are relative throughout, so the site works from any path prefix.
 - Budget: the `.wasm` artifact SHOULD be ≤ 5 MB (standard Go toolchain output is
   acceptable; TinyGo is optional). Load it once, show a loading state, and let HTTP
   caching do its job.
 
-## Build artifacts (normative)
+## Build artifacts
+
+This section describes the build as it is. It serves the one public deployment
+(chapter 01, "Scope"), and the checks named here are what hold it in place: change
+the build and those checks together.
 
 The source tree produces one artifact, **`dist/`**: the complete static site —
 `index.html`, hashed JS/CSS, and `moneypath.wasm`, with no other runtime dependency.
-Publishing MUST be nothing more than copying the tree to a static file host (object
-storage behind a CDN, a plain web server, a local directory). No build step, rewrite
-rule, or server configuration may be required to make it work.
-
-The build never assumes a particular host, even though one public deployment exists
-(chapter 01, "Scope"); these properties of the build are what keep every host an option:
+Publishing is copying the tree to the site's bucket; nothing is built or rewritten
+on the host.
 
 - **Build order.** Two stages: (1) compile the engine wasm (`GOOS=js GOARCH=wasm`);
-  (2) run the bundler with that wasm as a *bundler input* — imported as a hashed asset
-  (e.g. `new URL('./moneypath.wasm', import.meta.url)` or equivalent), never dropped into
-  a verbatim-copied `public/` directory — producing `dist/`.
+  (2) run the bundler with that wasm as a *bundler input*, imported as a hashed asset
+  through `new URL('./moneypath.wasm', import.meta.url)`, producing `dist/`.
 - **Matched glue.** The Go wasm glue (`wasm_exec.js`) and the compiler only work as a
-  pair. The build MUST take the glue from the Go toolchain that compiles the wasm; a
+  pair, so the build takes the glue from the Go toolchain that compiles the wasm. A
   copy is never committed.
 - **Content hashing.** Every asset the app fetches at runtime — JS, CSS,
-  `moneypath.wasm`, and the Go wasm glue (`wasm_exec.js`, bundled like any other module) —
-  MUST have a content-derived filename. This guarantees a fetched `index.html` always
-  references matching assets: a stale cache can never mix old and new files — at worst it
-  serves a coherent old version. (Whether `index.html` itself is cached fresh is
-  cache-header territory, i.e. host configuration, and stays out of scope.) Bundlers hash
-  JS/CSS by default but typically copy files out of `public/` verbatim; the wasm MUST NOT
-  be left unhashed. `index.html` is the only unhashed entry point.
-- **Wasm content type.** The app MUST NOT assume the host serves `.wasm` as
-  `application/wasm` — several object stores do not. Use
-  `WebAssembly.instantiateStreaming` where it works and fall back to
-  `WebAssembly.instantiate(await response.arrayBuffer())` when it rejects on content
-  type, rather than surfacing a failure the user cannot act on.
-- **No routing.** The app is a single page: `index.html` at the root of `dist/`. Tabs and
-  sections are in-page state, not URL routes. The app MUST NOT require deep-linkable
-  URLs, history rewriting, or a host-side 404-to-`index.html` rewrite. The only path a
-  host must resolve is the deploy root, serving `index.html`.
+  `moneypath.wasm`, and the glue, which is bundled like any other module — has a
+  content-derived filename, and `index.html` is the only unhashed entry point. A
+  fetched `index.html` therefore always references matching assets: a stale cache
+  serves a coherent old version, never a mix. The deploy relies on this to cache
+  `assets/` indefinitely. `TestStaticBundle` checks the engine's hashed name.
+- **Relative URLs.** `index.html` and the bundle refer to every asset by a relative
+  URL (`TestStaticBundle`).
+- **Wasm content type.** The app uses `WebAssembly.instantiateStreaming` and falls
+  back to `WebAssembly.instantiate(await response.arrayBuffer())` when that rejects,
+  as it does when a server sends `.wasm` without the `application/wasm` type.
+- **No routing.** The app is a single page: `index.html` at the root of `dist/`. Tabs
+  and sections are in-page state, not URL routes, so the host needs no rewrite rules.
+- **Completeness.** `web/scripts/check-dist.mjs` fails the build when `dist/` lacks the
+  real engine, the icons, the 404 page or the license notices.

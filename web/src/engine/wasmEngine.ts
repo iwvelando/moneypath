@@ -81,8 +81,6 @@ function yieldToPaint(): Promise<void> {
 }
 
 class WasmEngine implements Engine {
-  readonly kind = 'wasm' as const;
-
   version(): string {
     const fn = bridgeGlobals().moneypathVersion;
     return typeof fn === 'function' ? fn() : 'unknown';

@@ -1340,11 +1340,6 @@ select.input {
   color: var(--text-muted);
 }
 
-.tag--warn {
-  background: var(--warn-soft);
-  color: var(--warn);
-}
-
 /* ----------------------------------------------------------------- chart */
 
 .chart {

@@ -174,9 +174,10 @@ check on a phone in the PR and at the exploration checkpoint, as pending.
 - Stage paths explicitly; avoid blanket `git add -A` / `git add .`.
 - The engine build writes two gitignored files into `web/src/`: `moneypath.wasm`
   and Go's glue, `vendor/wasm_exec.js`, copied from the toolchain that compiled
-  the wasm so the pair always matches. Never commit either. When one is absent,
-  `web/scripts/ensure-wasm.mjs` fills it in (an empty wasm, the installed Go's
-  glue) so the frontend tests run before the first `make wasm`.
+  the wasm so the pair always matches. Never commit either. The frontend unit
+  tests run that wasm, not a stand-in: `make test-web` rebuilds it first, while
+  a bare `npm test` in `web/` builds it only when it is missing, so run
+  `make wasm` after a Go edit.
 - **A new field in the web editor model (`web/src/config/types.ts`) must also work for
   saved drafts that predate it**, not just fresh and uploaded configs. The editor
   restores its draft from `localStorage` (`web/src/state/persistence.ts`), and an old
