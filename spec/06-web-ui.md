@@ -27,8 +27,8 @@ These are the properties that must survive any redesign:
 - **Persistence is localStorage only**, and always optional to the engine: editor state
   under a versioned key, theme choice, optimizer toggle. Corrupt or version-mismatched
   state falls back to the starter config rather than failing. A draft saved before a
-  setting existed restores with that setting blank, not discarded. No cookies, no
-  external storage.
+  setting existed restores with that setting blank, not discarded; one saved before
+  choices existed restores as a plan with none. No cookies, no external storage.
 - **It must work from any path prefix** with no configuration: relative URLs for every
   asset including the WASM binary. A host serves `index.html` for the deploy root and
   needs no rewrite rules — the app is a single page with no client-side routing, and no
@@ -44,8 +44,9 @@ These are the properties that must survive any redesign:
 The app covers, at a coarse grain:
 
 - A **config editor** — simulation settings (including the interest rate cash earns),
-  common events / loans / investments, and scenarios with their own events / loans /
-  investments and per-event optimizer blocks. Existing entries appear as compact
+  the baseline (the config's `common` events / loans / investments), choices with their
+  options, and scenarios with their selections, their own events / loans / investments
+  and per-event optimizer blocks. Existing entries appear as compact
   summaries and open into inline forms. Several entries can stay open, and each list
   offers Expand all / Collapse all. Adding or duplicating an entry opens it and focuses
   its name; jumping to an optimized event reveals its form. Collapsing an entry
@@ -54,7 +55,29 @@ The app covers, at a coarse grain:
   schedules, never calculated payments or forecast returns. Loan terms, insurance, early
   payoff, and investment tax settings are grouped within the forms. Every field carries
   a help affordance explaining its semantics; where a field has meaning defined in
-  chapter 03, the help says what that chapter says.
+  chapter 03, the help says what that chapter says. A field asks a phone for the
+  keyboard its value needs: the full one where a number may be negative, and for a
+  month the number pad, with the field supplying the dash that pad lacks.
+- **Choices** (chapter 03, "Choices") — each choice is a section holding its options.
+  An option is an entry like any other: collapsed, it says what it adds, changes and
+  removes and which scenarios pick it, so its reach is known before it is edited. Open,
+  it holds the entries it adds (no optimizer on its events) and the baseline entries it
+  changes or removes. A change is edited in the baseline entry's own form, filled with
+  the values the entry has on that path: editing a field makes it part of the change,
+  emptying one takes it away, each changed field is listed beside the baseline's value
+  with a way back to it, and every field left alone follows the baseline. The entry's
+  name is not editable there. Each scenario picks one option per choice from a
+  dropdown, in choice order. The editor keeps a plan valid as it is built, in place of
+  only reporting what the engine would refuse: a new choice starts with one option that
+  changes nothing, selected by every scenario, so no forecast moves; a new scenario
+  picks the first option of each choice and a duplicate keeps its picks; an option a
+  scenario picks, or a choice's last option, cannot be removed; and the control that
+  picks a baseline entry to change or remove is a search box over the baseline: typing
+  part of a name narrows the list, which lets only entries the option may target be
+  picked and names the reason beside the rest. Renaming a choice, an option or a targeted baseline
+  entry keeps selections and targets intact. What the editor cannot make valid it keeps
+  and flags, never drops or repairs: a target the baseline does not have stays under the
+  name as written, and a scenario with no pick for a choice shows that dropdown unset.
 - **Running forecasts**, with a busy indicator and errors that appear where the run was
   started, never by moving the reader somewhere else. The editor is long and a tweak is
   usually followed by a run, so the run action stays reachable from any scroll position
@@ -99,7 +122,8 @@ The app covers, at a coarse grain:
   marks all of these as describing an earlier version of the plan; they stay readable,
   being the baseline the next run will be compared against.
 - **Getting data in and out** — uploading a config (v2 directly, v1 auto-migrated with
-  its notices shown), downloading the engine-serialized v2 YAML, and downloading the
+  its notices shown; choices and selections are kept), downloading the engine-serialized
+  v2 YAML, and downloading the
   engine-rendered CSV, which is byte-for-byte what the CLI produces.
 - **Resetting** to a built-in starter config, and a System / Light / Dark theme.
 
@@ -111,8 +135,8 @@ beside its fields. This introduction stays pinned below the navigation bar while
 its section scrolls, then leaves with the section. On smaller screens introductions
 stack above the fields and scroll normally to preserve working space. A pinned
 navigation and run bar stays reachable while the plan scrolls. A “Jump to section”
-dropdown includes Simulation, Common settings, and Scenarios, with individual scenarios
-nested beneath Scenarios. The destinations have no active-section highlight. An optimizer
+dropdown includes Simulation, Baseline, Choices, and Scenarios, with individual choices
+nested beneath Choices and individual scenarios beneath Scenarios. The destinations have no active-section highlight. An optimizer
 status button shows only On or Off and opens its enable switch and event jump list, or setup guidance when the list
 is empty. Only one panel opens at a time; Escape closes it and returns focus to its trigger.
 Run Forecast remains directly accessible, including while either panel is open.

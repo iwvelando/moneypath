@@ -7,19 +7,26 @@
  * document below is a valid config for `moneypathForecast`.
  */
 
+import { ENTRY_KINDS, SET_FIELDS, linkTargets, targetName } from './choices';
 import {
+  type ChoiceModel,
   type CommonModel,
   type ConfigModel,
+  type EntryKind,
   type EventKind,
   type EventModel,
   type InvestmentModel,
   type LoanModel,
   type OptimizeField,
   type OptimizeModel,
+  type OptionModel,
   type ScenarioModel,
+  type TargetRef,
+  emptyChoice,
   emptyEvent,
   emptyInvestment,
   emptyLoan,
+  emptyOption,
   emptyScenario,
   newId,
 } from './types';
@@ -114,8 +121,61 @@ export function serializeInvestment(investment: InvestmentModel): JsonObject {
   return out;
 }
 
-function serializeScenario(scenario: ScenarioModel): JsonObject {
+/** The fields an option changes, with an emptied field written as null: taken away. */
+function serializeSet(kind: EntryKind, set: object): JsonObject {
+  const values = set as Record<string, unknown>;
+  const out: JsonObject = {};
+  for (const field of SET_FIELDS[kind]) {
+    if (!(field.key in values)) continue;
+    const value = values[field.key];
+    if (field.format === 'list') {
+      out[field.key] = (value as EventModel[]).map((e) => serializeEvent(e, field.eventKind!));
+    } else if (field.format === 'flag') {
+      out[field.key] = value === true;
+    } else if (field.format === 'month') {
+      out[field.key] = (value as string).trim() || null;
+    } else {
+      out[field.key] = (value as number | null) ?? null;
+    }
+  }
+  return out;
+}
+
+function serializeOption(option: OptionModel, common: CommonModel): JsonObject {
+  const out: JsonObject = { name: option.name.trim() };
+  if (option.events.length > 0) out['events'] = option.events.map((e) => serializeEvent(e, 'cashflow'));
+  if (option.loans.length > 0) out['loans'] = option.loans.map(serializeLoan);
+  if (option.investments.length > 0) out['investments'] = option.investments.map(serializeInvestment);
+
+  const change: JsonObject = {};
+  const remove: JsonObject = {};
+  for (const kind of ENTRY_KINDS) {
+    const changes: (TargetRef & { set: object })[] = option.change[kind];
+    if (changes.length > 0) {
+      change[kind] = changes.map((entry) => ({
+        name: targetName(common, kind, entry),
+        set: serializeSet(kind, entry.set),
+      }));
+    }
+    if (option.remove[kind].length > 0) {
+      remove[kind] = option.remove[kind].map((ref) => targetName(common, kind, ref));
+    }
+  }
+  if (Object.keys(change).length > 0) out['change'] = change;
+  if (Object.keys(remove).length > 0) out['remove'] = remove;
+  return out;
+}
+
+function serializeScenario(scenario: ScenarioModel, choices: ChoiceModel[]): JsonObject {
   const out: JsonObject = { name: scenario.name.trim(), active: scenario.active };
+  // Written in choice order. A choice the scenario picks nothing for is left
+  // out, so the engine names it; the editor never guesses a pick.
+  const select: JsonObject = {};
+  for (const choice of choices) {
+    const option = choice.options.find((candidate) => candidate.id === scenario.select[choice.id]);
+    if (option) select[choice.name.trim()] = option.name.trim();
+  }
+  if (Object.keys(select).length > 0) out['select'] = select;
   if (scenario.events.length > 0) {
     out['events'] = scenario.events.map((e) => serializeEvent(e, 'cashflow'));
   }
@@ -150,7 +210,14 @@ export function toConfigDocument(model: ConfigModel): JsonObject {
   }
   if (Object.keys(common).length > 0) doc['common'] = common;
 
-  doc['scenarios'] = model.scenarios.map(serializeScenario);
+  if (model.choices.length > 0) {
+    doc['choices'] = model.choices.map((choice) => ({
+      name: choice.name.trim(),
+      options: choice.options.map((option) => serializeOption(option, model.common)),
+    }));
+  }
+
+  doc['scenarios'] = model.scenarios.map((scenario) => serializeScenario(scenario, model.choices));
   return doc;
 }
 
@@ -292,9 +359,75 @@ function parseCommon(value: unknown): CommonModel {
   };
 }
 
-function parseScenario(value: unknown, index: number): ScenarioModel {
+function parseSet(kind: EntryKind, value: unknown): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  if (!isObject(value)) return out;
+  for (const field of SET_FIELDS[kind]) {
+    if (!(field.key in value)) continue;
+    const raw = value[field.key];
+    if (field.format === 'list') {
+      out[field.key] = readArray(raw).map((e) => parseEvent(e, field.eventKind!));
+    } else if (field.format === 'flag') {
+      out[field.key] = readBool(raw);
+    } else if (field.format === 'month') {
+      out[field.key] = readString(raw);
+    } else {
+      out[field.key] = readNumber(raw);
+    }
+  }
+  return out;
+}
+
+/** A target as written: by name only. `linkTargets` finds the entry it means. */
+function parseTarget(name: unknown): TargetRef {
+  return { id: newId('tg'), targetId: '', targetName: readString(name).trim() };
+}
+
+function parseOption(value: unknown, index: number): OptionModel {
+  const option = emptyOption(`Option ${index + 1}`);
+  if (!isObject(value)) return option;
+  option.name = readString(value['name']);
+  option.events = readArray(value['events']).map((e) => parseEvent(e, 'cashflow'));
+  option.loans = readArray(value['loans']).map(parseLoan);
+  option.investments = readArray(value['investments']).map(parseInvestment);
+  const change = isObject(value['change']) ? value['change'] : {};
+  const remove = isObject(value['remove']) ? value['remove'] : {};
+  for (const kind of ENTRY_KINDS) {
+    const changes = readArray(change[kind]).map((entry) => ({
+      ...parseTarget(isObject(entry) ? entry['name'] : ''),
+      set: parseSet(kind, isObject(entry) ? entry['set'] : null),
+    }));
+    (option.change as Record<EntryKind, unknown>)[kind] = changes;
+    option.remove[kind] = readArray(remove[kind]).map(parseTarget);
+  }
+  return option;
+}
+
+function parseChoice(value: unknown, index: number): ChoiceModel {
+  const choice = emptyChoice(`Choice ${index + 1}`);
+  if (!isObject(value)) return choice;
+  choice.name = readString(value['name']);
+  choice.options = readArray(value['options']).map(parseOption);
+  return choice;
+}
+
+/** A scenario's picks, by name as written. A name the plan does not have is left unpicked. */
+function parseSelect(value: unknown, choices: ChoiceModel[]): Record<string, string> {
+  const select: Record<string, string> = {};
+  if (!isObject(value)) return select;
+  for (const choice of choices) {
+    const picked = value[choice.name];
+    if (picked === undefined) continue;
+    const option = choice.options.find((candidate) => candidate.name === readString(picked));
+    if (option && !(choice.id in select)) select[choice.id] = option.id;
+  }
+  return select;
+}
+
+function parseScenario(value: unknown, index: number, choices: ChoiceModel[]): ScenarioModel {
   const scenario = emptyScenario(`scenario ${index + 1}`);
   if (!isObject(value)) return scenario;
+  scenario.select = parseSelect(value['select'], choices);
   scenario.name = readString(value['name']) || scenario.name;
   // v2 default is active: true (spec/03).
   scenario.active = readBool(value['active'], true);
@@ -309,9 +442,12 @@ export function fromConfigDocument(value: unknown): ConfigModel {
   const doc = isObject(value) ? value : {};
   const simulation = isObject(doc['simulation']) ? doc['simulation'] : {};
   const recommendations = isObject(doc['recommendations']) ? doc['recommendations'] : {};
-  const scenarios = readArray(doc['scenarios']).map(parseScenario);
+  const choices = readArray(doc['choices']).map(parseChoice);
+  const scenarios = readArray(doc['scenarios']).map((scenario, index) =>
+    parseScenario(scenario, index, choices),
+  );
 
-  return {
+  return linkTargets({
     simulation: {
       startDate: readString(simulation['startDate']),
       endDate: readString(simulation['endDate']),
@@ -320,8 +456,9 @@ export function fromConfigDocument(value: unknown): ConfigModel {
       emergencyFundMonths: readNumber(recommendations['emergencyFundMonths']),
     },
     common: parseCommon(doc['common']),
-    scenarios: scenarios.length > 0 ? scenarios : [emptyScenario('scenario 1')],
-  };
+    choices,
+    scenarios: scenarios.length > 0 ? scenarios : [emptyScenario('scenario 1', choices)],
+  });
 }
 
 /**
@@ -335,40 +472,95 @@ export function isLegacyDocument(value: unknown): boolean {
   return value['version'] === undefined;
 }
 
-/** Re-key every list row so a freshly loaded config gets stable, unique keys. */
+/**
+ * Re-key every list row so a freshly loaded config gets stable, unique keys.
+ * A selection or a target names another row by its id, so it is carried over
+ * to that row's new one.
+ */
 export function refreshIds(model: ConfigModel): ConfigModel {
+  const renamed = new Map<string, string>();
+  const fresh = (prefix: string, old: string): string => {
+    const id = newId(prefix);
+    renamed.set(old, id);
+    return id;
+  };
   const reEvent = (e: EventModel): EventModel => ({ ...e, id: newId('ev') });
+  const reLoan = (l: LoanModel): LoanModel => ({
+    ...l,
+    id: fresh('ln', l.id),
+    extraPrincipalPayments: l.extraPrincipalPayments.map(reEvent),
+  });
+  const reInvestment = (i: InvestmentModel): InvestmentModel => ({
+    ...i,
+    id: fresh('in', i.id),
+    contributions: i.contributions.map(reEvent),
+    withdrawals: i.withdrawals.map(reEvent),
+  });
+
+  // The baseline and the choices first: they are what the rest points at.
+  const common: CommonModel = {
+    events: model.common.events.map((e) => ({ ...e, id: fresh('ev', e.id) })),
+    loans: model.common.loans.map(reLoan),
+    investments: model.common.investments.map(reInvestment),
+  };
+  const reTarget = <R extends TargetRef>(ref: R): R => ({
+    ...ref,
+    id: newId('tg'),
+    targetId: renamed.get(ref.targetId) ?? '',
+  });
+  const reSet = <S extends object>(kind: EntryKind, set: S): S => {
+    const out: Record<string, unknown> = { ...(set as Record<string, unknown>) };
+    for (const field of SET_FIELDS[kind]) {
+      if (field.format === 'list' && Array.isArray(out[field.key])) {
+        out[field.key] = (out[field.key] as EventModel[]).map(reEvent);
+      }
+    }
+    return out as S;
+  };
+  const choices = model.choices.map((choice) => ({
+    ...choice,
+    id: fresh('ch', choice.id),
+    options: choice.options.map((option) => ({
+      ...option,
+      id: fresh('op', option.id),
+      events: option.events.map(reEvent),
+      loans: option.loans.map(reLoan),
+      investments: option.investments.map(reInvestment),
+      change: {
+        events: option.change.events.map((c) => ({ ...reTarget(c), set: reSet('events', c.set) })),
+        loans: option.change.loans.map((c) => ({ ...reTarget(c), set: reSet('loans', c.set) })),
+        investments: option.change.investments.map((c) => ({
+          ...reTarget(c),
+          set: reSet('investments', c.set),
+        })),
+      },
+      remove: {
+        events: option.remove.events.map(reTarget),
+        loans: option.remove.loans.map(reTarget),
+        investments: option.remove.investments.map(reTarget),
+      },
+    })),
+  }));
+
   return {
     simulation: { ...model.simulation },
-    common: {
-      events: model.common.events.map(reEvent),
-      loans: model.common.loans.map((l) => ({
-        ...l,
-        id: newId('ln'),
-        extraPrincipalPayments: l.extraPrincipalPayments.map(reEvent),
-      })),
-      investments: model.common.investments.map((i) => ({
-        ...i,
-        id: newId('in'),
-        contributions: i.contributions.map(reEvent),
-        withdrawals: i.withdrawals.map(reEvent),
-      })),
-    },
-    scenarios: model.scenarios.map((s) => ({
-      ...s,
-      id: newId('sc'),
-      events: s.events.map(reEvent),
-      loans: s.loans.map((l) => ({
-        ...l,
-        id: newId('ln'),
-        extraPrincipalPayments: l.extraPrincipalPayments.map(reEvent),
-      })),
-      investments: s.investments.map((i) => ({
-        ...i,
-        id: newId('in'),
-        contributions: i.contributions.map(reEvent),
-        withdrawals: i.withdrawals.map(reEvent),
-      })),
-    })),
+    common,
+    choices,
+    scenarios: model.scenarios.map((s) => {
+      const select: Record<string, string> = {};
+      for (const [choiceId, optionId] of Object.entries(s.select)) {
+        const choice = renamed.get(choiceId);
+        const option = renamed.get(optionId);
+        if (choice && option) select[choice] = option;
+      }
+      return {
+        ...s,
+        id: newId('sc'),
+        select,
+        events: s.events.map(reEvent),
+        loans: s.loans.map(reLoan),
+        investments: s.investments.map(reInvestment),
+      };
+    }),
   };
 }

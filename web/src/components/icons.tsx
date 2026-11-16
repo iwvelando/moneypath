@@ -66,6 +66,19 @@ export function IconBranch() {
 }
 
 /** Calendar with a marked day — dated cash events. */
+/** A fork in the path: one way in, two ways on. */
+export function IconChoice() {
+  return (
+    <Icon>
+      <line x1="8" y1="14" x2="8" y2="8.5" />
+      <path d="M8 8.5 C8 6 3.5 6.5 3.5 2.5" />
+      <path d="M8 8.5 C8 6 12.5 6.5 12.5 2.5" />
+      <path d="M1.9 4.1 L3.5 2.5 L5.1 4.1" />
+      <path d="M10.9 4.1 L12.5 2.5 L14.1 4.1" />
+    </Icon>
+  );
+}
+
 export function IconCalendar() {
   return (
     <Icon>

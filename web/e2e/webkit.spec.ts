@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp, overflow, problems, runForecast } from './helpers';
+import { openApp, overflow, problems, runForecast, uploadChoices } from './helpers';
 
 // Safari's engine on an iPhone profile, which every iOS browser uses. Runs in
 // the `webkit` project only (`make test-webkit`, and the macOS CI job).
@@ -8,7 +8,7 @@ test('an iPhone loads the engine, runs a forecast, and never scrolls sideways', 
   await openApp(page);
   expect(await overflow(page), 'workspace').toBeLessThanOrEqual(0);
   await page.getByRole('button', { name: 'Jump to section' }).tap();
-  await page.getByRole('button', { name: 'Common settings', exact: true }).tap();
+  await page.getByRole('button', { name: 'Baseline', exact: true }).tap();
   await expect(page.locator('#section-common')).toBeFocused();
   await page.getByRole('button', { name: 'Edit Living expenses', exact: true }).tap();
   await expect(page.locator('#section-common').getByRole('textbox', { name: 'Amount', exact: true })).toBeVisible();
@@ -38,7 +38,7 @@ test('a pointer selection works after keyboard focus in the workbar', async ({ p
   const jump = page.getByRole('button', { name: 'Jump to section' });
   await jump.focus();
   await jump.press('Enter');
-  await page.getByRole('button', { name: 'Common settings', exact: true }).click();
+  await page.getByRole('button', { name: 'Baseline', exact: true }).click();
   await expect(page.locator('#section-common')).toBeFocused();
   const optimizer = page.getByRole('button', { name: /^Optimizer:/ });
   await optimizer.focus();
@@ -170,4 +170,49 @@ test('the comparison tab and its series control answer taps and keys', async ({ 
   const selectMessage = "Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline' does not appear in the style-src directive of the Content Security Policy.";
   expect(found.filter((problem) => problem !== selectMessage)).toEqual([]);
   expect(found.filter((problem) => problem === selectMessage)).toHaveLength(violations.length);
+});
+
+test('an iPhone picks an option, changes a baseline entry, and runs the plan', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await uploadChoices(page);
+
+  const scenario = page.locator('section', { has: page.getByRole('heading', { name: 'as we are', exact: true }) });
+  const housing = scenario.getByRole('combobox', { name: 'Housing' });
+  await housing.selectOption({ label: 'Sell and rent' });
+  await expect(housing.locator('option:checked')).toHaveText('Sell and rent');
+  expect(await overflow(page), 'selections').toBeLessThanOrEqual(0);
+
+  const job = page.locator('section', { has: page.getByRole('heading', { name: 'Job', exact: true }) });
+  await job.getByRole('button', { name: 'Edit Stay', exact: true }).tap();
+  // The entry is found by typing, and picked with a tap that must not be lost
+  // to the box giving up focus.
+  const picker = job.getByRole('combobox', { name: 'Baseline entry' }).first();
+  await picker.tap();
+  await expect(job.getByRole('option', { name: /Mortgage/ })).toHaveAttribute('aria-disabled', 'true');
+  await picker.fill('liv');
+  await expect(job.getByRole('option')).toHaveCount(1);
+  expect(await overflow(page), 'entry list').toBeLessThanOrEqual(0);
+  await job.getByRole('option', { name: /Living costs/ }).tap();
+  await expect(picker).toHaveValue('Living costs');
+  await job.getByRole('button', { name: 'Change it' }).first().tap();
+  const amount = job.locator('[id^="change-"]').getByRole('textbox', { name: 'Amount', exact: true });
+  await expect(amount).toBeVisible();
+  await amount.fill('-2900');
+  // Only the option that was opened: Go freelance has a change of its own.
+  await expect(job.locator('.editor-card.is-open .changed-list li')).toHaveCount(1);
+  // The number pad has digits only; the field supplies the dash.
+  const start = job.locator('[id^="change-"]').getByRole('textbox', { name: 'Start month', exact: true });
+  await expect(start).toHaveAttribute('inputmode', 'numeric');
+  await start.pressSequentially('202703');
+  await expect(start).toHaveValue('2027-03');
+  await expect(job.locator('.editor-card.is-open .changed-list li')).toHaveCount(2);
+  expect(await overflow(page), 'an open change').toBeLessThanOrEqual(0);
+
+  await runForecast(page);
+  expect(await overflow(page), 'results').toBeLessThanOrEqual(0);
+  // WebKit logs this once for every native dropdown on the page, whatever the
+  // app does (#71). Anything else it reports still fails the test.
+  const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
+  expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
 });

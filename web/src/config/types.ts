@@ -68,10 +68,64 @@ export interface InvestmentModel {
   withdrawals: EventModel[];
 }
 
+/** The lists an option can add to, and the kinds of baseline entry it can target. */
+export type EntryKind = 'events' | 'loans' | 'investments';
+
+/**
+ * The fields an option changes on a baseline entry. A key that is present is
+ * changed, whatever its value: an empty value takes the field away on that
+ * path. A key that is absent follows the baseline.
+ */
+export type EventSet = Partial<Pick<EventModel, 'amount' | 'frequency' | 'startDate' | 'endDate'>>;
+export type LoanSet = Partial<Omit<LoanModel, 'id' | 'name'>>;
+export type InvestmentSet = Partial<Omit<InvestmentModel, 'id' | 'name'>>;
+
+/**
+ * A baseline entry an option changes or removes. `targetId` is the entry's
+ * client-only id, so a rename needs no rewrite; it is '' when the baseline has
+ * no such entry, and `targetName` then holds the name as written.
+ */
+export interface TargetRef {
+  id: string;
+  targetId: string;
+  targetName: string;
+}
+
+export interface ChangeModel<S> extends TargetRef {
+  set: S;
+}
+
+export interface OptionChanges {
+  events: ChangeModel<EventSet>[];
+  loans: ChangeModel<LoanSet>[];
+  investments: ChangeModel<InvestmentSet>[];
+}
+
+export type OptionRemovals = Record<EntryKind, TargetRef[]>;
+
+/** One way a choice can go: entries it adds, and baseline entries it changes or removes. */
+export interface OptionModel {
+  id: string;
+  name: string;
+  events: EventModel[];
+  loans: LoanModel[];
+  investments: InvestmentModel[];
+  change: OptionChanges;
+  remove: OptionRemovals;
+}
+
+export interface ChoiceModel {
+  id: string;
+  name: string;
+  options: OptionModel[];
+}
+
 export interface ScenarioModel {
   id: string;
   name: string;
   active: boolean;
+  /** The option picked for each choice: a choice's id to one of its options' ids. */
+  select: Record<string, string>;
   events: EventModel[];
   loans: LoanModel[];
   investments: InvestmentModel[];
@@ -94,6 +148,7 @@ export interface CommonModel {
 export interface ConfigModel {
   simulation: SimulationModel;
   common: CommonModel;
+  choices: ChoiceModel[];
   scenarios: ScenarioModel[];
 }
 
@@ -171,11 +226,34 @@ export function emptyInvestment(): InvestmentModel {
   };
 }
 
-export function emptyScenario(name: string): ScenarioModel {
+export function emptyOption(name: string): OptionModel {
+  return {
+    id: newId('op'),
+    name,
+    events: [],
+    loans: [],
+    investments: [],
+    change: { events: [], loans: [], investments: [] },
+    remove: { events: [], loans: [], investments: [] },
+  };
+}
+
+export function emptyChoice(name: string): ChoiceModel {
+  return { id: newId('ch'), name, options: [] };
+}
+
+/** A new scenario picks the first option of each choice, so it is valid as it stands. */
+export function emptyScenario(name: string, choices: ChoiceModel[] = []): ScenarioModel {
+  const select: Record<string, string> = {};
+  for (const choice of choices) {
+    const first = choice.options[0];
+    if (first) select[choice.id] = first.id;
+  }
   return {
     id: newId('sc'),
     name,
     active: true,
+    select,
     events: [],
     loans: [],
     investments: [],
@@ -212,6 +290,7 @@ export function cloneScenario(scenario: ScenarioModel): ScenarioModel {
   return {
     ...scenario,
     id: newId('sc'),
+    select: { ...scenario.select },
     events: scenario.events.map(cloneEvent),
     loans: scenario.loans.map(cloneLoan),
     investments: scenario.investments.map(cloneInvestment),

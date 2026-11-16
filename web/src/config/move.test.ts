@@ -20,6 +20,7 @@ function config(commonEvents: EventModel[], scenarios: ScenarioModel[]): ConfigM
   return {
     simulation: { startDate: '', endDate: '2030-12', startingCash: 0, cashInterestRate: null, emergencyFundMonths: null },
     common: { events: commonEvents, loans: [], investments: [] },
+    choices: [],
     scenarios,
   };
 }

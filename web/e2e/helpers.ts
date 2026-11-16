@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { expect, type Page } from '@playwright/test';
 
 /** Open the app and wait until the WebAssembly engine has answered. */
@@ -30,4 +31,17 @@ export function problems(page: Page): string[] {
 /** Sideways scroll in CSS pixels; anything above zero is a layout bug on a phone. */
 export async function overflow(page: Page): Promise<number> {
   return page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+}
+
+/** The worked example of choices, as the repository ships it. Tests run from web/. */
+export const CHOICES_EXAMPLE = '../examples/choices.yaml';
+
+/** Load the choices example into the editor through Upload Config. */
+export async function uploadChoices(page: Page): Promise<void> {
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'choices.yaml',
+    mimeType: 'application/yaml',
+    buffer: readFileSync(CHOICES_EXAMPLE),
+  });
+  await expect(page.getByRole('heading', { name: 'Housing', exact: true })).toBeVisible();
 }

@@ -1,7 +1,7 @@
 /**
  * Moving cash-flow events between the common block and scenarios.
  *
- * "Move to common" promotes a scenario event so every scenario inherits it;
+ * "Move to baseline" promotes a scenario event so every scenario inherits it;
  * same-named events left in other scenarios would then apply twice, so the
  * caller can ask for those replicates and remove them in the same step.
  * "Move to scenario" is the inverse: place a common event into one or more

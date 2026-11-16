@@ -25,7 +25,7 @@ function event(name: string, field?: OptimizeField): EventModel {
 }
 
 function config(scenarios: ScenarioModel[], commonEvents: EventModel[] = []): ConfigModel {
-  return { simulation, common: { events: commonEvents, loans: [], investments: [] }, scenarios };
+  return { simulation, common: { events: commonEvents, loans: [], investments: [] }, choices: [], scenarios };
 }
 
 describe('findOptimizers', () => {

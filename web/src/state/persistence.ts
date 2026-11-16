@@ -7,19 +7,26 @@
  * config rather than failing to boot.
  */
 
+import { ENTRY_KINDS, SET_FIELDS } from '../config/choices';
 import {
+  emptyChoice,
   emptyEvent,
   emptyInvestment,
   emptyLoan,
   emptyOptimize,
+  emptyOption,
   emptyScenario,
   emptySimulation,
+  type ChoiceModel,
   type CommonModel,
   type ConfigModel,
+  type EntryKind,
   type EventModel,
   type InvestmentModel,
   type LoanModel,
+  type OptionModel,
   type ScenarioModel,
+  type TargetRef,
 } from '../config/types';
 import { refreshIds } from '../config/serialize';
 import { starterConfig } from '../config/starter';
@@ -76,6 +83,7 @@ function looksLikeConfig(value: unknown): value is ConfigModel {
   const candidate = value as Partial<ConfigModel>;
   if (typeof candidate.simulation !== 'object' || candidate.simulation === null) return false;
   if (!listsAreArrays(candidate.common, SECTION_LISTS)) return false;
+  if (candidate.choices !== undefined && !Array.isArray(candidate.choices)) return false;
   if (!Array.isArray(candidate.scenarios)) return false;
   return candidate.scenarios.every((scenario) => listsAreArrays(scenario, SECTION_LISTS));
 }
@@ -119,6 +127,39 @@ function withSectionDefaults(saved: Saved<CommonModel>): CommonModel {
   };
 }
 
+function withTargetDefaults(saved: Saved<TargetRef>): TargetRef {
+  return { id: '', targetId: '', targetName: '', ...saved };
+}
+
+/** The fields a change carries stay exactly those it had; only a list's entries are filled in. */
+function withSetDefaults(kind: EntryKind, saved: object | undefined): Record<string, unknown> {
+  const set: Record<string, unknown> = { ...saved };
+  for (const field of SET_FIELDS[kind]) {
+    if (field.format !== 'list' || !(field.key in set)) continue;
+    set[field.key] = ((set[field.key] ?? []) as Saved<EventModel>[]).map(withEventDefaults);
+  }
+  return set;
+}
+
+function withOptionDefaults(saved: Saved<OptionModel>): OptionModel {
+  const option: OptionModel = { ...emptyOption(''), ...saved, ...withSectionDefaults(saved) };
+  const change: Record<string, unknown> = {};
+  const remove: Record<string, unknown> = {};
+  for (const kind of ENTRY_KINDS) {
+    const changes: Saved<TargetRef & { set: object }>[] = saved.change?.[kind] ?? [];
+    change[kind] = changes.map((entry) => ({
+      ...withTargetDefaults(entry),
+      set: withSetDefaults(kind, entry.set),
+    }));
+    remove[kind] = (saved.remove?.[kind] ?? []).map(withTargetDefaults);
+  }
+  return { ...option, change: change as unknown as OptionModel['change'], remove: remove as OptionModel['remove'] };
+}
+
+function withChoiceDefaults(saved: Saved<ChoiceModel>): ChoiceModel {
+  return { ...emptyChoice(''), ...saved, options: (saved.options ?? []).map(withOptionDefaults) };
+}
+
 function withScenarioDefaults(saved: Saved<ScenarioModel>): ScenarioModel {
   return { ...emptyScenario(''), ...saved, ...withSectionDefaults(saved) };
 }
@@ -127,6 +168,8 @@ function withModelDefaults(saved: ConfigModel): ConfigModel {
   return {
     simulation: { ...emptySimulation(), ...saved.simulation },
     common: withSectionDefaults(saved.common),
+    // A draft saved before choices existed is a plan with none.
+    choices: ((saved as Saved<ConfigModel>).choices ?? []).map(withChoiceDefaults),
     scenarios: saved.scenarios.map(withScenarioDefaults),
   };
 }

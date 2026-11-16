@@ -17,6 +17,17 @@ const PARTIALS: RegExp[] = [
   /^\d{4}-1[0-2]$/,
 ];
 
+/**
+ * What a month field holds after a keystroke. A phone's number pad has no
+ * dash, so one is put in once a digit follows a four-digit year. Only a run of
+ * digits is touched: a value with its dash, or one being corrected in the
+ * middle, stays exactly as typed.
+ */
+export function formatMonthInput(raw: string): string {
+  const value = raw.trim();
+  return /^\d{5,6}$/.test(value) ? `${value.slice(0, 4)}-${value.slice(4)}` : value;
+}
+
 export type MonthStatus = 'empty' | 'valid' | 'incomplete' | 'invalid';
 
 export function isMonth(value: string): boolean {
