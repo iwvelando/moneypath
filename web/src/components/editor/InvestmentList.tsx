@@ -1,4 +1,6 @@
+import { useContext } from 'preact/hooks';
 import { EditorCard, EditorFields, useEditorCards, type EditorCardState } from './EditorCard';
+import { CardScope } from './scope';
 import { investmentSummary } from './summaries';
 import { HELP } from '../../config/help';
 import {
@@ -30,63 +32,32 @@ function convertWithdrawals(withdrawals: EventModel[], style: WithdrawalStyle): 
   );
 }
 
-interface InvestmentCardProps extends EditorCardState {
+interface InvestmentFieldsProps {
   investment: InvestmentModel;
-  index: number;
   simulation: SimulationModel;
+  /** Off where the name is not this form's to edit: an option's change to a baseline account. */
+  showName?: boolean;
   onChange: (investment: InvestmentModel) => void;
-  onRemove: () => void;
-  onDuplicate: () => void;
 }
 
-function InvestmentCard({
-  investment,
-  index,
-  simulation,
-  onChange,
-  onRemove,
-  onDuplicate,
-  open,
-  autoFocus,
-  onOpenChange,
-}: InvestmentCardProps) {
+/** An account's fields, contributions and withdrawals. */
+export function InvestmentFields({ investment, simulation, showName = true, onChange }: InvestmentFieldsProps) {
   const patch = (changes: Partial<InvestmentModel>) => onChange({ ...investment, ...changes });
-  const title = investment.name.trim() || `Investment ${index + 1}`;
   const style = withdrawalStyleOf(investment);
-
+  const scope = useContext(CardScope);
   return (
-    <EditorCard
-      id={`investment-${investment.id}`}
-      title={title}
-      summary={investmentSummary(investment)}
-      open={open}
-      autoFocus={autoFocus}
-      onOpenChange={onOpenChange}
-      actions={
-        <>
-          <button type="button" class="btn btn--quiet" aria-label={`Duplicate ${title}`} onClick={onDuplicate}>
-            Duplicate
-          </button>
-          <button
-            type="button"
-            class="btn btn--quiet btn--danger"
-            aria-label={`Remove ${title}`}
-            onClick={onRemove}
-          >
-            Remove
-          </button>
-        </>
-      }
-    >
+    <>
       <EditorFields title="Account">
         <div class="field-grid">
-          <TextField
-            label="Name"
-            help={HELP.investmentName}
-            value={investment.name}
-            required
-            onInput={(name) => patch({ name })}
-          />
+          {showName ? (
+            <TextField
+              label="Name"
+              help={HELP.investmentName}
+              value={investment.name}
+              required
+              onInput={(name) => patch({ name })}
+            />
+          ) : null}
           <NumberField
             label="Starting value"
             help={HELP.investmentStartingValue}
@@ -160,7 +131,7 @@ function InvestmentCard({
             <label key={option}>
               <input
                 type="radio"
-                name={`withdrawal-style-${investment.id}`}
+                name={`${scope}withdrawal-style-${investment.id}`}
                 checked={style === option}
                 onChange={() => patch({ withdrawals: convertWithdrawals(investment.withdrawals, option) })}
               />
@@ -182,6 +153,58 @@ function InvestmentCard({
         withdrawalStyle={style}
         onChange={(withdrawals) => patch({ withdrawals: convertWithdrawals(withdrawals, style) })}
       />
+    </>
+  );
+}
+
+interface InvestmentCardProps extends EditorCardState {
+  investment: InvestmentModel;
+  index: number;
+  simulation: SimulationModel;
+  onChange: (investment: InvestmentModel) => void;
+  onRemove: () => void;
+  onDuplicate: () => void;
+}
+
+function InvestmentCard({
+  investment,
+  index,
+  simulation,
+  onChange,
+  onRemove,
+  onDuplicate,
+  open,
+  autoFocus,
+  onOpenChange,
+}: InvestmentCardProps) {
+  const title = investment.name.trim() || `Investment ${index + 1}`;
+  const scope = useContext(CardScope);
+
+  return (
+    <EditorCard
+      id={`${scope}investment-${investment.id}`}
+      title={title}
+      summary={investmentSummary(investment)}
+      open={open}
+      autoFocus={autoFocus}
+      onOpenChange={onOpenChange}
+      actions={
+        <>
+          <button type="button" class="btn btn--quiet" aria-label={`Duplicate ${title}`} onClick={onDuplicate}>
+            Duplicate
+          </button>
+          <button
+            type="button"
+            class="btn btn--quiet btn--danger"
+            aria-label={`Remove ${title}`}
+            onClick={onRemove}
+          >
+            Remove
+          </button>
+        </>
+      }
+    >
+      <InvestmentFields investment={investment} simulation={simulation} onChange={onChange} />
     </EditorCard>
   );
 }

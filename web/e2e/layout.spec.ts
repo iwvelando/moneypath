@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp, overflow, runForecast } from './helpers';
+import { openApp, overflow, runForecast, uploadChoices } from './helpers';
 
 // Runs in the `phone` project (360 px wide). Every view and state is visited
 // before measuring, because an overflow only counts if a reader can reach it.
@@ -7,7 +7,7 @@ test('no view scrolls sideways on a narrow phone', async ({ page }) => {
   await openApp(page);
   expect(await overflow(page), 'workspace').toBeLessThanOrEqual(0);
 
-  for (const id of ['section-simulation', 'section-common', 'section-scenarios']) {
+  for (const id of ['section-simulation', 'section-common', 'section-choices', 'section-scenarios']) {
     await page.locator(`#${id}`).scrollIntoViewIfNeeded();
     expect(await overflow(page), id).toBeLessThanOrEqual(0);
   }
@@ -177,7 +177,7 @@ test('desktop section introductions stay below the bar and stop at their section
       const controls = await bar.boundingBox();
       return Math.round(heading!.y - controls!.y - controls!.height);
     }).toBe(24);
-    await expect(intro.getByRole('heading', { name: 'Common settings' })).toBeInViewport();
+    await expect(intro.getByRole('heading', { name: 'Baseline' })).toBeInViewport();
   };
   for (const width of [1440, 800]) {
     await page.setViewportSize({ width, height: 998 });
@@ -227,7 +227,7 @@ test('workbar disclosures support keyboard navigation and direct common-settings
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Simulation', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
-  const common = page.getByRole('button', { name: 'Common settings', exact: true });
+  const common = page.getByRole('button', { name: 'Baseline', exact: true });
   await expect(common).toBeFocused();
   await common.press('Escape');
   await expect(jump).toBeFocused();
@@ -924,4 +924,48 @@ scenarios:
     expect(box.height).toBeGreaterThan(0);
   }
   expect(await overflow(page)).toBeLessThanOrEqual(0);
+});
+
+// Runs at desktop width and in the `phone` project. The option, its change to a
+// baseline entry and the entry picker are the widest things the editor holds.
+test('choices, an open change and the selections never scroll sideways', async ({ page }) => {
+  await openApp(page);
+  await uploadChoices(page);
+
+  const housing = page.locator('section', { has: page.getByRole('heading', { name: 'Housing', exact: true }) });
+  await housing.getByRole('button', { name: 'Edit Sell and rent', exact: true }).click();
+  await housing.getByRole('button', { name: 'Edit Changes Mortgage', exact: true }).click();
+  await expect(housing.locator('.changed-list li')).toHaveCount(4);
+  for (const part of ['.changed-list', '.target-picker', '.editor-card__footer']) {
+    await housing.locator(part).last().scrollIntoViewIfNeeded();
+    expect(await overflow(page), part).toBeLessThanOrEqual(0);
+  }
+  // The entry search opens a list over the form: inside the page, and whole.
+  const picker = housing.getByRole('combobox', { name: 'Baseline entry' });
+  await picker.click();
+  const list = housing.getByRole('listbox', { name: 'Baseline entry' });
+  await expect(list.getByRole('option')).toHaveCount(5);
+  expect(await overflow(page), 'entry list').toBeLessThanOrEqual(0);
+  await picker.fill('liv');
+  await expect(list.getByRole('option')).toHaveCount(1);
+  const option = list.getByRole('option', { name: /Living costs/ });
+  // Nothing covers it: a list clipped by its card would not take the click.
+  await option.click({ trial: true });
+  await picker.press('Escape');
+  await expect(list).toHaveCount(0);
+
+  // A reset button stays inside its row, beside the field it resets.
+  const row = housing.locator('.changed-list li').first();
+  const rowBox = (await row.boundingBox())!;
+  const reset = (await row.getByRole('button', { name: 'Reset Early payoff month' }).boundingBox())!;
+  expect(reset.x + reset.width).toBeLessThanOrEqual(rowBox.x + rowBox.width + 0.5);
+
+  const selections = page.locator('.selections').last();
+  await selections.scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'selections').toBeLessThanOrEqual(0);
+  const dropdown = selections.getByRole('combobox', { name: 'Job' });
+  const group = (await selections.boundingBox())!;
+  const box = (await dropdown.boundingBox())!;
+  expect(box.x).toBeGreaterThanOrEqual(group.x - 0.5);
+  expect(box.x + box.width).toBeLessThanOrEqual(group.x + group.width + 0.5);
 });

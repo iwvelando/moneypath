@@ -1,5 +1,6 @@
 import type { ComponentChildren } from 'preact';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { addChoice, linkTargets, removeChoice } from '../config/choices';
 import { HELP } from '../config/help';
 import {
   findReplicates,
@@ -10,18 +11,20 @@ import {
 import {
   cloneScenario,
   emptyScenario,
+  type ChoiceModel,
   type CommonModel,
   type ConfigModel,
   type ScenarioModel,
   type SimulationModel,
 } from '../config/types';
 import { findOptimizers, type OptimizerRef } from '../config/optimizers';
-import { CheckField, MonthField, NumberField, TextField } from './fields';
-import { IconBranch, IconLayers, IconSliders } from './icons';
+import { CheckField, MonthField, NumberField, SelectField, TextField } from './fields';
+import { IconBranch, IconChoice, IconLayers, IconSliders } from './icons';
 import { OptimizerControl } from './OptimizerControl';
 import { EventList } from './editor/EventList';
 import { InvestmentList } from './editor/InvestmentList';
 import { LoanList } from './editor/LoanList';
+import { OptionList } from './editor/OptionList';
 import { SectionNav, type SectionRef } from './SectionNav';
 
 interface SectionProps {
@@ -127,7 +130,15 @@ export function Workspace({
   const sections: SectionRef[] = useMemo(
     () => [
       { id: 'section-simulation', label: 'Simulation' },
-      { id: 'section-common', label: 'Common settings' },
+      { id: 'section-common', label: 'Baseline' },
+      {
+        id: 'section-choices',
+        label: 'Choices',
+        children: config.choices.map((choice, index) => ({
+          id: `section-choice-${choice.id}`,
+          label: choice.name.trim() || `Choice ${index + 1}`,
+        })),
+      },
       {
         id: 'section-scenarios',
         label: 'Scenarios',
@@ -137,7 +148,7 @@ export function Workspace({
         })),
       },
     ],
-    [config.scenarios],
+    [config.choices, config.scenarios],
   );
 
   const reveal = useCallback((id: string) => {
@@ -192,7 +203,7 @@ export function Workspace({
 
   const eventTitle = (name: string) => name.trim() || 'this event';
 
-  /** "Move to common" on a scenario event: immediate unless replicates exist. */
+  /** "Move to baseline" on a scenario event: immediate unless replicates exist. */
   const requestMoveToCommon = (scenarioId: string, index: number) => {
     const scenario = config.scenarios.find((s) => s.id === scenarioId);
     const event = scenario?.events[index];
@@ -237,8 +248,15 @@ export function Workspace({
 
   const patchSimulation = (changes: Partial<SimulationModel>) =>
     onChange({ ...config, simulation: { ...config.simulation, ...changes } });
+  // An option names the baseline entries it changes or removes, so they are
+  // brought in step whenever the baseline moves.
   const patchCommon = (changes: Partial<CommonModel>) =>
-    onChange({ ...config, common: { ...config.common, ...changes } });
+    onChange(linkTargets({ ...config, common: { ...config.common, ...changes } }));
+  const patchChoice = (id: string, changes: Partial<ChoiceModel>) =>
+    onChange({
+      ...config,
+      choices: config.choices.map((choice) => (choice.id === id ? { ...choice, ...changes } : choice)),
+    });
   const patchScenario = (index: number, next: ScenarioModel) =>
     onChange({
       ...config,
@@ -293,12 +311,12 @@ export function Workspace({
           ref={moveDialogRef}
         >
           <p id="move-common-title">
-            Move {moveDialog.eventTitle} to common settings? Other scenarios also contain an event
+            Move {moveDialog.eventTitle} to the baseline? Other scenarios also contain an event
             with this name:{' '}
             {moveDialog.replicates
               .map((replicate) => replicate.scenarioName.trim() || 'unnamed scenario')
               .join(', ')}
-            . Common events apply to every scenario, so those copies would count twice.
+            . Baseline events apply to every scenario, so those copies would count twice.
           </p>
           <div class="confirm__actions">
             <button type="button" class="btn" onClick={() => finishMoveToCommon(moveDialog.replicates)}>
@@ -430,8 +448,8 @@ export function Workspace({
 
       <Section
         id="section-common"
-        title="Common settings"
-        description="Events, loans and investments shared by every scenario."
+        title="Baseline"
+        description="Events, loans and investments that hold on every path, unless an option a scenario picks changes or removes them."
         highlighted={highlightId === 'section-common'}
         icon={<IconLayers />}
       >
@@ -457,9 +475,84 @@ export function Workspace({
       </Section>
 
       <Section
+        id="section-choices"
+        title="Choices"
+        description="The decisions this plan faces. Each choice has options, the ways it can go, and every scenario picks one option per choice."
+        highlighted={highlightId === 'section-choices'}
+        icon={<IconChoice />}
+        actions={
+          <button
+            type="button"
+            class="btn"
+            onClick={() => {
+              const next = addChoice(config);
+              onChange(next);
+              const added = next.choices.at(-1);
+              if (added) window.setTimeout(() => jump(`section-choice-${added.id}`), 0);
+            }}
+          >
+            Add choice
+          </button>
+        }
+      >
+        {config.choices.length === 0 ? (
+          <p class="empty">
+            No choices yet. Add one to describe a decision once and let each scenario pick how it goes,
+            in place of copying entries between scenarios.
+          </p>
+        ) : (
+          <ul class="scenario-index">
+            {config.choices.map((choice, index) => (
+              <li key={choice.id}>
+                <button type="button" class="chip" onClick={() => jump(`section-choice-${choice.id}`)}>
+                  {choice.name.trim() || `Choice ${index + 1}`}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      {config.choices.map((choice, index) => {
+        const id = `section-choice-${choice.id}`;
+        return (
+          <Section
+            key={choice.id}
+            id={id}
+            title={choice.name.trim() || `Choice ${index + 1}`}
+            highlighted={highlightId === id}
+            icon={<IconChoice />}
+            actions={
+              <div class="row-card__actions">
+                <button
+                  type="button"
+                  class="btn btn--quiet btn--danger"
+                  onClick={() => onChange(removeChoice(config, choice.id))}
+                >
+                  Remove choice
+                </button>
+              </div>
+            }
+          >
+            <div class="field-grid">
+              <TextField
+                label="Choice name"
+                help={HELP.choiceName}
+                value={choice.name}
+                required
+                wide
+                onInput={(name) => patchChoice(choice.id, { name })}
+              />
+            </div>
+            <OptionList config={config} choice={choice} onChange={onChange} />
+          </Section>
+        );
+      })}
+
+      <Section
         id="section-scenarios"
         title="Scenarios"
-        description="Alternative futures to compare. Each scenario adds to the common settings above."
+        description="Alternative futures to compare. Each scenario is the baseline, the options it picks, and whatever belongs to it alone."
         highlighted={highlightId === 'section-scenarios'}
         icon={<IconBranch />}
         actions={
@@ -467,7 +560,7 @@ export function Workspace({
             type="button"
             class="btn"
             onClick={() => {
-              const scenario = emptyScenario(`scenario ${config.scenarios.length + 1}`);
+              const scenario = emptyScenario(`scenario ${config.scenarios.length + 1}`, config.choices);
               onChange({ ...config, scenarios: [...config.scenarios, scenario] });
               window.setTimeout(() => jump(`section-scenario-${scenario.id}`), 0);
             }}
@@ -553,15 +646,42 @@ export function Workspace({
               checked={scenario.active}
               onChange={(active) => patch({ active })}
             />
+            {config.choices.length > 0 ? (
+              <fieldset class="editor-fields selections">
+                <legend>Selections</legend>
+                <div class="field-grid">
+                  {config.choices.map((choice, choiceIndex) => {
+                    const picked = scenario.select[choice.id];
+                    return (
+                      <SelectField<string>
+                        key={choice.id}
+                        label={choice.name.trim() || `Choice ${choiceIndex + 1}`}
+                        help={HELP.selection}
+                        value={choice.options.some((option) => option.id === picked) ? picked! : ''}
+                        placeholder="Pick an option"
+                        missingMessage="Pick an option for this choice."
+                        options={choice.options.map((option, optionIndex) => ({
+                          value: option.id,
+                          label: option.name.trim() || `Option ${optionIndex + 1}`,
+                        }))}
+                        onChange={(optionId) =>
+                          patch({ select: { ...scenario.select, [choice.id]: optionId } })
+                        }
+                      />
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ) : null}
             <EventList
               title="Events"
-              description="Scenario events may carry an optimizer directive."
+              description="Events on this path alone. They may carry an optimizer directive."
               kind="cashflow"
               events={scenario.events}
               simulation={config.simulation}
               allowOptimize
               moveAction={{
-                label: 'Move to common',
+                label: 'Move to baseline',
                 onMove: (eventIndex) => requestMoveToCommon(scenario.id, eventIndex),
               }}
               onChange={(events) => patch({ events })}

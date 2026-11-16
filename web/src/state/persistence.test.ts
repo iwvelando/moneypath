@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { EDITOR_STATE_VERSION, decodeEditorState, encodeEditorState } from './persistence';
 import { starterConfig } from '../config/starter';
-import { toConfigDocument } from '../config/serialize';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { parse as parseYaml } from 'yaml';
+import { fromConfigDocument, toConfigDocument } from '../config/serialize';
 
 describe('editor state persistence', () => {
   it('round-trips a saved config', () => {
@@ -171,6 +174,70 @@ describe('editor state persistence', () => {
     expect(scenarios[0]!.loans[0]!.sellPrice).toBe(500);
     expect(scenarios[0]!.loans[0]!.sellProperty).toBe(false);
     expect(common.events[0]!.name).toBe('Rent ');
+  });
+
+  describe('choices', () => {
+    // vitest runs from web/.
+    const withChoices = () =>
+      fromConfigDocument(parseYaml(readFileSync(resolve(process.cwd(), '../examples/choices.yaml'), 'utf8')));
+
+    it('restores a draft saved before choices existed as a plan with none', () => {
+      const outcome = decodeEditorState(JSON.stringify(sparseDraft()));
+      expect(outcome.source).toBe('restored');
+      expect(outcome.config.choices).toEqual([]);
+      expect(outcome.config.scenarios[0]!.select).toEqual({});
+      expect(toConfigDocument(outcome.config)).not.toHaveProperty('choices');
+    });
+
+    it('restores choices, selections and targets', () => {
+      const config = withChoices();
+      const outcome = decodeEditorState(encodeEditorState(config));
+      expect(outcome.source).toBe('restored');
+      expect(toConfigDocument(outcome.config)).toEqual(toConfigDocument(config));
+    });
+
+    it('backfills what an option or a change predates', () => {
+      const draft = sparseDraft() as { version: number; config: Record<string, unknown> };
+      draft.config['choices'] = [
+        {
+          id: 'c0',
+          name: 'Housing',
+          options: [
+            { id: 'o0', name: 'Keep' },
+            {
+              id: 'o1',
+              name: 'Sell',
+              loans: [{ id: 'l9', name: 'New loan' }],
+              change: { investments: [{ id: 't0', targetId: 'i0', targetName: 'Fund', set: { contributions: [{ id: 'e9', amount: 5 }] } }] },
+              remove: { events: [{ id: 't1', targetId: 'e0', targetName: 'Rent' }] },
+            },
+          ],
+        },
+      ];
+      (draft.config['scenarios'] as Record<string, unknown>[])[0]!['select'] = { c0: 'o1' };
+
+      const outcome = decodeEditorState(JSON.stringify(draft));
+      expect(outcome.source).toBe('restored');
+      const [keep, sell] = outcome.config.choices[0]!.options;
+      expect(keep).toMatchObject({ events: [], change: { events: [], loans: [], investments: [] }, remove: { loans: [] } });
+      expect(sell!.loans[0]!.extraPrincipalPayments).toEqual([]);
+      expect(sell!.change.investments[0]!.set.contributions![0]!.endDate).toBe('');
+      expect(sell!.change.investments[0]!.targetId).toBe(outcome.config.common.investments[0]!.id);
+      expect(sell!.remove.events[0]!.targetId).toBe(outcome.config.common.events[0]!.id);
+      expect(outcome.config.scenarios[0]!.select).toEqual({ [outcome.config.choices[0]!.id]: sell!.id });
+    });
+
+    it('falls back when the saved choices are not a list', () => {
+      const draft = sparseDraft() as { version: number; config: Record<string, unknown> };
+      draft.config['choices'] = 'x';
+      expect(decodeEditorState(JSON.stringify(draft)).source).toBe('starter');
+    });
+
+    it('falls back when an option holds something that is not a list', () => {
+      const draft = sparseDraft() as { version: number; config: Record<string, unknown> };
+      draft.config['choices'] = [{ id: 'c0', name: 'x', options: [{ id: 'o0', name: 'y', change: { loans: 3 } }] }];
+      expect(decodeEditorState(JSON.stringify(draft)).source).toBe('starter');
+    });
   });
 
   it('keeps a saved cash interest rate', () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addMonths,
   currentMonth,
+  formatMonthInput,
   isMonth,
   monthFromIndex,
   monthIndex,
@@ -63,5 +64,31 @@ describe('month arithmetic', () => {
   it('formats the current month zero-padded', () => {
     expect(currentMonth(new Date(2025, 5, 17))).toBe('2025-06');
     expect(currentMonth(new Date(2025, 10, 3))).toBe('2025-11');
+  });
+});
+
+describe('typing a month on a number pad', () => {
+  // A phone's number pad has no dash, so the field puts it in after the year.
+  it('puts the dash in once a digit follows the year', () => {
+    expect(formatMonthInput('2027')).toBe('2027');
+    expect(formatMonthInput('20270')).toBe('2027-0');
+    expect(formatMonthInput('202706')).toBe('2027-06');
+  });
+
+  it('leaves alone what already has a dash, so it can be typed in full or deleted back', () => {
+    expect(formatMonthInput('2027-06')).toBe('2027-06');
+    expect(formatMonthInput('2027-')).toBe('2027-');
+    expect(formatMonthInput('')).toBe('');
+  });
+
+  it('does not rearrange a value being corrected in the middle', () => {
+    // "2027-06" with the 7 deleted, on the way to "2028-06".
+    expect(formatMonthInput('202-06')).toBe('202-06');
+    expect(formatMonthInput('20a06')).toBe('20a06');
+    expect(formatMonthInput('2027061')).toBe('2027061');
+  });
+
+  it('drops the spaces around a pasted value', () => {
+    expect(formatMonthInput(' 2027-06 ')).toBe('2027-06');
   });
 });

@@ -1,4 +1,6 @@
+import { useContext } from 'preact/hooks';
 import { EditorCard, EditorFields, useEditorCards, type EditorCardState } from './EditorCard';
+import { CardScope } from './scope';
 import { loanSummary } from './summaries';
 import { HELP } from '../../config/help';
 import { cloneLoan, emptyLoan, type LoanModel, type SimulationModel } from '../../config/types';
@@ -6,46 +8,24 @@ import { CheckField, MonthField, NumberField, TextField } from '../fields';
 import { IconPercent } from '../icons';
 import { EventList } from './EventList';
 
-interface LoanCardProps extends EditorCardState {
+interface LoanFieldsProps {
   loan: LoanModel;
-  index: number;
   simulation: SimulationModel;
+  /** Off where the name is not this form's to edit: an option's change to a baseline loan. */
+  showName?: boolean;
   onChange: (loan: LoanModel) => void;
-  onRemove: () => void;
-  onDuplicate: () => void;
 }
 
-function LoanCard({ loan, index, simulation, onChange, onRemove, onDuplicate, open, autoFocus, onOpenChange }: LoanCardProps) {
+/** A loan's fields and its extra payments. */
+export function LoanFields({ loan, simulation, showName = true, onChange }: LoanFieldsProps) {
   const patch = (changes: Partial<LoanModel>) => onChange({ ...loan, ...changes });
-  const title = loan.name.trim() || `Loan ${index + 1}`;
-
   return (
-    <EditorCard
-      id={`loan-${loan.id}`}
-      title={title}
-      summary={loanSummary(loan)}
-      open={open}
-      autoFocus={autoFocus}
-      onOpenChange={onOpenChange}
-      actions={
-        <>
-          <button type="button" class="btn btn--quiet" aria-label={`Duplicate ${title}`} onClick={onDuplicate}>
-            Duplicate
-          </button>
-          <button
-            type="button"
-            class="btn btn--quiet btn--danger"
-            aria-label={`Remove ${title}`}
-            onClick={onRemove}
-          >
-            Remove
-          </button>
-        </>
-      }
-    >
+    <>
       <EditorFields title="Loan terms">
         <div class="field-grid">
-          <TextField label="Name" help={HELP.loanName} value={loan.name} required onInput={(name) => patch({ name })} />
+          {showName ? (
+            <TextField label="Name" help={HELP.loanName} value={loan.name} required onInput={(name) => patch({ name })} />
+          ) : null}
           <NumberField
             label="Principal"
             help={HELP.loanPrincipal}
@@ -154,6 +134,7 @@ function LoanCard({ loan, index, simulation, onChange, onRemove, onDuplicate, op
               help={HELP.loanSellCostsNet}
               value={loan.sellCostsNet}
               step={500}
+              signed
               onChange={(sellCostsNet) => patch({ sellCostsNet })}
             />
           </div>
@@ -168,6 +149,48 @@ function LoanCard({ loan, index, simulation, onChange, onRemove, onDuplicate, op
         simulation={simulation}
         onChange={(extraPrincipalPayments) => patch({ extraPrincipalPayments })}
       />
+    </>
+  );
+}
+
+interface LoanCardProps extends EditorCardState {
+  loan: LoanModel;
+  index: number;
+  simulation: SimulationModel;
+  onChange: (loan: LoanModel) => void;
+  onRemove: () => void;
+  onDuplicate: () => void;
+}
+
+function LoanCard({ loan, index, simulation, onChange, onRemove, onDuplicate, open, autoFocus, onOpenChange }: LoanCardProps) {
+  const title = loan.name.trim() || `Loan ${index + 1}`;
+  const scope = useContext(CardScope);
+
+  return (
+    <EditorCard
+      id={`${scope}loan-${loan.id}`}
+      title={title}
+      summary={loanSummary(loan)}
+      open={open}
+      autoFocus={autoFocus}
+      onOpenChange={onOpenChange}
+      actions={
+        <>
+          <button type="button" class="btn btn--quiet" aria-label={`Duplicate ${title}`} onClick={onDuplicate}>
+            Duplicate
+          </button>
+          <button
+            type="button"
+            class="btn btn--quiet btn--danger"
+            aria-label={`Remove ${title}`}
+            onClick={onRemove}
+          >
+            Remove
+          </button>
+        </>
+      }
+    >
+      <LoanFields loan={loan} simulation={simulation} onChange={onChange} />
     </EditorCard>
   );
 }

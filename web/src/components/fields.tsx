@@ -1,8 +1,19 @@
-import type { ComponentChildren } from 'preact';
-import { useEffect, useId, useState } from 'preact/hooks';
+import { createContext, type ComponentChildren } from 'preact';
+import { useContext, useEffect, useId, useState } from 'preact/hooks';
 import { HelpTip } from './HelpTip';
-import { monthIsError, monthMessage } from '../config/month';
+import { formatMonthInput, monthIsError, monthMessage } from '../config/month';
 import { sanitizeNumberInput } from '../util/number';
+
+/**
+ * The labels of the fields an option changes on a baseline entry, for the form
+ * that shows the entry as it is on that path. A field with one of these labels
+ * is marked as changed. Empty everywhere else.
+ */
+export const ChangedLabels = createContext<ReadonlySet<string>>(new Set());
+
+function ChangedMark() {
+  return <span class="field__changed">Changed</span>;
+}
 
 interface FieldShellProps {
   label: string;
@@ -16,7 +27,7 @@ interface FieldShellProps {
   wide?: boolean;
 }
 
-function FieldShell({
+export function FieldShell({
   label,
   help,
   controlId,
@@ -27,11 +38,13 @@ function FieldShell({
   children,
   wide,
 }: FieldShellProps) {
+  const changed = useContext(ChangedLabels).has(label);
   return (
-    <div class={wide ? 'field field--wide' : 'field'}>
+    <div class={`field${wide ? ' field--wide' : ''}${changed ? ' is-changed' : ''}`}>
       <div class="field__label">
         <label for={controlId}>{label}</label>
         <HelpTip id={helpId} label={label} text={help} />
+        {changed ? <ChangedMark /> : null}
       </div>
       {children}
       {message ? (
@@ -219,7 +232,10 @@ interface MonthFieldProps {
   placeholder?: string;
 }
 
-/** A `YYYY-MM` field validated as you type. */
+/**
+ * A `YYYY-MM` field validated as you type. It asks a phone for the number
+ * pad and puts the dash in itself, since that pad has none.
+ */
 export function MonthField({ label, help, value, onChange, required, placeholder }: MonthFieldProps) {
   const base = useId();
   const controlId = `${base}-input`;
@@ -251,7 +267,14 @@ export function MonthField({ label, help, value, onChange, required, placeholder
         placeholder={placeholder ?? 'YYYY-MM'}
         aria-describedby={message ? `${helpId} ${messageId}` : helpId}
         aria-invalid={invalid || undefined}
-        onInput={(event) => onChange((event.currentTarget as HTMLInputElement).value.trim())}
+        onInput={(event) => {
+          // Sync the DOM directly, as the number field does: the formatted
+          // text can equal the previous value, and then nothing re-renders.
+          const element = event.currentTarget as HTMLInputElement;
+          const formatted = formatMonthInput(element.value);
+          if (element.value !== formatted) element.value = formatted;
+          onChange(formatted);
+        }}
       />
     </FieldShell>
   );
@@ -270,8 +293,9 @@ export function CheckField({ label, help, checked, onChange }: CheckFieldProps) 
   const base = useId();
   const controlId = `${base}-input`;
   const helpId = `${base}-help`;
+  const changed = useContext(ChangedLabels).has(label);
   return (
-    <div class="field field--check">
+    <div class={changed ? 'field field--check is-changed' : 'field field--check'}>
       <div class="check-row">
         <input
           id={controlId}
@@ -282,6 +306,7 @@ export function CheckField({ label, help, checked, onChange }: CheckFieldProps) 
         />
         <label for={controlId}>{label}</label>
         <HelpTip id={helpId} label={label} text={help} />
+        {changed ? <ChangedMark /> : null}
       </div>
     </div>
   );
@@ -292,9 +317,14 @@ export function CheckField({ label, help, checked, onChange }: CheckFieldProps) 
 interface SelectFieldProps<T extends string> {
   label: string;
   help: string;
-  value: T;
-  options: readonly { value: T; label: string }[];
+  /** '' when nothing is picked, which only a field with a `placeholder` can show. */
+  value: T | '';
+  options: readonly { value: T; label: string; disabled?: boolean }[];
   onChange: (value: T) => void;
+  /** Shown while nothing is picked; it cannot be picked itself. */
+  placeholder?: string;
+  /** Said under the field while nothing is picked, for a field that must have a pick. */
+  missingMessage?: string;
 }
 
 export function SelectField<T extends string>({
@@ -303,21 +333,39 @@ export function SelectField<T extends string>({
   value,
   options,
   onChange,
+  placeholder,
+  missingMessage,
 }: SelectFieldProps<T>) {
   const base = useId();
   const controlId = `${base}-input`;
   const helpId = `${base}-help`;
+  const messageId = `${base}-msg`;
+  const missing = missingMessage !== undefined && value === '';
   return (
-    <FieldShell label={label} help={help} controlId={controlId} helpId={helpId}>
+    <FieldShell
+      label={label}
+      help={help}
+      controlId={controlId}
+      helpId={helpId}
+      messageId={messageId}
+      message={missing ? missingMessage : null}
+      tone="error"
+    >
       <select
         id={controlId}
-        class="input"
+        class={missing ? 'input is-invalid' : 'input'}
         value={value}
-        aria-describedby={helpId}
+        aria-describedby={missing ? `${helpId} ${messageId}` : helpId}
+        aria-invalid={missing || undefined}
         onChange={(event) => onChange((event.currentTarget as HTMLSelectElement).value as T)}
       >
+        {placeholder !== undefined ? (
+          <option value="" disabled>
+            {placeholder}
+          </option>
+        ) : null}
         {options.map((option) => (
-          <option key={option.value} value={option.value}>
+          <option key={option.value} value={option.value} disabled={option.disabled}>
             {option.label}
           </option>
         ))}

@@ -1,4 +1,6 @@
+import { useContext } from 'preact/hooks';
 import { EditorCard, EditorFields, useEditorCards, type EditorCardState } from './EditorCard';
+import { CardScope } from './scope';
 import { eventSummary } from './summaries';
 import { EVENT_KIND_LABEL, HELP, eventAmountHelp } from '../../config/help';
 import {
@@ -16,7 +18,7 @@ import {
   type OptimizeModel,
   type SimulationModel,
 } from '../../config/types';
-import { MonthField, NumberField, SelectField, TextField } from '../fields';
+import { ChangedLabels, MonthField, NumberField, SelectField, TextField } from '../fields';
 import { IconCalendar } from '../icons';
 
 /* ------------------------------------------------------------------ */
@@ -110,101 +112,46 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
 
 export type WithdrawalStyle = 'amount' | 'percentage';
 
-/** An extra per-row action, e.g. "Move to common" on scenario events. */
+/** The rows of a list are their own entries: what marks the list does not mark their fields. */
+const NO_LABELS: ReadonlySet<string> = new Set();
+
+/** An extra per-row action, e.g. "Move to baseline" on scenario events. */
 export interface EventMoveAction {
   label: string;
   onMove: (index: number) => void;
 }
 
-interface EventRowProps extends EditorCardState {
+interface EventFieldsProps {
   event: EventModel;
-  index: number;
   kind: EventKind;
-  simulation: SimulationModel;
-  allowOptimize: boolean;
-  withdrawalStyle: WithdrawalStyle;
-  moveAction?: EventMoveAction;
+  withdrawalStyle?: WithdrawalStyle;
+  /** Off where the name is not this form's to edit: an option's change to a baseline event. */
+  showName?: boolean;
   onChange: (event: EventModel) => void;
-  onRemove: () => void;
-  onDuplicate: () => void;
 }
 
-function EventRow({
+/** An event's own fields, without its optimizer. */
+export function EventFields({
   event,
-  index,
   kind,
-  simulation,
-  allowOptimize,
-  withdrawalStyle,
-  moveAction,
+  withdrawalStyle = 'amount',
+  showName = true,
   onChange,
-  onRemove,
-  onDuplicate,
-  open,
-  autoFocus,
-  onOpenChange,
-}: EventRowProps) {
+}: EventFieldsProps) {
   const patch = (changes: Partial<EventModel>) => onChange({ ...event, ...changes });
-  const title = event.name.trim() || `${EVENT_KIND_LABEL[kind]} ${index + 1}`;
   const usePercentage = kind === 'withdrawal' && withdrawalStyle === 'percentage';
-
   return (
-    <EditorCard
-      id={`event-${event.id}`}
-      title={title}
-      summary={eventSummary(event, kind, simulation)}
-      open={open}
-      autoFocus={autoFocus}
-      onOpenChange={onOpenChange}
-      badge={event.optimize ? `Optimizer: ${OPTIMIZE_FIELD_LABEL[event.optimize.field]}` : undefined}
-      actions={
-        <>
-          {allowOptimize && kind === 'cashflow' && event.optimize === null ? (
-            <button
-              type="button"
-              class="btn btn--quiet"
-              onClick={() => patch({ optimize: defaultOptimize('amount', event, simulation) })}
-            >
-              Add optimizer
-            </button>
-          ) : null}
-          {moveAction ? (
-            <button
-              type="button"
-              class="btn btn--quiet"
-              aria-label={`${moveAction.label} — ${title}`}
-              onClick={() => moveAction.onMove(index)}
-            >
-              {moveAction.label}
-            </button>
-          ) : null}
-          <button
-            type="button"
-            class="btn btn--quiet"
-            aria-label={`Duplicate ${title}`}
-            onClick={onDuplicate}
-          >
-            Duplicate
-          </button>
-          <button
-            type="button"
-            class="btn btn--quiet btn--danger"
-            aria-label={`Remove ${title}`}
-            onClick={onRemove}
-          >
-            Remove
-          </button>
-        </>
-      }
-    >
+    <>
       <EditorFields title={`${EVENT_KIND_LABEL[kind]} details`}>
         <div class="field-grid">
-          <TextField
-            label="Name"
-            help={HELP.eventName}
-            value={event.name}
-            onInput={(name) => patch({ name })}
-          />
+          {showName ? (
+            <TextField
+              label="Name"
+              help={HELP.eventName}
+              value={event.name}
+              onInput={(name) => patch({ name })}
+            />
+          ) : null}
           {usePercentage ? (
             <NumberField
               label="Percentage"
@@ -253,6 +200,97 @@ function EventRow({
           />
         </div>
       </EditorFields>
+    </>
+  );
+}
+
+interface EventRowProps extends EditorCardState {
+  event: EventModel;
+  index: number;
+  kind: EventKind;
+  simulation: SimulationModel;
+  allowOptimize: boolean;
+  withdrawalStyle: WithdrawalStyle;
+  moveAction?: EventMoveAction;
+  onChange: (event: EventModel) => void;
+  onRemove: () => void;
+  onDuplicate: () => void;
+}
+
+function EventRow({
+  event,
+  index,
+  kind,
+  simulation,
+  allowOptimize,
+  withdrawalStyle,
+  moveAction,
+  onChange,
+  onRemove,
+  onDuplicate,
+  open,
+  autoFocus,
+  onOpenChange,
+}: EventRowProps) {
+  const patch = (changes: Partial<EventModel>) => onChange({ ...event, ...changes });
+  const title = event.name.trim() || `${EVENT_KIND_LABEL[kind]} ${index + 1}`;
+  const scope = useContext(CardScope);
+
+  return (
+    <EditorCard
+      id={`${scope}event-${event.id}`}
+      title={title}
+      summary={eventSummary(event, kind, simulation)}
+      open={open}
+      autoFocus={autoFocus}
+      onOpenChange={onOpenChange}
+      badge={event.optimize ? `Optimizer: ${OPTIMIZE_FIELD_LABEL[event.optimize.field]}` : undefined}
+      actions={
+        <>
+          {allowOptimize && kind === 'cashflow' && event.optimize === null ? (
+            <button
+              type="button"
+              class="btn btn--quiet"
+              onClick={() => patch({ optimize: defaultOptimize('amount', event, simulation) })}
+            >
+              Add optimizer
+            </button>
+          ) : null}
+          {moveAction ? (
+            <button
+              type="button"
+              class="btn btn--quiet"
+              aria-label={`${moveAction.label} — ${title}`}
+              onClick={() => moveAction.onMove(index)}
+            >
+              {moveAction.label}
+            </button>
+          ) : null}
+          <button
+            type="button"
+            class="btn btn--quiet"
+            aria-label={`Duplicate ${title}`}
+            onClick={onDuplicate}
+          >
+            Duplicate
+          </button>
+          <button
+            type="button"
+            class="btn btn--quiet btn--danger"
+            aria-label={`Remove ${title}`}
+            onClick={onRemove}
+          >
+            Remove
+          </button>
+        </>
+      }
+    >
+      <EventFields
+        event={event}
+        kind={kind}
+        withdrawalStyle={withdrawalStyle}
+        onChange={onChange}
+      />
 
       {event.optimize && kind === 'cashflow' ? (
         <OptimizeForm
@@ -294,6 +332,8 @@ export function EventList({
   onChange,
 }: EventListProps) {
   const cards = useEditorCards(events);
+  // Marked when this list is one an option replaces on a baseline entry.
+  const changed = useContext(ChangedLabels).has(title);
   const replace = (index: number, event: EventModel) =>
     onChange(events.map((existing, i) => (i === index ? event : existing)));
 
@@ -305,6 +345,7 @@ export function EventList({
             <IconCalendar />
           </span>
           {title}
+          {changed ? <span class="field__changed">Changed</span> : null}
         </h4>
         {/* Prepend so the new row appears next to this button without scrolling. */}
         <div class="list-block__actions">
@@ -323,8 +364,9 @@ export function EventList({
         <p class="empty">None yet.</p>
       ) : (
         <ul class="row-list">
-          {events.map((event, index) => (
-            <EventRow
+          <ChangedLabels.Provider value={NO_LABELS}>
+            {events.map((event, index) => (
+              <EventRow
               key={event.id}
               {...cards.cardProps(event.id)}
               event={event}
@@ -343,6 +385,7 @@ export function EventList({
               }}
             />
           ))}
+          </ChangedLabels.Provider>
         </ul>
       )}
     </div>

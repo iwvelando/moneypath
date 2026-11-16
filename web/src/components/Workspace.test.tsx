@@ -21,6 +21,7 @@ function makeConfig(commonEvents: EventModel[], scenarios: ScenarioModel[]): Con
   return {
     simulation: { startDate: '', endDate: '2030-12', startingCash: 0, cashInterestRate: null, emergencyFundMonths: null },
     common: { events: commonEvents, loans: [], investments: [] },
+    choices: [],
     scenarios,
   };
 }
@@ -107,13 +108,13 @@ afterEach(() => {
   container.remove();
 });
 
-describe('Move to common', () => {
+describe('Move to baseline', () => {
   it('moves a scenario event straight to common when no same-named events exist elsewhere', async () => {
     const moved = event('Bonus');
     const scenario = { ...emptyScenario('plan a'), events: [moved] };
     await mount(makeConfig([], [scenario]));
 
-    await click('Move to common');
+    await click('Move to baseline');
     expect(latest.common.events.map((e) => e.id)).toEqual([moved.id]);
     expect(latest.scenarios[0]!.events).toHaveLength(0);
     // No dialog needed.
@@ -127,7 +128,7 @@ describe('Move to common', () => {
     const b = { ...emptyScenario('plan b'), events: [twin] };
     await mount(makeConfig([], [a, b]));
 
-    await click('Move to common', 0);
+    await click('Move to baseline', 0);
     const dialog = container.querySelector('[role="dialog"]');
     expect(dialog).not.toBeNull();
     expect(dialog?.textContent).toContain('plan b');
@@ -145,7 +146,7 @@ describe('Move to common', () => {
     const b = { ...emptyScenario('plan b'), events: [twin] };
     await mount(makeConfig([], [a, b]));
 
-    await click('Move to common', 0);
+    await click('Move to baseline', 0);
     await click('Move and keep duplicates');
     expect(latest.common.events.map((e) => e.id)).toEqual([moved.id]);
     expect(latest.scenarios[1]!.events.map((e) => e.id)).toEqual([twin.id]);
@@ -350,15 +351,15 @@ describe('the section navigation', () => {
     expect(container.querySelector('.sectionnav__panel')).toBeNull();
     await click('Jump to section');
     const links = Array.from(container.querySelectorAll('.sectionnav__link')).map((el) => el.textContent);
-    expect(links).toEqual(['Simulation', 'Common settings', 'Scenarios', 'plan a', 'plan b']);
+    expect(links).toEqual(['Simulation', 'Baseline', 'Choices', 'Scenarios', 'plan a', 'plan b']);
     expect(container.querySelector('.sectionnav__children')?.closest('li')?.textContent)
       .toBe('Scenariosplan aplan b');
   });
 
-  it('jumps directly to common settings, focuses the section, and closes', async () => {
+  it('jumps directly to the baseline, focuses the section, and closes', async () => {
     await mount(makeConfig([], [emptyScenario('plan a')]));
     await click('Jump to section');
-    await click('Common settings');
+    await click('Baseline');
     expect(document.activeElement).toBe(container.querySelector('#section-common'));
     expect(container.querySelector('.sectionnav__panel')).toBeNull();
   });
@@ -375,7 +376,7 @@ describe('the section navigation', () => {
     await mount(makeConfig([], []));
     await click('Jump to section');
     await act(async () => {
-      buttons('Common settings')[0]!.focus();
+      buttons('Baseline')[0]!.focus();
       document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     });
     expect(container.querySelector('.sectionnav__panel')).toBeNull();
@@ -409,7 +410,7 @@ describe('the section navigation', () => {
     await act(async () => {
       buttons('Jump to section')[0]!.dispatchEvent(new FocusEvent('focusout', { bubbles: true, relatedTarget: null }));
     });
-    await click('Common settings');
+    await click('Baseline');
     expect(document.activeElement).toBe(container.querySelector('#section-common'));
     expect(container.querySelector('.sectionnav__panel')).toBeNull();
   });

@@ -199,3 +199,18 @@ describe('summary-first editors', () => {
     expect(card('Rent').querySelectorAll('input')[1]!.value).toBe('-2500');
   });
 });
+
+describe('the keyboard a loan asks a phone for', () => {
+  it('is the full keyboard for net selling costs, which may be negative', async () => {
+    const loan: LoanModel = { ...emptyLoan(), name: 'Mortgage', sellProperty: true };
+    await act(async () => {
+      render(<LoanList loans={[loan]} simulation={simulation} onChange={() => {}} />, container);
+    });
+    const keyboard = (label: string) => {
+      const found = Array.from(container.querySelectorAll('label')).find((l) => l.textContent === label)!;
+      return document.getElementById(found.htmlFor)!.getAttribute('inputmode');
+    };
+    expect(keyboard('Net selling costs')).toBe('text');
+    expect(keyboard('Sale price')).toBe('decimal');
+  });
+});

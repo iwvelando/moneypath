@@ -30,6 +30,16 @@ export const HELP = {
   scenarioActive:
     'Default on. Inactive scenarios are skipped entirely — no results, no CSV columns.',
 
+  /* choices */
+  choiceName:
+    'Required, and must be unique among choices. A choice is a decision the plan faces, such as where to live.',
+  optionName:
+    'Required, and must be unique within its choice. An option is one way the decision can go. An option that adds, changes and removes nothing is a valid one: it leaves the baseline as it is.',
+  selection:
+    'The option this scenario takes for this choice. Every scenario picks one option for every choice. Editing an option changes every scenario that picks it.',
+  baselineTarget:
+    'A baseline entry for this option to change or remove on the paths that pick it. Type any part of its name to narrow the list. One entry can be changed or removed by the options of one choice only, so an entry another choice already uses is listed but cannot be picked. An entry needs a name that no other baseline entry of its kind shares.',
+
   /* event */
   eventName: 'Optional but recommended. Used in notes and warnings so you can tell entries apart.',
   eventFrequency:

@@ -1,7 +1,7 @@
 /**
  * Moving cash-flow events between the common block and scenarios.
  *
- * "Move to common" promotes a scenario event so every scenario inherits it;
+ * "Move to baseline" promotes a scenario event so every scenario inherits it;
  * same-named events left in other scenarios would then apply twice, so the
  * caller can ask for those replicates and remove them in the same step.
  * "Move to scenario" is the inverse: place a common event into one or more
@@ -9,6 +9,7 @@
  */
 
 import { cloneEvent, type ConfigModel, type EventModel } from './types';
+import { linkTargets } from './choices';
 
 export interface ReplicateRef {
   scenarioId: string;
@@ -65,7 +66,7 @@ export function moveEventToCommon(
   if (!moved) return config;
 
   const removedIds = new Set([eventId, ...removeReplicates.map((r) => r.eventId)]);
-  return {
+  return linkTargets({
     ...config,
     common: {
       ...config.common,
@@ -75,7 +76,7 @@ export function moveEventToCommon(
       ...scenario,
       events: scenario.events.filter((event) => !removedIds.has(event.id)),
     })),
-  };
+  });
 }
 
 /**
@@ -93,7 +94,7 @@ export function moveEventToScenarios(
   if (!source || scenarioIds.length === 0) return config;
 
   const targets = new Set(scenarioIds);
-  return {
+  return linkTargets({
     ...config,
     common: {
       ...config.common,
@@ -107,5 +108,5 @@ export function moveEventToScenarios(
         ? { ...scenario, events: [cloneEvent(source), ...scenario.events] }
         : scenario,
     ),
-  };
+  });
 }
