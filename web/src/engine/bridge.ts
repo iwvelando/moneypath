@@ -4,7 +4,7 @@
  * `{"error": "..."}` with a human-readable message.
  */
 
-import { EngineError, type ForecastResults } from './types';
+import { EngineError, type ForecastResults, type Problem } from './types';
 
 function parseJson(raw: string, what: string): unknown {
   try {
@@ -42,4 +42,22 @@ export function decodeForecast(raw: string): ForecastResults {
     warnings: Array.isArray(results.warnings) ? results.warnings : [],
     configYaml: results.configYaml ?? '',
   };
+}
+
+/** Everything the engine found wrong with a plan; empty for a sound one. */
+export function decodeProblems(raw: string): Problem[] {
+  const parsed = parseJson(raw, 'validation');
+  const message = errorMessage(parsed);
+  if (message !== null) throw new EngineError(message);
+  const problems = (parsed as { problems?: unknown }).problems;
+  if (!Array.isArray(problems)) return [];
+  return problems.map((entry) => {
+    const problem = entry as Partial<Problem>;
+    return {
+      level: problem.level === 'warning' ? 'warning' : 'error',
+      path: problem.path ?? '',
+      where: problem.where ?? '',
+      message: problem.message ?? '',
+    };
+  });
 }

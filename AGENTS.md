@@ -31,6 +31,33 @@ Anything a user can read — error and warning strings, UI copy, field help:
 - **No notation the reader has to decode.** Write "at least 0 and less than 100",
   not "[0, 100)". Assume a personal-finance enthusiast, not a mathematician.
 
+## Errors, warnings and messages
+
+An error appears at the thing that caused it, stays while it is true, and goes
+away on its own. DEVELOPMENT.md, "Errors, warnings and messages", has the detail.
+
+- **Three places, and no others.** Under the field, for anything about one field.
+  Beside the control that started it, for an action that failed (run, upload,
+  download, flip, keep). A page banner only for the whole app: the engine did not
+  load, the saved draft was discarded, the plan cannot be saved. Do not add a
+  message list, a toast, or a list of dismissable notices.
+- **The engine decides what is wrong, live.** A rule lives in `config/` and is
+  reported with the path of its field; the editor asks on every edit and shows the
+  answer under that field. Do not restate a rule in TypeScript. A field reports for
+  itself only what the engine never sees, such as text that is not a number.
+- **Every field says where it is.** A control that edits the plan carries its
+  config key (`field=`) inside the `At` path of its form. `App.test.tsx`, "places
+  every error the editor can produce under a control", fails when an error has
+  nowhere to appear; extend its plan when a rule or a form is added.
+- **Never discard or repair input in silence.** What cannot be used stays on
+  screen with its error, and a run is refused while any error stands.
+- **Add, never replace.** A message joins the text beside it; it does not take the
+  place of an explanation, a label or a hint.
+- **Warnings look and read different from errors.** A warning is in the quieter
+  warning style and starts "Warning: "; an error has no prefix. A warning never
+  stops a run or marks a field invalid.
+- **Confirmations are said once**, in the status line of the control that acted.
+
 ## Architecture invariants (spec/02)
 
 - `engine/` is pure: no I/O, no clock reads (callers pass "now"), no logging.

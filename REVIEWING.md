@@ -38,6 +38,7 @@ touches:
 | CSV or results output | Native and WASM stay byte-identical (`TestNativeWASMParity`). The bundle check needs a real `make dist` build. |
 | A field added to the web editor model | An old saved draft, which lacks the key, restores with the field blank; the sparse-draft tests reach it. `make typecheck` passes. |
 | Any text a user can read | No spec paths, chapter numbers, fixture names or Go identifiers; no notation to decode. |
+| A validation rule, an error or a warning | The rule is in `config/` with its field's path, not restated in TypeScript. It shows under its field, or beside the control that started the action; nothing is added to a page-level list. A warning is styled and prefixed as one. The plan in `App.test.tsx`, "places every error the editor can produce under a control", breaks the new rule. No input is dropped or corrected in silence. |
 | Controls, focus, touch, layout | Nothing scrolls sideways at 360 px. WebKit behavior is in `web/e2e/webkit.spec.ts`. Phone-only checks are listed as pending, not passed. |
 | A new kind of resource (worker, font, `data:` image, fetch) | `deploy/content-security-policy.txt` changed, and the matching cloud-accounts change lands first. |
 | A new runtime dependency | Its license reaches `web/dist/` (`make notices`, `check-dist.mjs`). Dependabot merges later updates unreviewed, so the tests must cover what the dependency does. |

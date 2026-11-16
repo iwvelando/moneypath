@@ -4,7 +4,15 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
 import { addMonths } from './config/month';
 import { starterConfig } from './config/starter';
-import { emptyChoice, emptyEvent, emptyOption, type ConfigModel } from './config/types';
+import {
+  emptyChoice,
+  emptyEvent,
+  emptyInvestment,
+  emptyLoan,
+  emptyOption,
+  newId,
+  type ConfigModel,
+} from './config/types';
 import { EDITOR_STATE_VERSION, KEYS } from './state/persistence';
 import { storageKeys } from './test/setup';
 
@@ -182,8 +190,15 @@ describe('the app', () => {
     expect(container.querySelectorAll('.chart__line').length).toBeGreaterThanOrEqual(2);
     expect(container.querySelectorAll('.results-table tbody tr').length).toBeGreaterThan(10);
     expect(container.querySelector('.summary__card')?.textContent).toContain('Emergency fund');
-    // Engine warnings are shown prominently but never block the run.
-    expect(container.querySelector('.banner--warn')).not.toBeNull();
+    // Engine warnings never block the run. They come with its results, and
+    // each stays under the field it is about.
+    expect(container.querySelector('#panel-results .run-warnings')?.textContent).toContain(
+      'Baseline, loan “Car loan”: With no cutoff',
+    );
+    expect(container.querySelector('#panel-workspace .run-warnings')).toBeNull();
+    const cutoff = container.querySelector('[data-path="common.loans.0.mortgageInsuranceCutoff"]');
+    expect(cutoff?.querySelector('.field__message.is-warning')?.textContent).toMatch(/^Warning: With no cutoff/);
+    expect(cutoff?.querySelector('.field__message.is-error')).toBeNull();
 
     const scenarioTabs = container.querySelectorAll('[role="tablist"][aria-label="Scenarios"] [role="tab"]');
     expect(scenarioTabs.length).toBeGreaterThan(1);
@@ -347,9 +362,31 @@ describe('the app', () => {
     });
     await settle(500);
 
-    // The error belongs where the run was started: the pinned bar.
-    expect(container.querySelector('.workbar__error')?.textContent).toContain('endDate');
+    // The run is refused where it was started, the pinned bar, which counts
+    // what is wrong and leads to it. The error itself is under its field.
+    expect(container.querySelector('.workbar__error')?.textContent).toContain(
+      'One thing in your plan needs fixing before the forecast can run.',
+    );
+    expect(container.querySelector('[data-path="simulation.endDate"] .field__message.is-error')).not.toBeNull();
     expect(container.querySelector('.toolbar__error')).toBeNull();
+    await act(async () => {
+      button('Show it').click();
+    });
+    await settle(50);
+    expect(document.activeElement).toBe(endInput);
+
+    // Fixing it clears the bar without another run.
+    await act(async () => {
+      endInput!.value = '2060-01';
+      endInput!.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await settle(50);
+    expect(container.querySelector('.workbar__error')).toBeNull();
+    await act(async () => {
+      endInput!.value = '';
+      endInput!.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await settle(50);
     // The editor is still on screen with its content intact.
     expect(container.querySelector('#section-simulation')).not.toBeNull();
     expect(container.querySelector<HTMLButtonElement>('#tab-results')?.disabled).toBe(true);
@@ -483,9 +520,231 @@ describe('the app', () => {
     const picked = (scenario: number) =>
       savedHome.options.find((o) => o.id === saved()[scenario]!.select[savedHome.id])?.name;
     expect([picked(0), picked(1)]).toEqual(['Stay', 'Move']);
-    expect(container.querySelector('.notices')?.textContent).toContain(`Added “${first} (Home: Move)” to your plan`);
+    // Said once, beside the button that did it.
+    expect(container.querySelector('.notices')).toBeNull();
     // The results are of the plan before the path was kept.
     expect(container.querySelector('#tab-results')!.classList.contains('is-outdated')).toBe(true);
     expect(panel().textContent).toContain('Added to your plan.');
+  });
+  /** The input of a field, found by its place in the plan. */
+  function fieldInput(path: string): HTMLInputElement {
+    const input = container.querySelector<HTMLInputElement>(`[data-path="${path}"] input`);
+    if (!input) throw new Error(`no field at ${path}`);
+    return input;
+  }
+
+  async function type(input: HTMLInputElement, value: string): Promise<void> {
+    await act(async () => {
+      input.dispatchEvent(new Event('focus'));
+      input.value = value;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('blur'));
+    });
+    await settle(50);
+  }
+
+  it('shows what the engine refuses under the field as it is typed, and on the collapsed entry', async () => {
+    await act(async () => {
+      render(<App />, container);
+    });
+    await settle();
+
+    const path = 'common.investments.0.withdrawalTaxRate';
+    const field = () => container.querySelector(`[data-path="${path}"]`)!;
+    expect(field().querySelector('.field__message')).toBeNull();
+    const card = field().closest('.editor-card')!;
+    expect(card.querySelector('.editor-card__notice')).toBeNull();
+
+    await type(fieldInput(path), '-1');
+    expect(field().querySelector('.field__message.is-error')?.textContent).toBe(
+      'The withdrawal tax rate must be at least 0 and less than 100.',
+    );
+    expect(fieldInput(path).getAttribute('aria-invalid')).toBe('true');
+    // The entry was never opened; its summary says to look inside.
+    expect(card.querySelector('.editor-card__notice')?.textContent).toBe('Check details');
+    // Nothing is said anywhere else until a run is asked for.
+    expect(container.querySelector('.workbar__error')).toBeNull();
+
+    await act(async () => {
+      button('Run Forecast').click();
+    });
+    await settle(300);
+    expect(container.querySelector<HTMLButtonElement>('#tab-results')?.disabled).toBe(true);
+    expect(container.querySelector('.workbar__error')?.textContent).toContain('One thing in your plan');
+    // Going to it opens the entry that holds it.
+    await act(async () => {
+      button('Show it').click();
+    });
+    await settle(50);
+    expect(card.classList.contains('is-open')).toBe(true);
+    expect(document.activeElement).toBe(fieldInput(path));
+
+    await type(fieldInput(path), '15');
+    expect(field().querySelector('.field__message')).toBeNull();
+    expect(card.querySelector('.editor-card__notice')).toBeNull();
+    expect(container.querySelector('.workbar__error')).toBeNull();
+  });
+
+  it('will not run on a number other than the one on screen', async () => {
+    await act(async () => {
+      render(<App />, container);
+    });
+    await settle();
+
+    const path = 'common.investments.0.taxRate';
+    await type(fieldInput(path), '.');
+    // Leaving the field keeps what was typed, with its error.
+    expect(fieldInput(path).value).toBe('.');
+    expect(container.querySelector(`[data-path="${path}"] .field__message.is-error`)?.textContent).toBe(
+      'Enter a number.',
+    );
+
+    await act(async () => {
+      button('Run Forecast').click();
+    });
+    await settle(300);
+    expect(container.querySelector<HTMLButtonElement>('#tab-results')?.disabled).toBe(true);
+    expect(container.querySelector('.workbar__error')?.textContent).toContain('One thing in your plan');
+
+    await type(fieldInput(path), '12');
+    await act(async () => {
+      button('Run Forecast').click();
+    });
+    await settle(500);
+    expect(container.querySelector('#tab-results')?.getAttribute('aria-selected')).toBe('true');
+  });
+
+  // The count in the run bar is of what is on screen: one field with one
+  // message is one thing, whatever the plan held before the text went wrong.
+  it('counts a field once, however it came to be wrong', async () => {
+    await act(async () => {
+      render(<App />, container);
+    });
+    await settle();
+
+    const path = 'common.events.2.frequency';
+    const shown = () =>
+      Array.from(container.querySelectorAll(`[data-path="${path}"] .field__message.is-error`), (m) => m.textContent);
+    const counted = async () => {
+      await act(async () => {
+        button('Run Forecast').click();
+      });
+      await settle(100);
+      return container.querySelector('.workbar__error strong')?.textContent;
+    };
+
+    for (const [text, message] of [
+      ['-1', 'The frequency must be a whole number of months, 1 or more.'],
+      ['.', 'Enter a number.'],
+      ['.3', 'This must be a whole number.'],
+      ['-', 'Enter a number.'],
+    ] as const) {
+      await type(fieldInput(path), text);
+      expect(shown(), text).toEqual([message]);
+      expect(await counted(), text).toBe('One thing in your plan needs fixing before the forecast can run.');
+    }
+  });
+
+  it('says why a file was not loaded beside the upload control, once', async () => {
+    await act(async () => {
+      render(<App />, container);
+    });
+    await settle();
+
+    const upload = async (text: string) => {
+      const input = container.querySelector<HTMLInputElement>('input[type="file"]')!;
+      Object.defineProperty(input, 'files', { configurable: true, value: [new File([text], 'plan.yaml')] });
+      await act(async () => {
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await settle(100);
+    };
+
+    await upload('');
+    await upload('');
+    const errors = container.querySelectorAll('.toolbar .toolbar__error');
+    expect(errors).toHaveLength(1);
+    expect(errors[0]!.getAttribute('role')).toBe('alert');
+    expect(errors[0]!.textContent).toBe('plan.yaml was not loaded. That file is empty.');
+
+    // A file that loads replaces the complaint with what happened.
+    await upload('version: 2\nsimulation: {startDate: 2025-01, endDate: 2030-01, startingCash: 5}\nscenarios: [{name: only}]\n');
+    expect(container.querySelector('.toolbar__error')).toBeNull();
+    expect(container.querySelector('.toolbar__status')?.textContent).toBe('Loaded plan.yaml into the editor.');
+    expect(container.querySelector('.notices')).toBeNull();
+  });
+
+  it('says so when the browser will not save the plan', async () => {
+    const setItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = () => {
+      throw new DOMException('full', 'QuotaExceededError');
+    };
+    try {
+      await act(async () => {
+        render(<App />, container);
+      });
+      await settle(600);
+      expect(container.querySelector('.banner--warn')?.textContent).toContain('This browser is not saving your plan');
+    } finally {
+      Storage.prototype.setItem = setItem;
+    }
+  });
+  // The guard for "every error has a field": whatever the editor can build,
+  // the engine's complaint about it lands on a control. An error with nowhere
+  // to appear is written out in the run bar, and this plan must leave none.
+  it('places every error the editor can produce under a control', async () => {
+    const config = starterConfig();
+    config.simulation.cashInterestRate = -1;
+    config.simulation.emergencyFundMonths = -1;
+    const car = config.common.loans[0]!;
+    car.extraPrincipalPayments = [{ ...emptyEvent(), amount: -5, frequency: 0 }];
+    car.mortgageInsuranceCutoff = 101;
+    config.common.loans.push({ ...emptyLoan(), downPayment: -1, escrow: -1, earlyPayoffDate: 'soon' });
+    const fund = config.common.investments[0]!;
+    fund.taxRate = 100;
+    fund.withdrawalTaxRate = -1;
+    fund.startingValue = -1;
+    fund.contributions = [{ ...emptyEvent(), amount: 0 }];
+    fund.withdrawals = [{ ...emptyEvent() }];
+    config.common.investments.push({ ...emptyInvestment(), name: fund.name });
+    config.common.events.push({ ...emptyEvent(), frequency: 1.5, startDate: '2030-01', endDate: '2029-01' });
+
+    const stay = emptyOption('Same');
+    const move = emptyOption('Same');
+    move.events = [{ ...emptyEvent(), name: 'Costs' }];
+    move.change.loans = [{ id: newId('cg'), targetId: car.id, targetName: car.name, set: { term: 0 } }];
+    const home = { ...emptyChoice(''), options: [stay, move] };
+    config.choices = [home];
+
+    const [first, second] = config.scenarios;
+    second!.name = first!.name;
+    first!.select = { [home.id]: stay.id };
+    first!.events = [
+      {
+        ...emptyEvent(),
+        amount: -100,
+        optimize: { field: 'amount', min: 5, max: 1, minDate: '', maxDate: '', tolerance: 0, maxIterations: 0 },
+      },
+      {
+        ...emptyEvent(),
+        amount: -100,
+        optimize: { field: 'endDate', min: null, max: null, minDate: '', maxDate: 'x', tolerance: null, maxIterations: null },
+      },
+    ];
+    seedPlan(config);
+
+    await act(async () => {
+      render(<App />, container);
+    });
+    await settle();
+    await act(async () => {
+      button('Run Forecast').click();
+    });
+    await settle(300);
+
+    const bar = container.querySelector('.workbar__error')!;
+    const count = Number(/^(\d+) things/.exec(bar.textContent ?? '')?.[1]);
+    expect(count).toBeGreaterThanOrEqual(25);
+    expect(Array.from(bar.querySelectorAll('li'), (item) => item.textContent)).toEqual([]);
   });
 });

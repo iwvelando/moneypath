@@ -170,6 +170,8 @@ describe('flipping one choice of a scenario', () => {
     expect(keepButton()).not.toBeNull();
     expect(text()).not.toContain('Added to your plan.');
     expect(host.querySelector('.flip__keep [role="alert"]')?.textContent).toBe(message);
+    // The refusal is added beside what the button does, never in place of it.
+    expect(host.querySelector('.flip__keep [role="status"]')?.textContent).toContain('to your plan. Until then');
     await pick(1, 'op-sell');
     expect(host.querySelector('.flip__keep [role="alert"]')).toBeNull();
   });

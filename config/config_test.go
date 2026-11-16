@@ -110,7 +110,7 @@ func TestValidateWarnings(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(warns) != 1 || !contains(warns[0], "startingCash") {
+	if len(warns) != 1 || !contains(warns[0], "starting cash") {
 		t.Errorf("want startingCash warning, got %v", warns)
 	}
 	if cfg.Simulation.ResolvedStartingCash != 0 {

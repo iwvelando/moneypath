@@ -13,18 +13,20 @@
  */
 
 import '../vendor/wasm_exec.js';
-import { decodeForecast } from './bridge';
+import { decodeForecast, decodeProblems } from './bridge';
 import {
   EngineError,
   type Engine,
   type ForecastOptions,
   type ForecastResults,
+  type Problem,
 } from './types';
 
 const wasmUrl = new URL('./moneypath.wasm', import.meta.url);
 
 interface MoneypathGlobals {
   moneypathForecast?: (configYAML: string, optionsJSON: string) => string;
+  moneypathValidate?: (configYAML: string, optionsJSON: string) => string;
   moneypathVersion?: () => string;
 }
 
@@ -91,6 +93,12 @@ class WasmEngine implements Engine {
     if (typeof fn !== 'function') throw new EngineError('The moneypath engine is not loaded.');
     await yieldToPaint();
     return decodeForecast(fn(configYaml, JSON.stringify(options)));
+  }
+
+  validate(configYaml: string, options: { now?: string }): Problem[] {
+    const fn = bridgeGlobals().moneypathValidate;
+    if (typeof fn !== 'function') throw new EngineError('The moneypath engine is not loaded.');
+    return decodeProblems(fn(configYaml, JSON.stringify(options)));
   }
 }
 

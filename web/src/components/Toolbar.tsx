@@ -4,6 +4,8 @@ import { THEMES, THEME_LABEL, type Theme } from '../state/theme';
 interface ToolbarProps {
   running: boolean;
   busyLabel: string | null;
+  /** Why the last upload, download or reset did not happen. These start here, so it is said here. */
+  error: string | null;
   engineReady: boolean;
   theme: Theme;
   onUpload: (file: File) => void;
@@ -17,6 +19,7 @@ interface ToolbarProps {
 export function Toolbar({
   running,
   busyLabel,
+  error,
   engineReady,
   theme,
   onUpload,
@@ -91,8 +94,13 @@ export function Toolbar({
       </div>
 
       <p class="toolbar__status" role="status" aria-live="polite">
-        {busyLabel ?? ''}
+        {error ? '' : (busyLabel ?? '')}
       </p>
+      {error ? (
+        <p class="toolbar__error" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

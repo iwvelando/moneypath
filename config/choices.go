@@ -104,20 +104,27 @@ func canonicalNode(n *yaml.Node) {
 func isNull(n *yaml.Node) bool { return n.Kind == yaml.ScalarNode && n.Tag == "!!null" }
 
 // apply returns a copy of base with the fields under Set replaced. A field
-// set to null is taken away, so it falls back to its default.
-func (c *EntryChange[T]) apply(base *T) (*T, error) {
+// set to null is taken away, so it falls back to its default. What stops it
+// is reported as problems placed under path, the change's own.
+func (c *EntryChange[T]) apply(base *T, path string) (*T, []Problem) {
+	set := join(path, "set")
 	if c.Set.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("set is required and lists the fields to replace, each as \"field: value\"")
+		return nil, []Problem{{Level: LevelError, Path: set, Message: "This change does not say which fields to change."}}
 	}
 	var doc yaml.Node
 	if err := doc.Encode(base); err != nil {
-		return nil, err
+		return nil, decodeProblems(err, nil, set)
 	}
+	var problems []Problem
 	for i := 0; i+1 < len(c.Set.Content); i += 2 {
 		key, val := c.Set.Content[i], c.Set.Content[i+1]
 		switch key.Value {
-		case "name", "optimize":
-			return nil, fmt.Errorf("%s cannot be set", key.Value)
+		case "name":
+			problems = append(problems, Problem{Level: LevelError, Path: join(set, "name"), Message: "A change cannot rename the entry."})
+			continue
+		case "optimize":
+			problems = append(problems, Problem{Level: LevelError, Path: join(set, "optimize"), Message: "A change cannot add an optimizer."})
+			continue
 		}
 		at := -1
 		for j := 0; j+1 < len(doc.Content); j += 2 {
@@ -137,9 +144,12 @@ func (c *EntryChange[T]) apply(base *T) (*T, error) {
 			doc.Content = append(doc.Content, key, val)
 		}
 	}
+	if problems != nil {
+		return nil, problems
+	}
 	out := new(T)
 	if err := doc.Decode(out); err != nil {
-		return nil, err
+		return nil, decodeProblems(err, &c.Set, set)
 	}
 	return out, nil
 }
@@ -225,167 +235,165 @@ func applyEffects[T any](base []*T, effects []*effect[T]) []*T {
 // entryRef names a common entry the way change and remove do.
 type entryRef struct{ kind, name string }
 
-// validateChoices checks every choice and option (spec chapter 03, Choices,
+// choices checks every choice and option (spec chapter 03, Choices,
 // Validation) and works out what each option does to common. It runs after
-// common itself has been validated.
-func validateChoices(cfg *Config, start, end Month, warns *[]string) error {
+// common itself has been checked.
+func (c *checker) choices(cfg *Config) {
 	choiceSeen := map[string]bool{}
 	owner := map[entryRef]string{} // the choice whose options change or remove the entry
 	for ci, ch := range cfg.Choices {
-		if ch == nil || ch.Name == "" {
-			return fmt.Errorf("choices[%d] has no name", ci)
+		path := join("choices", ci)
+		if ch == nil {
+			c.fail(path, "This choice is empty.")
+			continue
 		}
-		if choiceSeen[ch.Name] {
-			return fmt.Errorf("duplicate choice name %q", ch.Name)
+		switch {
+		case ch.Name == "":
+			c.fail(join(path, "name"), "The choice needs a name.")
+		case choiceSeen[ch.Name]:
+			c.fail(join(path, "name"), "Another choice is already named “%s”. Give each choice its own name.", ch.Name)
 		}
 		choiceSeen[ch.Name] = true
 		if len(ch.Options) == 0 {
-			return fmt.Errorf("choice %q has no options; a choice needs at least one", ch.Name)
+			c.fail(join(path, "options"), "A choice needs at least one option.")
 		}
 		optionSeen := map[string]bool{}
 		for oi, opt := range ch.Options {
-			if opt == nil || opt.Name == "" {
-				return fmt.Errorf("choice %q: options[%d] has no name", ch.Name, oi)
+			p := join(path, "options", oi)
+			if opt == nil {
+				c.fail(p, "This option is empty.")
+				continue
 			}
-			if optionSeen[opt.Name] {
-				return fmt.Errorf("choice %q: duplicate option name %q", ch.Name, opt.Name)
+			switch {
+			case opt.Name == "":
+				c.fail(join(p, "name"), "The option needs a name.")
+			case optionSeen[opt.Name]:
+				c.fail(join(p, "name"), "Another option of this choice is already named “%s”. Give each option its own name.", opt.Name)
 			}
 			optionSeen[opt.Name] = true
-			where := fmt.Sprintf("choice %q, option %q", ch.Name, opt.Name)
-			const noOptimize = "optimize is not allowed on an option's events; put the event in a scenario's own events"
-			if err := validateSection(&opt.Section, where, noOptimize, start, end, warns); err != nil {
-				return err
-			}
-			if err := validateOptionEffects(cfg, ch, opt, where, owner, start, end, warns); err != nil {
-				return err
-			}
+			c.section(&opt.Section, p, "An optimizer cannot be used on an option’s event; put the event in a scenario’s own events.")
+			c.optionEffects(cfg, ch, opt, p, owner)
 		}
 	}
-	return nil
 }
 
-func validateOptionEffects(cfg *Config, ch *Choice, opt *Option, where string, owner map[entryRef]string, start, end Month, warns *[]string) error {
+func (c *checker) optionEffects(cfg *Config, ch *Choice, opt *Option, path string, owner map[entryRef]string) {
 	opt.events.reset()
 	opt.loans.reset()
 	opt.investments.reset()
 
 	touched := map[entryRef]bool{}
 	// claim finds the one common entry of that kind and name and records
-	// that this option changes or removes it.
-	claim := func(action, kind, name string, names []string) (int, error) {
+	// that this option changes or removes it. at is the path of the change
+	// or removal.
+	claim := func(at, action, kind, name string, names []string) (int, bool) {
 		if name == "" {
-			return 0, fmt.Errorf("%s: %s: name the %s to %s; a common %s without a name cannot be changed or removed",
-				where, action, kind, action, kind)
+			c.fail(at, "Name the %s to %s. A baseline %s without a name cannot be changed or removed.", kind, action, kind)
+			return 0, false
 		}
-		at, count := -1, 0
+		found, count := -1, 0
 		for i, n := range names {
 			if n == name {
-				at = i
+				found = i
 				count++
 			}
 		}
 		if count == 0 {
-			return 0, fmt.Errorf("%s: %s: common has no %s named %q", where, action, kind, name)
+			c.fail(at, "The baseline has no %s named “%s”.", kind, name)
+			return 0, false
 		}
 		if count > 1 {
-			return 0, fmt.Errorf("%s: %s: common has %d %ss named %q; give each a name of its own so an option can %s one",
-				where, action, count, kind, name, action)
+			c.fail(at, "The baseline has %d %ss named “%s”. Give each a name of its own so an option can %s one.", count, kind, name, action)
+			return 0, false
 		}
 		ref := entryRef{kind, name}
 		if touched[ref] {
-			return 0, fmt.Errorf("%s: common %s %q is changed or removed more than once", where, kind, name)
+			c.fail(at, "This option changes or removes the baseline %s “%s” more than once.", kind, name)
+			return 0, false
 		}
 		touched[ref] = true
 		if other, ok := owner[ref]; ok && other != ch.Name {
-			return 0, fmt.Errorf("common %s %q is changed or removed by two choices, %q and %q; only the options of one choice can change or remove an entry",
+			c.fail(at, "The baseline %s “%s” is changed or removed by two choices, “%s” and “%s”. Only the options of one choice can change or remove an entry.",
 				kind, name, other, ch.Name)
+			return 0, false
 		}
 		owner[ref] = ch.Name
-		return at, nil
+		return found, true
 	}
 
 	common := &cfg.Common
 	eventNames := make([]string, len(common.Events))
 	for i, ev := range common.Events {
-		eventNames[i] = ev.Name
+		if ev != nil {
+			eventNames[i] = ev.Name
+		}
 	}
 	loanNames := make([]string, len(common.Loans))
 	for i, l := range common.Loans {
-		loanNames[i] = l.Name
+		if l != nil {
+			loanNames[i] = l.Name
+		}
 	}
 	investmentNames := make([]string, len(common.Investments))
 	for i, inv := range common.Investments {
-		investmentNames[i] = inv.Name
+		if inv != nil {
+			investmentNames[i] = inv.Name
+		}
 	}
 
 	if rm := opt.Remove; rm != nil {
-		for _, name := range rm.Events {
-			at, err := claim("remove", "event", name, eventNames)
-			if err != nil {
-				return err
+		for k, name := range rm.Events {
+			if at, ok := claim(join(path, "remove", "events", k), "remove", "event", name, eventNames); ok {
+				opt.events.removed[at] = true
 			}
-			opt.events.removed[at] = true
 		}
-		for _, name := range rm.Loans {
-			at, err := claim("remove", "loan", name, loanNames)
-			if err != nil {
-				return err
+		for k, name := range rm.Loans {
+			if at, ok := claim(join(path, "remove", "loans", k), "remove", "loan", name, loanNames); ok {
+				opt.loans.removed[at] = true
 			}
-			opt.loans.removed[at] = true
 		}
-		for _, name := range rm.Investments {
-			at, err := claim("remove", "investment", name, investmentNames)
-			if err != nil {
-				return err
+		for k, name := range rm.Investments {
+			if at, ok := claim(join(path, "remove", "investments", k), "remove", "investment", name, investmentNames); ok {
+				opt.investments.removed[at] = true
 			}
-			opt.investments.removed[at] = true
 		}
 	}
 
 	if chg := opt.Change; chg != nil {
-		w := where + ": change"
-		const noOptimize = "optimize is not allowed on common events"
-		for _, c := range chg.Events {
-			at, err := claim("change", "event", nameOf(c), eventNames)
-			if err != nil {
-				return err
+		const noOptimize = "An optimizer cannot be used on a baseline event; put the event in a scenario."
+		for k, change := range chg.Events {
+			p := join(path, "change", "events", k)
+			at, ok := claim(p, "change", "event", nameOf(change), eventNames)
+			if !ok {
+				continue
 			}
-			changed, err := applyChange(c, common.Events[at], w, "event", warns, func(ev *Event, warns *[]string) error {
-				return validateEvent(ev, w, at, noOptimize, start, end, warns)
-			})
-			if err != nil {
-				return err
+			if changed := applyChange(c, change, common.Events[at], p, func(c *checker, ev *Event, path string) {
+				c.event(ev, path, noOptimize)
+			}); changed != nil {
+				opt.events.changed[at] = changed
 			}
-			opt.events.changed[at] = changed
 		}
-		for _, c := range chg.Loans {
-			at, err := claim("change", "loan", nameOf(c), loanNames)
-			if err != nil {
-				return err
+		for k, change := range chg.Loans {
+			p := join(path, "change", "loans", k)
+			at, ok := claim(p, "change", "loan", nameOf(change), loanNames)
+			if !ok {
+				continue
 			}
-			changed, err := applyChange(c, common.Loans[at], w, "loan", warns, func(l *Loan, warns *[]string) error {
-				return validateLoan(l, w, at, start, end, warns)
-			})
-			if err != nil {
-				return err
+			if changed := applyChange(c, change, common.Loans[at], p, (*checker).loan); changed != nil {
+				opt.loans.changed[at] = changed
 			}
-			opt.loans.changed[at] = changed
 		}
-		for _, c := range chg.Investments {
-			at, err := claim("change", "investment", nameOf(c), investmentNames)
-			if err != nil {
-				return err
+		for k, change := range chg.Investments {
+			p := join(path, "change", "investments", k)
+			at, ok := claim(p, "change", "investment", nameOf(change), investmentNames)
+			if !ok {
+				continue
 			}
-			changed, err := applyChange(c, common.Investments[at], w, "investment", warns, func(inv *Investment, warns *[]string) error {
-				return validateInvestment(inv, w, at, start, end, warns)
-			})
-			if err != nil {
-				return err
+			if changed := applyChange(c, change, common.Investments[at], p, (*checker).investment); changed != nil {
+				opt.investments.changed[at] = changed
 			}
-			opt.investments.changed[at] = changed
 		}
 	}
-	return nil
 }
 
 func nameOf[T any](c *EntryChange[T]) string {
@@ -395,81 +403,103 @@ func nameOf[T any](c *EntryChange[T]) string {
 	return c.Name
 }
 
-// applyChange builds the changed entry and validates it as changed. A warning
-// the entry raises as written in common is not repeated for its changed form.
-func applyChange[T any](c *EntryChange[T], base *T, where, kind string, warns *[]string, validate func(*T, *[]string) error) (*T, error) {
-	changed, err := c.apply(base)
-	if err != nil {
-		return nil, fmt.Errorf("%s: %s %q: %w", where, kind, c.Name, err)
+// applyChange builds the changed entry and checks it as changed, placing its
+// problems under the change's set. A problem the entry raises as written in
+// common is not repeated for its changed form.
+func applyChange[T any](c *checker, change *EntryChange[T], base *T, path string, check func(*checker, *T, string)) *T {
+	changed, problems := change.apply(base, path)
+	if problems != nil {
+		c.problems = append(c.problems, problems...)
+		return nil
 	}
-	var got []string
-	if err := validate(changed, &got); err != nil {
-		return nil, err
-	}
-	already := map[string]bool{}
-	if unchanged, err := (&EntryChange[T]{Set: yaml.Node{Kind: yaml.MappingNode}}).apply(base); err == nil {
-		var baseWarns []string
-		if validate(unchanged, &baseWarns) == nil {
-			for _, w := range baseWarns {
-				already[w] = true
-			}
+	set := join(path, "set")
+	sub := &checker{start: c.start, end: c.end, window: c.window}
+	check(sub, changed, set)
+
+	already := map[Problem]bool{}
+	if unchanged, problems := (&EntryChange[T]{Set: yaml.Node{Kind: yaml.MappingNode}}).apply(base, path); problems == nil {
+		baseline := &checker{start: c.start, end: c.end, window: c.window}
+		check(baseline, unchanged, set)
+		for _, p := range baseline.problems {
+			already[p] = true
 		}
 	}
-	for _, w := range got {
-		if !already[w] {
-			*warns = append(*warns, w)
+	for _, p := range sub.problems {
+		if !already[p] {
+			c.problems = append(c.problems, p)
 		}
 	}
-	return changed, nil
+	return changed
 }
 
-// resolveScenarios validates each scenario's select and resolves the scenario
+// resolveScenarios checks each scenario's select and resolves the scenario
 // into the two lists the engine simulates (spec chapter 03, Choices,
 // Resolution). Inactive scenarios are resolved and checked like any other.
-func resolveScenarios(cfg *Config) error {
-	for _, sc := range cfg.Scenarios {
+func (c *checker) resolveScenarios(cfg *Config) {
+	for si, sc := range cfg.Scenarios {
+		if sc == nil {
+			continue
+		}
 		if len(cfg.Choices) == 0 && len(sc.Select) == 0 {
 			sc.Resolved, sc.ResolvedShared = sc.Section, cfg.Common
 			continue
 		}
+		path := join("scenarios", si)
 		picked := map[string]string{}
 		for _, sel := range sc.Select {
 			if _, dup := picked[sel.Choice]; dup {
-				return fmt.Errorf("scenario %q: select names the choice %q more than once", sc.Name, sel.Choice)
+				c.fail(join(path, "select"), "The selections name the choice “%s” more than once.", sel.Choice)
+				continue
 			}
 			picked[sel.Choice] = sel.Option
 		}
 
 		var selected []*Option
 		ordered := Select{}
-		for _, ch := range cfg.Choices {
+		complete := true
+		for ci, ch := range cfg.Choices {
+			if ch == nil {
+				complete = false
+				continue
+			}
 			name, ok := picked[ch.Name]
 			if !ok {
-				return fmt.Errorf("scenario %q: select picks no option for the choice %q", sc.Name, ch.Name)
+				c.fail(join(path, "select", ci), "Pick an option for the choice “%s”.", ch.Name)
+				complete = false
+				continue
 			}
 			delete(picked, ch.Name)
 			var opt *Option
-			names := make([]string, len(ch.Options))
-			for i, o := range ch.Options {
-				names[i] = o.Name
+			var names []string
+			for _, o := range ch.Options {
+				if o == nil {
+					continue
+				}
+				names = append(names, o.Name)
 				if o.Name == name {
 					opt = o
 				}
 			}
 			if opt == nil {
-				return fmt.Errorf("scenario %q: the choice %q has no option named %q; its options are: %s",
-					sc.Name, ch.Name, name, strings.Join(names, ", "))
+				c.fail(join(path, "select", ci), "The choice “%s” has no option named “%s”. Its options are: %s.",
+					ch.Name, name, strings.Join(names, ", "))
+				complete = false
+				continue
 			}
 			selected = append(selected, opt)
 			ordered = append(ordered, Selection{Choice: ch.Name, Option: name})
 		}
-		// Whatever is left names no choice of the plan. Report the first as written.
+		// Whatever is left names no choice of the plan, in the order written.
 		for _, sel := range sc.Select {
 			if _, left := picked[sel.Choice]; left {
-				return fmt.Errorf("scenario %q: select names the choice %q, which this plan does not have", sc.Name, sel.Choice)
+				c.fail(join(path, "select"), "The selections name a choice, “%s”, that this plan does not have.", sel.Choice)
+				delete(picked, sel.Choice)
+				complete = false
 			}
 		}
-		sc.Select = ordered
+		if complete {
+			sc.Select = ordered
+		}
 
 		own := sc.Section
 		resolved := Section{
@@ -488,11 +518,14 @@ func resolveScenarios(cfg *Config) error {
 			loanFx = append(loanFx, &opt.loans)
 			invFx = append(invFx, &opt.investments)
 		}
+		// Names repeated within the scenario's own list are already reported there.
 		names := map[string]bool{}
-		for _, inv := range resolved.Investments {
-			if names[inv.Name] {
-				return fmt.Errorf("scenario %q: duplicate investment name %q among its own investments and those its selected options add",
-					sc.Name, inv.Name)
+		for i, inv := range resolved.Investments {
+			if inv == nil || inv.Name == "" {
+				continue
+			}
+			if names[inv.Name] && i >= len(own.Investments) {
+				c.fail(join(path, "investments"), "“%s” names more than one investment among this scenario’s own and those its selected options add. Give each its own name.", inv.Name)
 			}
 			names[inv.Name] = true
 		}
@@ -503,5 +536,4 @@ func resolveScenarios(cfg *Config) error {
 			Investments: applyEffects(cfg.Common.Investments, invFx),
 		}
 	}
-	return nil
 }

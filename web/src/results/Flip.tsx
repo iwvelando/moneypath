@@ -187,15 +187,17 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
               >
                 {outcome.kept ? 'Kept as a scenario' : 'Keep as a scenario'}
               </button>
-              <p
-                ref={keepMessage}
-                role={outcome.keepError ? 'alert' : 'status'}
-                class={outcome.keepError ? 'flip__error' : undefined}
-              >
-                {outcome.keepError ?? (outcome.kept
+              <p role="status">
+                {outcome.kept
                   ? 'Added to your plan. Run the forecast again to see it beside the others.'
-                  : `Adds “${outcome.flip.name}” to your plan. Until then this comparison changes nothing.`)}
+                  : `Adds “${outcome.flip.name}” to your plan. Until then this comparison changes nothing.`}
               </p>
+              {/* Beside what the button does, never in place of it. */}
+              {outcome.keepError ? (
+                <p ref={keepMessage} role="alert" class="flip__error">
+                  {outcome.keepError}
+                </p>
+              ) : null}
             </div>
           </>
         ) : null}

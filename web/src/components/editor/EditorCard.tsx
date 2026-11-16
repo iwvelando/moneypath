@@ -1,5 +1,6 @@
 import type { ComponentChildren } from 'preact';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { PathProblems, useErrorsUnder, usePath } from '../problems';
 import type { EditorSummary } from './summaries';
 
 export interface EditorCardState {
@@ -37,13 +38,17 @@ interface EditorCardProps extends EditorCardState {
   badge?: string;
   actions: ComponentChildren;
   children: ComponentChildren;
+  /** The card says for itself what is wrong with the entry as a whole. */
+  ownNote?: boolean;
 }
 
-export function EditorCard({ id, title, summary, badge, actions, children, open, autoFocus, onOpenChange }: EditorCardProps) {
+export function EditorCard({ id, title, summary, badge, actions, children, open, autoFocus, onOpenChange, ownNote = false }: EditorCardProps) {
   const root = useRef<HTMLLIElement>(null);
   const toggle = useRef<HTMLButtonElement>(null);
   const bodyId = `${id}-fields`;
-  const description = `${id}-summary ${id}-detail${summary.attention ? ` ${id}-attention` : ''}`;
+  // Anything wrong inside the entry is signposted on its summary, open or not.
+  const attention = useErrorsUnder(usePath()) || summary.attention;
+  const description = `${id}-summary ${id}-detail${attention ? ` ${id}-attention` : ''}`;
   useLayoutEffect(() => {
     if (!autoFocus) return;
     root.current?.scrollIntoView?.({ block: 'start' });
@@ -67,7 +72,7 @@ export function EditorCard({ id, title, summary, badge, actions, children, open,
             <span class="editor-card__title">{title}</span>
             <span class="editor-card__summary" id={`${id}-summary`}>{summary.primary}</span>
             <span class="editor-card__detail" id={`${id}-detail`}>{summary.detail}</span>
-            {summary.attention ? <span class="editor-card__notice" id={`${id}-attention`}>Check details</span> : null}
+            {attention ? <span class="editor-card__notice" id={`${id}-attention`}>Check details</span> : null}
             {badge ? <span class="editor-card__badge">{badge}</span> : null}
           </span>
           <span class="editor-card__affordance" aria-hidden="true">
@@ -78,6 +83,7 @@ export function EditorCard({ id, title, summary, badge, actions, children, open,
       {/* Keep fields mounted so collapsing never discards a field's draft. */}
       <div class="editor-card__body" id={bodyId} hidden={!open}>
         <div class="row-card__actions editor-card__actions">{actions}</div>
+        <PathProblems quiet={ownNote} />
         {children}
         <div class="editor-card__footer">
           <button type="button" class="btn btn--quiet" onClick={() => {

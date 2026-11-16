@@ -1,5 +1,5 @@
 import type { ComponentChildren } from 'preact';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { addChoice, linkTargets, removeChoice } from '../config/choices';
 import { HELP } from '../config/help';
 import {
@@ -21,6 +21,8 @@ import { findOptimizers, type OptimizerRef } from '../config/optimizers';
 import { CheckField, MonthField, NumberField, SelectField, TextField } from './fields';
 import { IconBranch, IconChoice, IconLayers, IconSliders } from './icons';
 import { OptimizerControl } from './OptimizerControl';
+import { At, PathProblems, Problems } from './problems';
+import { problemText, type Problem } from '../engine/types';
 import { EventList } from './editor/EventList';
 import { InvestmentList } from './editor/InvestmentList';
 import { LoanList } from './editor/LoanList';
@@ -84,7 +86,12 @@ interface WorkspaceProps {
   onOptimizerEnabledChange: (value: boolean) => void;
   running: boolean;
   canRun: boolean;
-  /** Shown in the pinned bar: a run starts here, so its failure belongs here. */
+  /**
+   * A run was asked for while the plan still has errors. The pinned bar then
+   * counts them and leads to the first; each one is under its own field.
+   */
+  blocked?: boolean;
+  /** A run that failed for a reason no field accounts for. A run starts in the bar, so it is said here. */
   runError: string | null;
   onRun: () => void;
 }
@@ -96,6 +103,7 @@ export function Workspace({
   onOptimizerEnabledChange,
   running,
   canRun,
+  blocked = false,
   runError,
   onRun,
 }: WorkspaceProps) {
@@ -122,6 +130,46 @@ export function Workspace({
     observer.observe(bar);
     return () => observer.disconnect();
   }, []);
+
+  const problems = useContext(Problems);
+  const errors = useMemo(() => problems.all.filter((problem) => problem.level === 'error'), [problems]);
+  // An error with no field of its own on the page is spelled out in the bar,
+  // so it is never counted without being shown.
+  const [unplaced, setUnplaced] = useState<readonly Problem[]>([]);
+  useLayoutEffect(() => {
+    if (!blocked) return;
+    const placed = new Set(
+      Array.from(workspaceRef.current?.querySelectorAll('[data-path]') ?? [], (element) =>
+        element.getAttribute('data-path'),
+      ),
+    );
+    const next = errors.filter((problem) => !placed.has(problem.path));
+    setUnplaced((current) =>
+      current.length === next.length && current.every((problem, index) => problem === next[index]) ? current : next,
+    );
+  }, [blocked, errors]);
+
+  /** Opens whatever holds the first error on the page and goes to its field. */
+  const showFirstError = () => {
+    const paths = new Set(errors.map((problem) => problem.path));
+    const target = Array.from(workspaceRef.current?.querySelectorAll<HTMLElement>('[data-path]') ?? []).find(
+      (element) => paths.has(element.dataset['path'] ?? ''),
+    );
+    if (!target) return;
+    for (
+      let card = target.closest('.editor-card');
+      card;
+      card = card.parentElement?.closest('.editor-card') ?? null
+    ) {
+      card.dispatchEvent(new Event('editor:reveal'));
+    }
+    // Once the cards have opened.
+    window.setTimeout(() => {
+      const gently = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      target.scrollIntoView?.({ behavior: gently ? 'smooth' : 'auto', block: 'center' });
+      (target.querySelector<HTMLElement>('input, select') ?? target).focus({ preventScroll: true });
+    }, 0);
+  };
 
   const [openPanel, setOpenPanel] = useState<'sections' | 'optimizer' | null>(null);
   const [highlightId, setHighlightId] = useState<string | null>(null);
@@ -295,9 +343,31 @@ export function Workspace({
             {running ? 'Running…' : 'Run Forecast'}
           </button>
         </div>
-        {runError ? (
+        {blocked && errors.length > 0 ? (
+          <div class="workbar__error" role="alert">
+            <p>
+              <strong>
+                {errors.length === 1
+                  ? 'One thing in your plan needs fixing before the forecast can run.'
+                  : `${errors.length} things in your plan need fixing before the forecast can run.`}
+              </strong>{' '}
+              {errors.length > unplaced.length ? (
+                <button type="button" class="btn btn--small" onClick={showFirstError}>
+                  {errors.length === 1 ? 'Show it' : 'Show the first'}
+                </button>
+              ) : null}
+            </p>
+            {unplaced.length > 0 ? (
+              <ul>
+                {unplaced.map((problem) => (
+                  <li key={`${problem.path} ${problem.message}`}>{problemText(problem)}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : runError ? (
           <p class="workbar__error" role="alert">
-            <strong>The engine could not run this config.</strong> {runError}
+            <strong>The forecast could not be run.</strong> {runError}
           </p>
         ) : null}
       </div>
@@ -404,13 +474,16 @@ export function Workspace({
         icon={<IconSliders />}
       >
         <div class="field-grid">
+          <At path="simulation">
           <MonthField
+            field="startDate"
             label="Start month"
             help={HELP.startDate}
             value={config.simulation.startDate}
             onChange={(startDate) => patchSimulation({ startDate })}
           />
           <MonthField
+            field="endDate"
             label="End month"
             help={HELP.endDate}
             value={config.simulation.endDate}
@@ -418,6 +491,7 @@ export function Workspace({
             onChange={(endDate) => patchSimulation({ endDate })}
           />
           <NumberField
+            field="startingCash"
             label="Starting cash"
             help={HELP.startingCash}
             value={config.simulation.startingCash}
@@ -426,6 +500,7 @@ export function Workspace({
             onChange={(startingCash) => patchSimulation({ startingCash })}
           />
           <NumberField
+            field="cashInterestRate"
             label="Cash interest rate"
             help={HELP.cashInterestRate}
             value={config.simulation.cashInterestRate}
@@ -434,7 +509,10 @@ export function Workspace({
             suffix="% / yr"
             onChange={(cashInterestRate) => patchSimulation({ cashInterestRate })}
           />
+          </At>
+          <At path="recommendations">
           <NumberField
+            field="emergencyFundMonths"
             label="Emergency fund months"
             help={HELP.emergencyFundMonths}
             value={config.simulation.emergencyFundMonths}
@@ -443,6 +521,7 @@ export function Workspace({
             suffix="months"
             onChange={(emergencyFundMonths) => patchSimulation({ emergencyFundMonths })}
           />
+          </At>
         </div>
       </Section>
 
@@ -453,6 +532,7 @@ export function Workspace({
         highlighted={highlightId === 'section-common'}
         icon={<IconLayers />}
       >
+        <At path="common">
         <EventList
           title="Events"
           description="Positive amounts are income, negative amounts are spending."
@@ -472,6 +552,7 @@ export function Workspace({
           simulation={config.simulation}
           onChange={(investments) => patchCommon({ investments })}
         />
+        </At>
       </Section>
 
       <Section
@@ -534,8 +615,10 @@ export function Workspace({
               </div>
             }
           >
+            <At path={`choices.${index}`}>
             <div class="field-grid">
               <TextField
+                field="name"
                 label="Choice name"
                 help={HELP.choiceName}
                 value={choice.name}
@@ -545,6 +628,7 @@ export function Workspace({
               />
             </div>
             <OptionList config={config} choice={choice} onChange={onChange} />
+            </At>
           </Section>
         );
       })}
@@ -630,8 +714,10 @@ export function Workspace({
               </div>
             }
           >
+            <At path={`scenarios.${index}`}>
             <div class="field-grid">
               <TextField
+                field="name"
                 label="Scenario name"
                 help={HELP.scenarioName}
                 value={scenario.name}
@@ -655,6 +741,7 @@ export function Workspace({
                     return (
                       <SelectField<string>
                         key={choice.id}
+                        field={`select.${choiceIndex}`}
                         label={choice.name.trim() || `Choice ${choiceIndex + 1}`}
                         help={HELP.selection}
                         value={choice.options.some((option) => option.id === picked) ? picked! : ''}
@@ -691,11 +778,13 @@ export function Workspace({
               simulation={config.simulation}
               onChange={(loans) => patch({ loans })}
             />
+            <PathProblems field="investments" />
             <InvestmentList
               investments={scenario.investments}
               simulation={config.simulation}
               onChange={(investments) => patch({ investments })}
             />
+            </At>
           </Section>
         );
       })}

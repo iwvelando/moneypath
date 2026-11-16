@@ -2,6 +2,7 @@ package app
 
 import (
 	"encoding/json"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -264,8 +265,44 @@ func TestRunForecastRefusesAFinanceForecastPlan(t *testing.T) {
 	if err == nil {
 		t.Fatal("a finance-forecast plan was forecast")
 	}
-	want := "this file has no 'version' field, so it is not a moneypath plan; plans in the older finance-forecast format are no longer converted"
+	want := "This file has no version, so it is not a moneypath plan. Plans in the older finance-forecast format are no longer converted."
 	if err.Error() != want {
 		t.Errorf("error = %q, want %q", err, want)
+	}
+}
+
+// Spec chapter 02, Problems JSON: every problem of the plan, each with its
+// level, path, place in words and sentence; an empty list for a sound plan.
+func TestProblemsJSON(t *testing.T) {
+	now, err := config.ParseMonth("2025-01")
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc := "version: 2\nsimulation: {endDate: 2030-01}\n" +
+		"common: {investments: [{name: Brokerage, withdrawalTaxRate: -1, taxRate: 100}]}\nscenarios: [{name: a}]\n"
+	var got struct {
+		Problems []map[string]string `json:"problems"`
+	}
+	if err := json.Unmarshal(ProblemsJSON([]byte(doc), now), &got); err != nil {
+		t.Fatal(err)
+	}
+	want := []map[string]string{
+		{"level": "warning", "path": "simulation.startingCash", "where": "Simulation",
+			"message": "No starting cash is given, so the plan starts with 0.00."},
+		{"level": "error", "path": "common.investments.0.taxRate", "where": "Baseline, investment “Brokerage”",
+			"message": "The growth tax rate must be at least 0 and less than 100."},
+		{"level": "error", "path": "common.investments.0.withdrawalTaxRate", "where": "Baseline, investment “Brokerage”",
+			"message": "The withdrawal tax rate must be at least 0 and less than 100."},
+	}
+	if !reflect.DeepEqual(got.Problems, want) {
+		t.Errorf("problems = %v\nwant %v", got.Problems, want)
+	}
+
+	sound := "version: 2\nsimulation: {endDate: 2030-01, startingCash: 0}\nscenarios: [{name: a}]\n"
+	if out := string(ProblemsJSON([]byte(sound), now)); out != `{"problems":[]}` {
+		t.Errorf("a sound plan gives %s, want an empty list", out)
+	}
+	if out := string(ProblemsJSON([]byte("version: [2\n"), now)); !strings.Contains(out, `"level":"error"`) {
+		t.Errorf("an unreadable file gives %s, want one error", out)
 	}
 }

@@ -48,12 +48,12 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 		active = append(active, sc.Name)
 	}
 	if original == nil {
-		return nil, fmt.Errorf("%q is not an active scenario in this plan; the active scenarios are: %s",
+		return nil, fmt.Errorf("“%s” is not an active scenario in this plan. The active scenarios are: %s.",
 			fl.Scenario, strings.Join(active, ", "))
 	}
 
 	if len(f.Config.Choices) == 0 {
-		return nil, fmt.Errorf("this plan has no choices, so there is nothing to flip")
+		return nil, fmt.Errorf("This plan has no choices, so there is nothing to flip.")
 	}
 	var choice *config.Choice
 	choices := make([]string, len(f.Config.Choices))
@@ -64,7 +64,7 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 		}
 	}
 	if choice == nil {
-		return nil, fmt.Errorf("this plan has no choice named %q; its choices are: %s",
+		return nil, fmt.Errorf("This plan has no choice named “%s”. Its choices are: %s.",
 			fl.Choice, strings.Join(choices, ", "))
 	}
 	found := false
@@ -74,7 +74,7 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 		found = found || opt.Name == fl.Option
 	}
 	if !found {
-		return nil, fmt.Errorf("the choice %q has no option named %q; its options are: %s",
+		return nil, fmt.Errorf("The choice “%s” has no option named “%s”. Its options are: %s.",
 			fl.Choice, fl.Option, strings.Join(options, ", "))
 	}
 
@@ -96,7 +96,7 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 			continue
 		}
 		if sel.Option == fl.Option {
-			return nil, fmt.Errorf("scenario %q already takes %q for the choice %q; name another of its options",
+			return nil, fmt.Errorf("The scenario “%s” already takes “%s” for the choice “%s”. Pick another of its options.",
 				fl.Scenario, fl.Option, fl.Choice)
 		}
 		flipped.Select[i].Option = fl.Option
@@ -105,7 +105,7 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 	cfg.Scenarios = []*config.Scenario{flipped}
 
 	invalid := func(err error) error {
-		return fmt.Errorf("with %q for the choice %q: %w", fl.Option, fl.Choice, err)
+		return fmt.Errorf("With “%s” for the choice “%s”, this path cannot be run. %w", fl.Option, fl.Choice, err)
 	}
 	if _, err := config.Validate(cfg, in.Now); err != nil {
 		return nil, invalid(err)

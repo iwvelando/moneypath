@@ -236,67 +236,67 @@ func TestChoiceErrors(t *testing.T) {
 	}{
 		{"choice without a name",
 			with(t, "- name: Job\n", "- options:\n      - name: X\n  - name: Job\n"),
-			[]string{"choices[1]", "no name"}},
+			[]string{"Choice 2", "needs a name"}},
 		{"repeated choice name",
 			with(t, "- name: Job\n", "- name: Housing\n"),
-			[]string{"duplicate choice name", `"Housing"`}},
+			[]string{"already named", "“Housing”"}},
 		{"choice with no options",
 			with(t, "- name: Job\n", "- name: Empty\n  - name: Job\n"),
-			[]string{`choice "Empty"`, "no options"}},
+			[]string{"Choice “Empty”", "at least one option"}},
 		{"option without a name",
 			with(t, "- name: Stay\n", "- events: []\n"),
-			[]string{`choice "Job"`, "options[0]", "no name"}},
+			[]string{"Choice “Job”", "option 1", "needs a name"}},
 		{"repeated option name",
 			with(t, "- name: Stay\n", "- name: Leave\n"),
-			[]string{`choice "Job"`, "duplicate option name", `"Leave"`}},
+			[]string{"Choice “Job”", "already named", "“Leave”"}},
 		{"scenario picks nothing for a choice",
 			with(t, "{Housing: Sell, Job: Leave}", "{Housing: Sell}"),
-			[]string{`scenario "one"`, "picks no option", `"Job"`}},
+			[]string{"Scenario “one”", "Pick an option", "“Job”"}},
 		{"scenario has no select at all",
 			with(t, "    select: {Housing: Sell, Job: Leave}\n", ""),
-			[]string{`scenario "one"`, "picks no option", `"Housing"`}},
+			[]string{"Scenario “one”", "Pick an option", "“Housing”"}},
 		{"scenario names an unknown choice",
 			with(t, "{Housing: Sell, Job: Leave}", "{Housing: Sell, Job: Leave, Car: Buy}"),
-			[]string{`scenario "one"`, `"Car"`, "does not have"}},
+			[]string{"Scenario “one”", "“Car”", "does not have"}},
 		{"scenario names an unknown option",
 			with(t, "{Housing: Sell, Job: Leave}", "{Housing: Sell, Job: Freelance}"),
-			[]string{`scenario "one"`, `choice "Job"`, `"Freelance"`, "Stay", "Leave"}},
+			[]string{"Scenario “one”", "choice “Job”", "“Freelance”", "Stay", "Leave"}},
 		{"scenario names a choice twice",
 			with(t, "{Housing: Sell, Job: Leave}", "{Housing: Sell, Job: Leave, Housing: Keep}"),
-			[]string{`"Housing"`, "more than once"}},
+			[]string{"“Housing”", "more than once"}},
 		{"remove target the baseline lacks",
 			with(t, "- name: Leave\n", "- name: Leave\n        remove: {events: [Salery]}\n"),
-			[]string{`choice "Job"`, `option "Leave"`, "common has no event", `"Salery"`}},
+			[]string{"Choice “Job”", "option “Leave”", "The baseline has no event", "“Salery”"}},
 		{"change target the baseline lacks",
 			with(t, "- name: Leave\n", "- name: Leave\n        change: {loans: [{name: Morgage, set: {term: 12}}]}\n"),
-			[]string{`choice "Job"`, `option "Leave"`, "common has no loan", `"Morgage"`}},
+			[]string{"Choice “Job”", "option “Leave”", "The baseline has no loan", "“Morgage”"}},
 		{"unnamed target",
 			with(t, "- name: Leave\n", "- name: Leave\n        remove: {events: [\"\"]}\n"),
-			[]string{`choice "Job"`, `option "Leave"`, "name"}},
+			[]string{"Choice “Job”", "option “Leave”", "Name the event"}},
 		{"entry changed and removed in one option",
 			with(t, "- name: Leave\n", "- name: Leave\n        remove: {events: [Gym]}\n        change: {events: [{name: Gym, set: {amount: -10}}]}\n"),
-			[]string{`choice "Job"`, `option "Leave"`, `event "Gym"`, "more than once"}},
+			[]string{"Choice “Job”", "option “Leave”", "event “Gym”", "more than once"}},
 		{"entry removed twice in one option",
 			with(t, "- name: Leave\n", "- name: Leave\n        remove: {events: [Gym, Gym]}\n"),
-			[]string{`choice "Job"`, `option "Leave"`, `event "Gym"`, "more than once"}},
+			[]string{"Choice “Job”", "option “Leave”", "event “Gym”", "more than once"}},
 		{"optimize on an option's event",
 			with(t, "[{name: Rent, amount: -1900}]", "[{name: Rent, amount: -1900, optimize: {field: amount, min: -2000, max: 0}}]"),
-			[]string{`choice "Housing"`, `option "Sell"`, `"Rent"`, "optimize is not allowed"}},
+			[]string{"Choice “Housing”", "option “Sell”", "“Rent”", "optimizer cannot be used"}},
 		{"set names the entry",
 			with(t, "- name: Leave\n", "- name: Leave\n        change: {events: [{name: Gym, set: {name: Club}}]}\n"),
-			[]string{`choice "Job"`, `option "Leave"`, `event "Gym"`, "name cannot be set"}},
+			[]string{"Choice “Job”", "option “Leave”", "event “Gym”", "cannot rename"}},
 		{"set carries optimize",
 			with(t, "- name: Leave\n", "- name: Leave\n        change: {events: [{name: Gym, set: {optimize: {field: amount, min: -1, max: 0}}}]}\n"),
-			[]string{`choice "Job"`, `option "Leave"`, `event "Gym"`, "optimize cannot be set"}},
+			[]string{"Choice “Job”", "option “Leave”", "event “Gym”", "cannot add an optimizer"}},
 		{"change without set",
 			with(t, "- name: Leave\n", "- name: Leave\n        change: {events: [{name: Gym}]}\n"),
-			[]string{`choice "Job"`, `option "Leave"`, `event "Gym"`, "set"}},
+			[]string{"Choice “Job”", "option “Leave”", "event “Gym”", "which fields to change"}},
 		{"an added entry breaks an entry rule",
 			with(t, "[{name: Freelance, amount: 6000}]", "[{name: Freelance}]"),
-			[]string{`choice "Job"`, `option "Leave"`, `"Freelance"`, "amount is required"}},
+			[]string{"Choice “Job”", "option “Leave”", "“Freelance”", "amount is required"}},
 		{"a set of the wrong type",
 			with(t, "- name: Leave\n", "- name: Leave\n        change: {loans: [{name: Mortgage, set: {term: soon}}]}\n"),
-			[]string{`choice "Job"`, `option "Leave"`, `loan "Mortgage"`}},
+			[]string{"Choice “Job”", "option “Leave”", "loan “Mortgage”", "whole number"}},
 		{"select is not a mapping",
 			with(t, "{Housing: Sell, Job: Leave}", "[Sell, Leave]"),
 			[]string{"select"}},
@@ -327,7 +327,7 @@ func TestTargetTheBaselineHasTwiceIsRefused(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	for _, w := range []string{`choice "Job"`, `option "Leave"`, "2 events", `"Gym"`} {
+	for _, w := range []string{"Choice “Job”", "option “Leave”", "2 events", "“Gym”"} {
 		if !strings.Contains(err.Error(), w) {
 			t.Errorf("error %q should mention %q", err, w)
 		}
@@ -345,7 +345,7 @@ func TestEntryChangedByTwoChoicesIsRefused(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	for _, w := range []string{`loan "Mortgage"`, "two choices", `"Housing"`, `"Job"`} {
+	for _, w := range []string{"loan “Mortgage”", "two choices", "“Housing”", "“Job”"} {
 		if !strings.Contains(err.Error(), w) {
 			t.Errorf("error %q should mention %q", err, w)
 		}
@@ -367,7 +367,7 @@ func TestChangedEntryIsValidatedEvenWhenUnselected(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error: the scenario selects Leave, but Stay is broken")
 	}
-	for _, w := range []string{`choice "Job"`, `option "Stay"`, `loan "Mortgage"`, "term"} {
+	for _, w := range []string{"Choice “Job”", "option “Stay”", "loan “Mortgage”", "term"} {
 		if !strings.Contains(err.Error(), w) {
 			t.Errorf("error %q should mention %q", err, w)
 		}
@@ -382,8 +382,8 @@ func TestSetValueIsQuotedAsWritten(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error: a payoff date names a month, not a day")
 	}
-	if !strings.Contains(err.Error(), `"2027-06-15"`) {
-		t.Errorf("error %q should quote the date as written, \"2027-06-15\"", err)
+	if !strings.Contains(err.Error(), "“2027-06-15”") {
+		t.Errorf("error %q should quote the date as written, “2027-06-15”", err)
 	}
 }
 
@@ -397,7 +397,7 @@ func TestInvestmentNamesAreUniqueInAResolvedScenario(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	for _, w := range []string{`scenario "one"`, "duplicate investment name", `"Fund"`} {
+	for _, w := range []string{"Scenario “one”", "more than one investment", "“Fund”"} {
 		if !strings.Contains(err.Error(), w) {
 			t.Errorf("error %q should mention %q", err, w)
 		}
@@ -406,7 +406,7 @@ func TestInvestmentNamesAreUniqueInAResolvedScenario(t *testing.T) {
 	// An inactive scenario is resolved and checked like any other.
 	inactive := strings.Replace(doc, "  - name: one\n", "  - name: one\n    active: false\n", 1) +
 		"  - name: two\n    select: {Housing: Keep, Job: Stay}\n"
-	if _, _, err := load(t, inactive); err == nil || !strings.Contains(err.Error(), `scenario "one"`) {
+	if _, _, err := load(t, inactive); err == nil || !strings.Contains(err.Error(), "Scenario “one”") {
 		t.Errorf("an inactive scenario is still validated; got %v", err)
 	}
 
@@ -433,19 +433,19 @@ func TestChoiceWarnings(t *testing.T) {
 	_, warns := mustLoad(t, doc)
 	joined := strings.Join(warns, "\n")
 	for _, w := range []string{
-		`choice "Housing", option "Sell": event "Rent": ends after the simulation end`,
-		`choice "Job", option "Leave": change: loan "Mortgage": sellProperty has no effect`,
-		`unknown key "choices[1].options[1].colour"`,
-		`unknown key "choices[1].options[1].change.loans[0].set.intrestRate"`,
+		"Choice “Housing”, option “Sell”, event “Rent”: This ends after the simulation does",
+		"Choice “Job”, option “Leave”, changed loan “Mortgage”: Selling the property has no effect",
+		"Choice “Job”, option “Leave”: “colour” is not a setting moneypath knows",
+		"Choice “Job”, option “Leave”, changed loan “Mortgage”: “intrestRate” is not a setting moneypath knows",
 	} {
 		if !strings.Contains(joined, w) {
 			t.Errorf("warnings should include %q; got:\n%s", w, joined)
 		}
 	}
-	if n := strings.Count(joined, "mortgageInsurance without mortgageInsuranceCutoff"); n != 1 {
+	if n := strings.Count(joined, "With no cutoff, the mortgage insurance"); n != 1 {
 		t.Errorf("the baseline's own warning should appear once, not %d times:\n%s", n, joined)
 	}
-	if strings.Contains(joined, "select") {
+	if strings.Contains(joined, "select”") {
 		t.Errorf("select must not raise unknown-key warnings:\n%s", joined)
 	}
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { decodeForecast } from './bridge';
+import { decodeForecast, decodeProblems } from './bridge';
 
 const base = { version: 'v', scenarios: ['a', 'b'], rows: [], csv: '', metrics: [{}, {}], warnings: [], configYaml: '' };
 
@@ -26,5 +26,25 @@ describe('decoding a forecast', () => {
     };
     expect(decodeForecast(JSON.stringify({ ...base, flip })).flip).toEqual(flip);
     expect(decodeForecast(JSON.stringify(base)).flip).toBeNull();
+  });
+});
+
+describe('decoding problems', () => {
+  it('keeps each problem the engine reported', () => {
+    const problems = [
+      { level: 'error', path: 'common.loans.0.term', where: 'Baseline, loan “Car”', message: 'The term must be 1 month or more.' },
+      { level: 'warning', path: 'simulation.startingCash', where: 'Simulation', message: 'No starting cash is given.' },
+    ];
+    expect(decodeProblems(JSON.stringify({ problems }))).toEqual(problems);
+  });
+
+  it('reads a reply without problems as none', () => {
+    expect(decodeProblems('{"problems":[]}')).toEqual([]);
+    expect(decodeProblems('{}')).toEqual([]);
+  });
+
+  it('refuses a reply it cannot read, and an engine error', () => {
+    expect(() => decodeProblems('nope')).toThrow();
+    expect(() => decodeProblems('{"error":"bad options"}')).toThrow('bad options');
   });
 });

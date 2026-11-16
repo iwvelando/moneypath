@@ -227,13 +227,16 @@ export function loadEditorState(): RestoreOutcome {
   return decodeEditorState(store.getItem(KEYS.editorState));
 }
 
-export function saveEditorState(config: ConfigModel): void {
+/** Saves the draft, and says whether it was saved: storage can be full, or denied. */
+export function saveEditorState(config: ConfigModel): boolean {
   const store = storage();
-  if (!store) return;
+  if (!store) return false;
   try {
     store.setItem(KEYS.editorState, encodeEditorState(config));
+    return true;
   } catch {
     // Quota or disabled storage — persistence is optional to the engine.
+    return false;
   }
 }
 

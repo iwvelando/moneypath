@@ -1,6 +1,6 @@
 # 02 — Architecture
 
-*Status: **Mixed** — the sections marked normative (Results JSON, Determinism) are
+*Status: **Mixed** — the sections marked normative (Results JSON, Problems JSON, Determinism) are
 Contract; the rest is descriptive. See SPEC.md.*
 
 ## Shape
@@ -54,7 +54,46 @@ The WASM module exposes to JavaScript (names normative):
   Options also accept `"flip"`, `{"scenario": "…", "choice": "…", "option": "…"}`, which
   asks for the comparison described under `flip` below. A flip that cannot be made
   returns `{"error": "..."}` and no results.
+- `moneypathValidate(configYAML string, optionsJSON string) → string` — parses and
+  validates the config without running it and returns the **problems JSON** below. It
+  never returns `{"error": "..."}` for a config it could read as text: a config that
+  cannot be parsed is itself one problem. Options accept `"now"` as above.
 - `moneypathVersion() → string` — the build version string.
+
+### Problems JSON (normative shape)
+
+```json
+{"problems": [
+  {"level": "error",
+   "path": "common.investments.0.withdrawalTaxRate",
+   "where": "Baseline, investment “Brokerage”",
+   "message": "The withdrawal tax rate must be at least 0 and less than 100."},
+  {"level": "warning",
+   "path": "scenarios.1.events.0.endDate",
+   "where": "Scenario “rent”, event “Bonus”",
+   "message": "This ends after the simulation does (2030-01), so the later months are not counted."}
+]}
+```
+
+`problems` holds **every** rule of chapter 03 the config breaks, not only the first, and
+every warning; it is empty for a config with neither. Each entry has:
+
+- `level` — `error` (the config cannot be run) or `warning` (it can).
+- `path` — the field the problem is about, as its place in the config document: keys
+  joined by `.`, with a list entry given by its zero-based position. A scenario's pick for
+  a choice is `scenarios.<i>.select.<j>`, where `j` is the choice's position in `choices`.
+  A problem with a baseline entry as an option changes it is placed under that change's
+  `set` (`choices.<i>.options.<j>.change.loans.<k>.set.term`), whether or not `set` lists
+  the field. `path` names the entry or list when no single field is at fault, and is
+  empty when the problem is with the document as a whole.
+- `where` — the same place in words a reader of the app knows (`common` is "Baseline"; an
+  entry is named, or numbered from 1 when it has no name). Empty when `path` is.
+- `message` — one complete sentence that states the rule without repeating the place.
+  It uses no config key, no index and no comparison symbols.
+
+`moneypathForecast` reports the same problems as text: its `error` is the first
+`error` problem and each of its `warnings` is one `warning` problem, written
+`<where>: <message>`, or `<message>` alone when `where` is empty.
 
 ### Results JSON (normative shape)
 

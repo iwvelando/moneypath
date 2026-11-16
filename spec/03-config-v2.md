@@ -30,6 +30,11 @@ with choices.
   for these fields SHOULD name the convention.
 - Unknown top-level or nested keys SHOULD produce a validation warning naming the key
   (catches typos), but MUST NOT be a hard error.
+- **Whole numbers** (`version`, `frequency`, `term`, `maxIterations`) take no fraction:
+  `1.5` where a whole number belongs is a validation error, never rounded.
+- **Validation reports everything it finds.** Every rule below that a config breaks is
+  reported, each with the field it concerns, not only the first (chapter 02, "Problems
+  JSON"). A config with any hard error is not run.
 
 ## Top level
 
@@ -287,8 +292,8 @@ Hard errors:
 
 Warnings: the existing ones, each naming the choice and option it concerns. An unknown
 key inside `set` is warned about like any other. A warning that a baseline entry
-already raises as written in `common` is not repeated for its changed form. An option
-that no scenario selects is not warned about.
+already raises as written in `common` is not repeated for its changed form, and
+neither is a hard error. An option that no scenario selects is not warned about.
 
 ### Canonical form
 
