@@ -1,5 +1,5 @@
-// Package money holds the currency display format shared by the pretty
-// renderer and the optimizer's display values (spec chapter 05).
+// Package money holds the currency formats: the plain two-decimal form of
+// the CSV (spec chapter 05) and the display form of the optimizer's values.
 package money
 
 import (

@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { expect, type Page } from '@playwright/test';
 
@@ -44,4 +45,26 @@ export async function uploadChoices(page: Page): Promise<void> {
     buffer: readFileSync(CHOICES_EXAMPLE),
   });
   await expect(page.getByRole('heading', { name: 'Housing', exact: true })).toBeVisible();
+}
+
+/**
+ * A plan file fed straight to the built engine, outside the browser and past
+ * the editor: what the app should show for the same file. Returns the engine's
+ * results JSON. Needs the engine `make dist` built.
+ */
+export function engineForecast(configPath: string, options: object = {}): Record<string, unknown> {
+  const raw = execFileSync(
+    'node',
+    [
+      '../scripts/parity_harness.cjs',
+      'src/vendor/wasm_exec.js',
+      'src/engine/moneypath.wasm',
+      configPath,
+      JSON.stringify(options),
+    ],
+    { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 },
+  );
+  const results = JSON.parse(raw) as Record<string, unknown>;
+  if (typeof results['error'] === 'string') throw new Error(results['error']);
+  return results;
 }

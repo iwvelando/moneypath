@@ -12,7 +12,7 @@ import { keepFlippedScenario } from './config/choices';
 import { currentMonth } from './config/month';
 import { fromConfigDocument, refreshIds, toConfigYaml } from './config/serialize';
 import { starterConfig } from './config/starter';
-import { parseMigratedYaml, planUpload } from './config/upload';
+import { planUpload } from './config/upload';
 import type { ConfigModel } from './config/types';
 import { loadEngine, type EngineStatus } from './engine';
 import { EngineError, type FlipComparison, type FlipRequest, type ForecastResults } from './engine/types';
@@ -276,40 +276,11 @@ export function App() {
         return;
       }
 
-      if (plan.action === 'load') {
-        setConfig(refreshIds(fromConfigDocument(plan.document)));
-        setBusyLabel(`Loaded ${file.name}.`);
-        pushNotice('info', `Loaded ${file.name} into the editor.`);
-        return;
-      }
-
-      if (!engine) {
-        setBusyLabel(null);
-        pushNotice('error', 'That looks like a legacy config, but the engine is not available to migrate it.');
-        return;
-      }
-
-      setRunning(true);
-      setBusyLabel('Migrating a legacy config…');
-      try {
-        const migrated = await engine.migrate(text);
-        setConfig(refreshIds(fromConfigDocument(parseMigratedYaml(migrated.configYaml))));
-        pushNotice('info', plan.reason);
-        for (const notice of migrated.notices) pushNotice('warn', `Migration notice: ${notice}`);
-        setBusyLabel(`Migrated ${file.name}.`);
-      } catch (error) {
-        setBusyLabel(null);
-        pushNotice(
-          'error',
-          error instanceof EngineError
-            ? `Migration failed: ${error.message}`
-            : `Migration failed: ${String(error)}`,
-        );
-      } finally {
-        setRunning(false);
-      }
+      setConfig(refreshIds(fromConfigDocument(plan.document)));
+      setBusyLabel(`Loaded ${file.name}.`);
+      pushNotice('info', `Loaded ${file.name} into the editor.`);
     },
-    [engine, pushNotice],
+    [pushNotice],
   );
 
   const resetConfig = useCallback(() => {

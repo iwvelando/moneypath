@@ -3,17 +3,17 @@
 ## Ground rules
 
 - `SPEC.md` and `spec/` record which behaviors are deliberate. Chapters carry a
-  **status** (Contract / Descriptive / Frozen / Reference) stated in their first
+  **status** (Contract / Descriptive / Reference) stated in their first
   line — read `SPEC.md`, "How these chapters are maintained", before changing a
   chapter or the behavior it covers.
-  - **Contract** (03 config format, 04 engine semantics, 02's normative sections):
+  - **Contract** (01 product, 03 config format, 04 engine semantics, 05 CSV download,
+    02's normative sections):
     change the chapter *before* the code, in the same commit as the fixtures that
     pin the new behavior, and say so in the commit message.
-  - **Descriptive** (05 CLI, 06 web UI): change the code, then update the chapter in
+  - **Descriptive** (06 web UI): change the code, then update the chapter in
     the same commit if it still claims otherwise. Tests are the real contract.
-  - **Frozen** (07): the v1 format cannot change. Edit only to correct an error.
-- Work test-first. `testdata/conformance/` and `testdata/migration/` are wired into
-  `go test` as acceptance gates. **Never edit a fixture to make failing code pass.**
+- Work test-first. `testdata/conformance/` is wired into `go test` as the acceptance
+  gate. **Never edit a fixture to make failing code pass.**
   Editing one is legitimate only as a deliberate change to specified behavior — that
   is a spec change, and it lands as one (chapter edit + fixture edit + explicit
   callout in the commit message). If a fixture instead looks like it contradicts
@@ -23,8 +23,7 @@
 
 ## User-facing text
 
-Anything a user can read — CLI output, error and warning strings, UI copy, field
-help, migration notices:
+Anything a user can read — error and warning strings, UI copy, field help:
 
 - **No internal references.** No spec paths, chapter or section numbers, fixture
   names, or Go identifiers. State the rule itself instead. Code comments may cite
@@ -35,10 +34,13 @@ help, migration notices:
 ## Architecture invariants (spec/02)
 
 - `engine/` is pure: no I/O, no clock reads (callers pass "now"), no logging.
-- All finance math lives in Go, shared by CLI and WASM. The frontend
+- All finance math lives in Go, compiled to WASM for the site. The frontend
   (`web/`) only edits configs and renders results.
-- CSV rendering is shared code; native and WASM output must stay
-  byte-identical (`TestCLIWASMParity` enforces this).
+- CSV rendering is Go code. The fixtures are checked against a native build and
+  the site ships the WASM build, so the two must stay byte-identical
+  (`TestNativeWASMParity` enforces this).
+- There is no command-line tool and no conversion of finance-forecast plans.
+  The web app is the only product surface.
 
 ## Building and testing
 
@@ -50,16 +52,15 @@ make test-web       # frontend vitest suite (cd web && npm run test -- --run)
 make test-browser   # Playwright against the production build, under the production CSP
 make test-webkit    # the same on Safari's engine (iPhone profile)
 make typecheck      # tsc --noEmit over web/ — see below; test-web does NOT do this
-make build          # wasm → web/dist → binary with embedded web app
+make dist           # wasm → web/dist, the static site
 make check          # fmt-check, vet, production build, Go and frontend suites
 make pre-pr         # check + the full Chromium and WebKit browser suites
 make preview-lan    # production build over HTTPS on the local network, for a phone
-go build ./cmd/moneypath   # CLI-only build, no Node needed
 ```
 
 **`make test-web` does not typecheck.** vitest strips types rather than checking
 them, so a changed prop or exported signature can leave every test green and still
-break `make build` (the only other place `tsc --noEmit` runs). Run `make typecheck`
+break `make dist` (the only other place `tsc --noEmit` runs). Run `make typecheck`
 after changing a component's props or anything in `web/src/config/types.ts`.
 
 **Run `make fmt` whenever you touch a `.go` file, and again before committing** —
@@ -82,8 +83,8 @@ DEVELOPMENT.md, "Delivering a change", has the full procedure. The rules:
   address it prints together with a short list of things to try. Never hand over
   `127.0.0.1` or `localhost`: a phone cannot open it. Then wait for the go-ahead,
   unless the owner has waived the checkpoint or the work is unattended, in which case
-  the handoff says the exploration is still owed. CLI-only and documentation
-  changes have no checkpoint, nor does an engine change whose numbers the fixtures pin.
+  the handoff says the exploration is still owed. Documentation changes have no
+  checkpoint, nor does an engine change whose numbers the fixtures pin.
 - **Then verify once.** Run `make pre-pr` on the final changes, after the checkpoint
   and before the PR. A change made after that run needs it again. The exception is a
   change only to Markdown (and instruction-only skills under `.agents/skills/`), which
@@ -170,14 +171,12 @@ check on a phone in the PR and at the exploration checkpoint, as pending.
 
 ## Repo-specific gotchas
 
-- **Never commit `internal/webembed/dist/index.html`.** The committed copy is
-  a development placeholder; `make dist` overwrites it locally as a build
-  artifact (see DEVELOPMENT.md, "The embedded web tree"). A pre-commit hook
-  in `.githooks/` blocks it; contributors run `./scripts/dev-setup.sh` once
-  to enable the hook and hide the local modification via skip-worktree. Avoid
-  blanket `git add -A` / `git add .` — stage paths explicitly.
-- The real `moneypath.wasm` is gitignored everywhere (`*.wasm`); the web
-  build generates a placeholder when it's absent (`web/scripts/ensure-wasm.mjs`).
+- Stage paths explicitly; avoid blanket `git add -A` / `git add .`.
+- The engine build writes two gitignored files into `web/src/`: `moneypath.wasm`
+  and Go's glue, `vendor/wasm_exec.js`, copied from the toolchain that compiled
+  the wasm so the pair always matches. Never commit either. When one is absent,
+  `web/scripts/ensure-wasm.mjs` fills it in (an empty wasm, the installed Go's
+  glue) so the frontend tests run before the first `make wasm`.
 - **A new field in the web editor model (`web/src/config/types.ts`) must also work for
   saved drafts that predate it**, not just fresh and uploaded configs. The editor
   restores its draft from `localStorage` (`web/src/state/persistence.ts`), and an old

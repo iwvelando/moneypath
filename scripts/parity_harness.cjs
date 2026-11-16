@@ -1,4 +1,6 @@
-// Node harness for the CLI <-> WASM parity check (spec chapter 08 item 3).
+// Node harness that runs the wasm engine outside a browser: the native <-> WASM
+// parity check (spec chapter 08) and the browser tests that compare the app with
+// a plan fed straight to the engine.
 // Usage: node parity_harness.cjs <wasm_exec.js> <moneypath.wasm> <config.yaml> <optionsJSON>
 // Prints the raw string returned by moneypathForecast to stdout.
 'use strict';

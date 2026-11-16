@@ -462,10 +462,10 @@ export function fromConfigDocument(value: unknown): ConfigModel {
 }
 
 /**
- * Legacy (v1) detection, per spec/05: "a v1 config (detected by a missing
- * `version` field or `common.deathDate` present)".
+ * Whether a document reads as a plan in the older finance-forecast format: it
+ * has no `version` field, or it carries `common.deathDate`.
  */
-export function isLegacyDocument(value: unknown): boolean {
+export function isFinanceForecastDocument(value: unknown): boolean {
   if (!isObject(value)) return false;
   const common = value['common'];
   if (isObject(common) && common['deathDate'] !== undefined) return true;

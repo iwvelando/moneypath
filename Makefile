@@ -1,30 +1,30 @@
 # moneypath build pipeline (spec chapter 02, "Build artifacts").
 #
-# Release build order:
-#   1. `make wasm`  — compile the engine to web/src/engine/moneypath.wasm
+#   1. `make wasm`  — compile the engine to web/src/engine/moneypath.wasm and
+#                     copy the Go toolchain's matching glue beside the app
 #   2. `make dist`  — write license notices, bundle the web app (wasm is a
-#                     hashed bundler input), check the tree, then copy
-#                     web/dist over the embedded tree
-#   3. `make build` — native binary embedding that same dist/ tree
+#                     hashed bundler input) into web/dist, and check the tree
 #
-# `make dist` overwrites internal/webembed/dist locally; do not commit the
-# built tree (the committed copy is a development placeholder — the bundle
-# identity check in conformance/ gates releases).
+# web/dist is the whole product: the static site CI publishes.
 
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo dev)
 LDFLAGS := -ldflags "-X main.version=$(VERSION)"
 # CI passes NPM_INSTALL="npm ci" so the lockfile is used exactly.
 NPM_INSTALL ?= npm install --no-fund --no-audit
 
-.PHONY: all build dist wasm notices fmt fmt-check vet typecheck test test-go test-web test-browser test-webkit check pre-pr preview-lan share-card clean serve dev-setup
+.PHONY: all dist wasm notices fmt fmt-check vet typecheck test test-go test-web test-browser test-webkit check pre-pr preview-lan share-card clean dev-setup
 
-all: build
+all: dist
 
+# One-time: use the committed git hooks (.githooks/).
 dev-setup:
-	./scripts/dev-setup.sh
+	git config core.hooksPath .githooks
 
+# The glue (wasm_exec.js) and the compiler only work as a pair, so it comes
+# from the toolchain that builds the engine and is never committed.
 wasm:
 	GOOS=js GOARCH=wasm go build $(LDFLAGS) -o web/src/engine/moneypath.wasm ./cmd/moneypath-wasm
+	install -m 644 "$$(go env GOROOT)/lib/wasm/wasm_exec.js" web/src/vendor/wasm_exec.js
 
 # Licenses the published site must carry: Go's (the engine is the Go runtime),
 # every Go module compiled into the wasm, and the npm runtime dependencies.
@@ -34,12 +34,6 @@ notices:
 
 dist: wasm notices
 	cd web && npm run build && node scripts/check-dist.mjs
-	rm -rf internal/webembed/dist
-	cp -R web/dist internal/webembed/dist
-
-build: dist
-	mkdir -p bin
-	go build $(LDFLAGS) -o bin/moneypath ./cmd/moneypath
 
 # gofmt every Go file in the module. Run after touching Go sources and
 # before committing; `fmt-check` is the non-mutating form for a quick verdict.
@@ -79,7 +73,7 @@ test-webkit: dist
 
 # What CI's `check` job runs short of the browser: formatting, vet, the
 # production build (which typechecks), then the Go and frontend suites. dist
-# comes before test-go so its parity and bundle checks see the real build.
+# comes before test-go so its bundle check sees the real build.
 check: fmt-check vet dist test-go test-web
 
 # Everything a pull request needs locally (AGENTS.md, "Delivering a change"):
@@ -100,8 +94,5 @@ preview-lan: dist
 share-card: dist
 	cd web && node scripts/build-share-card.mjs
 
-serve: build
-	./bin/moneypath serve
-
 clean:
-	rm -rf bin web/dist
+	rm -rf web/dist web/src/engine/moneypath.wasm web/src/vendor/wasm_exec.js

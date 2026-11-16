@@ -27,34 +27,31 @@ Supplementary analyses:
 
 ## Users and delivery
 
-One user class: an individual comfortable editing YAML or using the bundled web editor.
-Two front doors, same engine:
-
-1. **CLI** (`moneypath`) — reads a config file, prints results as a pretty table or CSV.
-2. **Web app** — a static single-page app with a structured config editor, an interactive
-   chart, a results table, and CSV/config downloads. All computation happens **in the
-   browser** via the Go engine compiled to WebAssembly. Nothing the user enters ever
-   leaves their machine.
+One user class: an individual planning their own finances. One front door: the **web
+app**, a static single-page app with a structured config editor, an interactive chart, a
+results table, and CSV/config downloads. All computation happens **in the browser** via
+the Go engine compiled to WebAssembly. Nothing the user enters ever leaves their machine.
+The plan can be downloaded as a YAML file and uploaded again; the file is the user's copy
+of their plan, and a person comfortable with YAML may edit it by hand.
 
 ## Scope
 
 In scope:
 
-- Everything in chapters 03–07: config v2, full engine semantics, CLI, web UI, migration
-  from the legacy format.
-- `moneypath serve`: a convenience subcommand that serves the embedded static web app
-  locally. It hosts files only — it MUST NOT expose any computation or upload API.
+- Everything in chapters 03–06: config v2, full engine semantics, the CSV download, the
+  web UI.
 - **One public deployment**, at `moneypath.isaacvelando.com`: CI in this repository
   verifies every change and publishes `dist/` on each merge to `main`, by copying the tree
   to a static bucket behind a CDN and nothing more. The hosting itself (bucket, CDN,
   certificate, DNS, the deploy role) is infrastructure-as-code in a separate repository,
   `iwvelando/cloud-accounts`; this one holds no IaC. The deployment is one host among
-  many, not a target the build bends to: `dist/` stays host-agnostic (chapter 02), and
-  the public site computes exactly what `moneypath serve` does, in the visitor's browser.
+  many, not a target the build bends to: `dist/` stays host-agnostic (chapter 02).
 
 Out of scope (design must not preclude them, but build none of them):
 
 - Accounts, authentication, server-side persistence, telemetry.
+- A command-line tool, and conversion of plans written for finance-forecast, the tool
+  moneypath succeeds. A file in that format is refused with a plain explanation.
 - Multi-currency, inflation modeling, Monte Carlo simulation, tax-bracket modeling.
 
 ## Why the architecture looks like this

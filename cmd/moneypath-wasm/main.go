@@ -3,7 +3,6 @@
 // moneypath-wasm exposes the engine to JavaScript (spec chapter 02):
 //
 //	moneypathForecast(configYAML, optionsJSON) -> results JSON | {"error": …}
-//	moneypathMigrate(legacyYAML)               -> {"configYaml", "notices"} | {"error": …}
 //	moneypathVersion()                         -> version string
 package main
 
@@ -71,17 +70,6 @@ func forecastFn(_ js.Value, args []js.Value) any {
 	return string(out)
 }
 
-func migrateFn(_ js.Value, args []js.Value) any {
-	if len(args) < 1 {
-		return errorJSON(fmt.Errorf("moneypathMigrate requires a config argument"))
-	}
-	out, err := app.MigrationJSON([]byte(args[0].String()))
-	if err != nil {
-		return errorJSON(err)
-	}
-	return string(out)
-}
-
 func currentMonth() config.Month {
 	t := time.Now()
 	return config.Month(t.Year()*12 + int(t.Month()) - 1)
@@ -89,7 +77,6 @@ func currentMonth() config.Month {
 
 func main() {
 	js.Global().Set("moneypathForecast", js.FuncOf(forecastFn))
-	js.Global().Set("moneypathMigrate", js.FuncOf(migrateFn))
 	js.Global().Set("moneypathVersion", js.FuncOf(func(js.Value, []js.Value) any {
 		return version
 	}))

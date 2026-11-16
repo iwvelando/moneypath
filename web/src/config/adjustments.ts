@@ -3,8 +3,7 @@
  *
  * A forecast never edits the plan by itself: the optimizer reports what it
  * would change, and the plan keeps the user's own numbers until they say
- * otherwise. This module is the "say otherwise" — the CLI's `--write-config`
- * is the same step by another route.
+ * otherwise. This module is the "say otherwise".
  *
  * Matching a reported adjustment back to an event is positional. The engine
  * walks active scenarios in order and, inside each, the events carrying an

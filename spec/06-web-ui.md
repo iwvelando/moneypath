@@ -6,12 +6,12 @@ which move faster than prose can follow. See SPEC.md.*
 
 ## What it is
 
-A single-page static app that is the primary interface to the same engine: a structured
+A single-page static app that is the interface to the engine: a structured
 editor for a v2 config, and a reader for the results of running it. The user should be
 able to plan without ever learning the YAML format, and to leave with the YAML if they
 want it.
 
-It is not a separate product from the CLI. Anything it computes, it computes by calling
+Anything it computes, it computes by calling
 the engine — the frontend edits configs and renders results, and holds no finance math of
 its own (chapter 02).
 
@@ -20,7 +20,7 @@ its own (chapter 02).
 These are the properties that must survive any redesign:
 
 - **All computation is in-browser**, through the WASM engine. No backend, no compute
-  endpoint, no upload API — including in `moneypath serve`, which is a file server.
+  endpoint, no upload API.
 - **Nothing the user enters leaves their machine.** No network calls at runtime beyond
   the app's own assets. Uploaded configs are read locally. No telemetry, no analytics,
   no external fonts or CDNs.
@@ -87,8 +87,7 @@ The app covers, at a coarse grain:
   blind. Editing is where a run is shaped and started; reading results is not.
   A run reports what the optimizer chose but never edits the plan itself: each adjustment
   is applied to the plan only when the reader asks, and the results say plainly that the
-  plan still holds their own values until then. (The CLI's `--write-config` is the same
-  step by another route.) Any download that would carry unapplied adjustments says so,
+  plan still holds their own values until then. Any download that would carry unapplied adjustments says so,
   so the plan on screen and the file that leaves the app never disagree in silence.
 - **Results** — per-scenario summary (emergency fund, optimizer adjustments), a chart of
   liquid and total over time, and the full month-by-month table. The table initially
@@ -133,10 +132,10 @@ The app covers, at a coarse grain:
   Editing the config
   marks all of these as describing an earlier version of the plan; they stay readable,
   being the baseline the next run will be compared against.
-- **Getting data in and out** — uploading a config (v2 directly, v1 auto-migrated with
-  its notices shown; choices and selections are kept), downloading the engine-serialized
-  v2 YAML, and downloading the
-  engine-rendered CSV, which is byte-for-byte what the CLI produces.
+- **Getting data in and out** — uploading a version 2 config (choices and
+  selections are kept; a file with no `version` field or in the older finance-forecast
+  format is refused with an explanation), downloading the engine-serialized
+  v2 YAML, and downloading the engine-rendered CSV (chapter 05).
 - **Resetting** to a built-in starter config, and a System / Light / Dark theme.
 
 ## Presentation

@@ -2,42 +2,42 @@
 
 ## Prerequisites
 
-- Go (see `go.mod` for the minimum version) — engine, CLI, WASM bridge.
-- Node + npm — web app build and tests, and the CLI↔WASM parity test
+- Go (see `go.mod` for the minimum version) — engine and WASM bridge.
+- Node + npm — web app build and tests, and the native↔WASM parity test
   (which runs the wasm module under Node; it self-skips when `node` is absent).
 
 ## One-time setup
 
 ```sh
-./scripts/dev-setup.sh
+make dev-setup
 ```
 
-This does two things (both undoable; the script prints how):
-
-1. Points `core.hooksPath` at the committed `.githooks/` directory.
-2. Marks `internal/webembed/dist/index.html` with `git update-index
-   --skip-worktree` so the local build overwrite (below) stops appearing in
-   `git status`.
+This points `core.hooksPath` at the committed `.githooks/` directory. Undo it with
+`git config --unset core.hooksPath`.
 
 ## Build pipeline
 
-One source tree, two artifacts (spec/02-architecture.md, "Build artifacts"):
+One source tree, one artifact (spec/02-architecture.md, "Build artifacts"):
 
 ```sh
-make wasm    # 1. engine → web/src/engine/moneypath.wasm (GOOS=js GOARCH=wasm)
+make wasm    # 1. engine → web/src/engine/moneypath.wasm (GOOS=js GOARCH=wasm), and
+             #    the toolchain's wasm_exec.js → web/src/vendor/
 make dist    # 2. writes license notices into web/public/, Vite bundles the app with
-             #    that wasm as a hashed asset → web/dist/, scripts/check-dist.mjs
-             #    confirms the tree is complete, then web/dist/ is copied over
-             #    internal/webembed/dist/
-make build   # 3. native binary embedding that same tree → bin/moneypath
+             #    that wasm as a hashed asset → web/dist/, and scripts/check-dist.mjs
+             #    confirms the tree is complete
 ```
 
 `web/dist/` is the shippable static site — deploying is copying the tree to any
-static file host; it works from any sub-path. `moneypath serve` is a local
-convenience that serves the binary's embedded copy of the same tree.
+static file host; it works from any sub-path.
 
-CLI-only work needs no frontend toolchain: `go build ./cmd/moneypath` gives a
-working binary (with a placeholder web app embedded).
+Go's glue, `wasm_exec.js`, runs the wasm and only works with the compiler that built
+it. `make wasm` copies it from that toolchain; both files are gitignored. For the
+dev server, run `make wasm` and then `npm run dev` in `web/`. Before a first engine
+build, `web/scripts/ensure-wasm.mjs` supplies an empty wasm and the installed Go's
+glue, which is enough for `make test-web`.
+
+Engine work needs no frontend toolchain: `go test ./...` runs the units and the
+conformance fixtures natively.
 
 ## Trying it on a phone
 
@@ -56,30 +56,12 @@ always is, and Safari runs WebAssembly several times slower without one.
 The port stays clear of 4181, which the browser tests use, so a preview can stay up
 while they run. Stop it with Ctrl-C when the phone check is done.
 
-## The embedded web tree
-
-`internal/webembed/dist/` holds what `go:embed` bakes into the binary for
-`moneypath serve`:
-
-- The **committed** `index.html` there is a development placeholder, so `go
-  build ./...` works without Node.
-- `make dist` **overwrites it locally** with the real build; the rest of the
-  built site — hashed assets, favicons — lands beside it but is gitignored
-  (`.gitignore` ignores everything under that directory except `index.html`).
-- The built `index.html` must never be committed: its asset references would
-  dangle in a fresh checkout. The `.githooks/pre-commit` hook blocks it, and
-  skip-worktree (via `dev-setup.sh`) hides the local modification. To change
-  the placeholder itself deliberately: `ALLOW_EMBED_COMMIT=1 git commit ...`.
-- Releases can't ship a stale or placeholder tree: `TestStaticBundle`
-  (`conformance/bundle_test.go`) fails unless the embedded tree byte-matches
-  `web/dist/`.
-
 ## Tests
 
 ```sh
 make fmt       # gofmt -w . — after any Go edit, and before every commit
 make fmt-check # non-mutating; lists anything still unformatted
-make test-go   # Go units + conformance fixtures + CLI↔WASM parity + bundle check
+make test-go   # Go units + conformance fixtures + native↔WASM parity + bundle check
 make test-web  # frontend vitest suite
 make test      # both
 make check     # fmt-check, vet, the production build, then both suites
@@ -135,8 +117,8 @@ Playwright reuses a server already listening on that port outside CI. A leftover
   one page there is; `e2e/crawl.spec.ts` holds it to the canonical URL in
   `index.html`.
 
-The project is developed test-first: `testdata/conformance/` and
-`testdata/migration/` are wired into `go test` and are the acceptance gates.
+The project is developed test-first: `testdata/conformance/` is wired into
+`go test` and is the acceptance gate.
 New behavior gets a failing test first (red/green/refactor).
 
 ## Changing behavior
@@ -146,23 +128,21 @@ thing the code can't tell you: `engine/` shows that escrow settles uniformly at
 loan end, never that it was deliberate. Chapters therefore carry a **status** in their first line, and the
 status decides the order of work (`SPEC.md`, "How these chapters are maintained"):
 
-- **Contract** — chapters 03 (config format), 04 (engine semantics), and the
-  normative sections of 02. These are promises: to YAML files users already have,
+- **Contract** — chapters 01 (product), 03 (config format), 04 (engine semantics),
+  05 (the CSV download), and the normative sections of 02. These are promises: to YAML files users already have,
   and to their money. Edit the chapter *first*, then the fixtures that pin the new
   numbers, then the code, and say in the commit message that specified behavior
   changed.
-- **Descriptive** — chapters 05 (CLI) and 06 (web UI). Write the code and its
+- **Descriptive** — chapter 06 (web UI). Write the code and its
   tests; update the chapter in the same commit if it now says something untrue.
-  These surfaces iterate faster than prose can usefully follow.
-- **Frozen** — chapter 07. The v1 format is dead and cannot change.
+  This surface iterates faster than prose can usefully follow.
 
 If a normative fixture fails, treat it as your bug first and a fixture bug second.
 Editing a fixture is legitimate **only** as part of a deliberate Contract change,
 never to make failing code pass; if you become convinced a fixture contradicts
 chapters 03–05 as written, stop and raise it.
 
-Anything a user can read — CLI output, error strings, UI copy, field help,
-migration notices — follows the two rules in AGENTS.md, "User-facing text": no
+Anything a user can read — error strings, UI copy, field help — follows the two rules in AGENTS.md, "User-facing text": no
 internal references (spec paths, chapter numbers), and no notation the reader has
 to decode.
 
@@ -283,7 +263,7 @@ behavior" and "Delivering a change" above; a ready issue waives neither.
 | A feature's agreed outcome and acceptance criteria | Its parent issue |
 | One implementation or research assignment | A sub-issue |
 | Readiness, active work and prerequisites | Labels, native sub-issue and blocked-by relationships |
-| Specified config format, engine rules, CLI and web behavior | `spec/`, the fixtures and the tests |
+| Specified config format, engine rules and web behavior | `spec/`, the fixtures and the tests |
 | What a change did and how it was verified | The PR |
 | Discussion, experiments and superseded decisions | Issue and PR comments |
 
@@ -302,7 +282,7 @@ either one.
   `[R04] Guardrails`. It is the acceptance record, and it is not ordinarily assigned
   whole.
 - A **slice** is a native sub-issue, such as `[R04.2]`: usually one PR that can merge
-  and deploy alone, with its tests, spec changes and fixtures. Engine, CLI, web and
+  and deploy alone, with its tests, spec changes and fixtures. Engine, web and
   documentation are not routinely split into separate slices. Every merge to `main`
   deploys, so no slice leaves a public interaction that a later slice must repair.
 - A **blocked-by** relationship marks a real prerequisite, never a shared theme.
@@ -406,4 +386,5 @@ comment and refreshes the downstream issues.
 See the table in [README.md](README.md). The one architectural rule to keep
 sacred: `engine/` stays pure (no I/O, no clock, no logging) and all finance
 math stays in Go — the frontend only edits configs and renders results
-(spec/02 boundaries; this is what guarantees CLI/WASM parity).
+(spec/02 boundaries; this is what lets the natively checked fixtures speak for
+the WASM build).

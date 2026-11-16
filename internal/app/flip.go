@@ -6,7 +6,6 @@ import (
 
 	"github.com/iwvelando/moneypath/config"
 	"github.com/iwvelando/moneypath/engine"
-	"github.com/iwvelando/moneypath/render"
 )
 
 // Flip asks for one active scenario to be compared with itself under another
@@ -26,16 +25,6 @@ type FlipResult struct {
 	Original   *engine.ScenarioResult
 	Flipped    *engine.ScenarioResult
 	Comparison engine.Comparison
-}
-
-// FlipError says a flip named something the plan does not have. It is the
-// caller's mistake, where any other error is the plan's.
-type FlipError struct{ msg string }
-
-func (e *FlipError) Error() string { return e.msg }
-
-func flipErrorf(format string, args ...any) error {
-	return &FlipError{msg: fmt.Sprintf(format, args...)}
 }
 
 // FlipName is the display name of a scenario's flipped path.
@@ -59,12 +48,12 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 		active = append(active, sc.Name)
 	}
 	if original == nil {
-		return nil, flipErrorf("%q is not an active scenario in this plan; the active scenarios are: %s",
+		return nil, fmt.Errorf("%q is not an active scenario in this plan; the active scenarios are: %s",
 			fl.Scenario, strings.Join(active, ", "))
 	}
 
 	if len(f.Config.Choices) == 0 {
-		return nil, flipErrorf("this plan has no choices, so there is nothing to flip")
+		return nil, fmt.Errorf("this plan has no choices, so there is nothing to flip")
 	}
 	var choice *config.Choice
 	choices := make([]string, len(f.Config.Choices))
@@ -75,7 +64,7 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 		}
 	}
 	if choice == nil {
-		return nil, flipErrorf("this plan has no choice named %q; its choices are: %s",
+		return nil, fmt.Errorf("this plan has no choice named %q; its choices are: %s",
 			fl.Choice, strings.Join(choices, ", "))
 	}
 	found := false
@@ -85,7 +74,7 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 		found = found || opt.Name == fl.Option
 	}
 	if !found {
-		return nil, flipErrorf("the choice %q has no option named %q; its options are: %s",
+		return nil, fmt.Errorf("the choice %q has no option named %q; its options are: %s",
 			fl.Choice, fl.Option, strings.Join(options, ", "))
 	}
 
@@ -107,7 +96,7 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 			continue
 		}
 		if sel.Option == fl.Option {
-			return nil, flipErrorf("scenario %q already takes %q for the choice %q; name another of its options",
+			return nil, fmt.Errorf("scenario %q already takes %q for the choice %q; name another of its options",
 				fl.Scenario, fl.Option, fl.Choice)
 		}
 		flipped.Select[i].Option = fl.Option
@@ -121,10 +110,7 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 	if _, err := config.Validate(cfg, in.Now); err != nil {
 		return nil, invalid(err)
 	}
-	res, err := engine.Run(cfg, engine.Options{
-		Optimize:            in.Optimize,
-		EmergencyFundMonths: in.EmergencyMonths,
-	})
+	res, err := engine.Run(cfg, engine.Options{Optimize: in.Optimize})
 	if err != nil {
 		return nil, invalid(err)
 	}
@@ -136,11 +122,4 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 		Flipped:    path,
 		Comparison: engine.Compare(f.Result.Start, path, original),
 	}, nil
-}
-
-// FlipOutput renders the flipped path minus its scenario in both output forms
-// (spec chapter 05). The forecast must carry a flip.
-func FlipOutput(f *Forecast) (pretty, csv string) {
-	return render.ComparisonPretty(f.Result, f.Flip.Flipped, f.Flip.Original),
-		render.ComparisonCSV(f.Result, f.Flip.Flipped, f.Flip.Original)
 }

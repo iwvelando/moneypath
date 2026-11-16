@@ -6,7 +6,7 @@ them. Update it when those change. See SPEC.md.*
 ## `testdata/conformance/<case>/`
 
 - `config.yaml` — a v2 config. Every conformance config pins `simulation.startDate`, so
-  runs are reproducible without `--now`.
+  runs are reproducible whatever the current month.
 - `expected.csv` — the exact CSV the engine must produce (chapter 05 format).
 - `manifest.yaml` — metadata:
 
@@ -49,12 +49,6 @@ A case passes when every numeric cell matches within `tolerance` (compare parsed
 not strings), and all dates, headers, and note strings match
 exactly. Tolerances absorb float64 formatting edge cases, not semantic slack.
 
-## `testdata/migration/<case>/`
-
-- `legacy.yaml` — a v1 input.
-- `expected.yaml` — the v2 translation. Compared **semantically**: both documents are
-  parsed and their structures must be equal (key order, comments and formatting are free).
-
 ## Changing a fixture
 
 Fixtures are the enforcement mechanism for chapters 03–05, so a failing one is your bug
@@ -71,11 +65,8 @@ side.
 | Check | Where | What it asserts |
 |---|---|---|
 | Conformance | `TestConformance` (`conformance/`) | Each normative case reproduces `expected.csv` under its manifest rules. |
-| Migration | `TestMigrationFixtures` (`legacy/`) | Each case converts to `expected.yaml` semantically, and the output validates as v2. |
-| Round-trip | `TestMigrationFixtures` (`legacy/`) | Every migrated config then runs through the forecast engine without hard errors. |
-| Rejections | `TestMigrateRejects` (`legacy/`) | Chapter 07's required failure modes still fail. |
-| CLI ↔ WASM parity | `TestCLIWASMParity` (`conformance/`) | For every conformance config, native and WASM CSV are byte-identical. Runs the wasm module under Node; self-skips when `node` is absent. |
-| Static bundle | `TestStaticBundle` (`conformance/`) | The web build produces a standalone `dist/`, and the tree embedded in the binary is identical to it (chapter 02). |
+| Native ↔ WASM parity | `TestNativeWASMParity` (`conformance/`) | For every conformance config, native and WASM CSV are byte-identical. Runs the wasm module under Node; self-skips when `node` is absent. |
+| Static bundle | `TestStaticBundle` (`conformance/`) | The web build produces a standalone `dist/`: relative URLs throughout and a content-hashed engine (chapter 02). Self-skips when `web/dist` is not built. |
 | Distribution | `web/scripts/check-dist.mjs` (`make dist`) | `dist/` holds the real engine, the icons and link-preview card, the 404 page, and the license notices. |
 | Browser | `web/e2e/` (Playwright; `make test-browser`, `make test-webkit`) | The production build, under the production CSP, loads the real engine, runs a forecast and both downloads, survives denied storage, and never scrolls sideways on a 360 px phone or an iPhone. Tests tagged `@smoke` also run against the live site after each deploy. |
 

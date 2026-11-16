@@ -16,10 +16,11 @@ import (
 	"github.com/iwvelando/moneypath/render"
 )
 
-// TestCLIWASMParity is the parity check of spec chapter 08: for every conformance
-// config, the CSV from the native engine and from the WASM build must be
+// TestNativeWASMParity is the parity check of spec chapter 08: for every
+// conformance config, the CSV from the native engine, which the fixtures are
+// checked against, and from the WASM build, which the site ships, must be
 // byte-identical. The WASM module runs under Node via the Go glue script.
-func TestCLIWASMParity(t *testing.T) {
+func TestNativeWASMParity(t *testing.T) {
 	if testing.Short() {
 		t.Skip("short mode")
 	}

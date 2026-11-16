@@ -16,7 +16,7 @@ labels: "roadmap, kind:feature, stage:needs-design"
 
 ## Feature acceptance
 
-<!-- Observable outcomes: what the CLI and the web app show, which figures are pinned by
+<!-- Observable outcomes: what the web app shows, which figures are pinned by
      fixtures, and what happens to plans and saved drafts that predate the feature. -->
 
 ## Dependencies and delivery
