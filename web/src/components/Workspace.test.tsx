@@ -11,6 +11,8 @@ import {
   type OptimizeField,
   type ScenarioModel,
 } from '../config/types';
+import type { Problem } from '../engine/types';
+import { Problems, problemSet } from './problems';
 import { Workspace } from './Workspace';
 
 function event(name: string): EventModel {
@@ -36,6 +38,7 @@ interface HarnessProps {
   optimizerEnabled?: boolean;
   running?: boolean;
   canRun?: boolean;
+  blocked?: boolean;
   runError?: string | null;
 }
 
@@ -44,6 +47,7 @@ function Harness({
   optimizerEnabled = false,
   running = false,
   canRun = true,
+  blocked = false,
   runError = null,
 }: HarnessProps) {
   const [config, setConfig] = useState(initial);
@@ -59,6 +63,7 @@ function Harness({
       }}
       running={running}
       canRun={canRun}
+      blocked={blocked}
       runError={runError}
       onRun={() => {
         runs += 1;
@@ -482,6 +487,41 @@ describe('run errors', () => {
     expect(error).not.toBeNull();
     expect(error?.getAttribute('role')).toBe('alert');
     expect(error?.textContent).toContain('endDate must not be before startDate');
+  });
+
+  it('spells out, in the bar, an error that has no field of its own on the page', async () => {
+    const problems: Problem[] = [
+      { level: 'error', path: 'scenarios.0.select', where: 'Scenario “plan a”', message: 'The selections name a choice, “Car”, that this plan does not have.' },
+      { level: 'error', path: 'scenarios.0.name', where: 'Scenario 1', message: 'The scenario needs a name.' },
+      { level: 'warning', path: 'colour', where: '', message: '“colour” is not a setting moneypath knows, so it is ignored.' },
+    ];
+    await act(async () => {
+      render(
+        <Problems.Provider value={problemSet(problems)}>
+          <Harness initial={makeConfig([], [emptyScenario('plan a')])} blocked />
+        </Problems.Provider>,
+        container,
+      );
+    });
+    const bar = container.querySelector('.workbar__error')!;
+    expect(bar.textContent).toContain('2 things in your plan need fixing before the forecast can run.');
+    // Only the one with nowhere else to appear is written out; a warning never is.
+    expect(Array.from(bar.querySelectorAll('li'), (item) => item.textContent)).toEqual([
+      'Scenario “plan a”: The selections name a choice, “Car”, that this plan does not have.',
+    ]);
+    expect(buttons('Show the first')).toHaveLength(1);
+  });
+
+  it('says nothing about errors until a run is asked for', async () => {
+    await act(async () => {
+      render(
+        <Problems.Provider value={problemSet([{ level: 'error', path: 'scenarios.0.name', where: 'Scenario 1', message: 'The scenario needs a name.' }])}>
+          <Harness initial={makeConfig([], [emptyScenario('plan a')])} />
+        </Problems.Provider>,
+        container,
+      );
+    });
+    expect(container.querySelector('.workbar__error')).toBeNull();
   });
 
   it('shows nothing when the last run was fine', async () => {

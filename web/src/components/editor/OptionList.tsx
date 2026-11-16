@@ -32,6 +32,7 @@ import type {
 import { Combobox } from '../Combobox';
 import { ChangedLabels, TextField } from '../fields';
 import { IconChoice, IconLayers } from '../icons';
+import { At, PathProblems } from '../problems';
 import { EditorCard, useEditorCards, type EditorCardState } from './EditorCard';
 import { EventFields, EventList } from './EventList';
 import { InvestmentFields, InvestmentList } from './InvestmentList';
@@ -86,6 +87,7 @@ function ChangeCard({ kind, change, entry, simulation, onChange, onRemove, open,
       open={open}
       autoFocus={autoFocus}
       onOpenChange={onOpenChange}
+      ownNote={entry === null}
       actions={
         <button type="button" class="btn btn--quiet btn--danger" aria-label={`Stop changing ${name}`} onClick={onRemove}>
           Stop changing
@@ -126,6 +128,7 @@ function ChangeCard({ kind, change, entry, simulation, onChange, onRemove, open,
             </div>
           ) : null}
           <CardScope.Provider value={`${change.id}-`}>
+            <At sub="set">
             <ChangedLabels.Provider value={labels}>
               {kind === 'events' ? (
                 <EventFields event={effective as EventModel} kind="cashflow" showName={false} onChange={edit} />
@@ -140,6 +143,7 @@ function ChangeCard({ kind, change, entry, simulation, onChange, onRemove, open,
                 />
               )}
             </ChangedLabels.Provider>
+            </At>
           </CardScope.Provider>
         </>
       )}
@@ -244,8 +248,8 @@ function BaselineEffects({ config, choice, option, onChange }: BaselineEffectsPr
       {changes.length + removals.length > 0 ? (
         <ul class="row-list">
           {changes.map(({ kind, change }) => (
+            <At key={change.id} sub={`change.${kind}.${(option.change[kind] as AnyChange[]).indexOf(change)}`}>
             <ChangeCard
-              key={change.id}
               {...cards.cardProps(change.id)}
               kind={kind}
               change={change}
@@ -266,6 +270,7 @@ function BaselineEffects({ config, choice, option, onChange }: BaselineEffectsPr
                 )
               }
             />
+            </At>
           ))}
           {removals.map(({ kind, ref }) => {
             const entry = targetEntry<Named>(config.common[kind], ref);
@@ -283,6 +288,9 @@ function BaselineEffects({ config, choice, option, onChange }: BaselineEffectsPr
                     </span>
                   )}
                 </p>
+                <At sub={`remove.${kind}.${option.remove[kind].indexOf(ref)}`}>
+                  <PathProblems quiet={entry === undefined || entry === null} />
+                </At>
                 <button
                   type="button"
                   class="btn btn--quiet"
@@ -359,6 +367,7 @@ function OptionCard({ config, choice, option, index, onChange, onRemove, open, a
     >
       <div class="field-grid">
         <TextField
+          field="name"
           label="Option name"
           help={HELP.optionName}
           value={option.name}
@@ -436,8 +445,8 @@ export function OptionList({ config, choice, onChange }: OptionListProps) {
       <p class="list-block__hint">The ways this decision can go. Each scenario picks one.</p>
       <ul class="row-list">
         {choice.options.map((option, index) => (
+          <At key={option.id} sub={`options.${index}`}>
           <OptionCard
-            key={option.id}
             {...cards.cardProps(option.id)}
             config={config}
             choice={choice}
@@ -446,6 +455,7 @@ export function OptionList({ config, choice, onChange }: OptionListProps) {
             onChange={replace}
             onRemove={() => onChange(removeOption(config, choice.id, option.id))}
           />
+          </At>
         ))}
       </ul>
     </div>

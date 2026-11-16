@@ -5,6 +5,7 @@ import { loanSummary } from './summaries';
 import { HELP } from '../../config/help';
 import { cloneLoan, emptyLoan, type LoanModel, type SimulationModel } from '../../config/types';
 import { CheckField, MonthField, NumberField, TextField } from '../fields';
+import { At } from '../problems';
 import { IconPercent } from '../icons';
 import { EventList } from './EventList';
 
@@ -24,16 +25,16 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
       <EditorFields title="Loan terms">
         <div class="field-grid">
           {showName ? (
-            <TextField label="Name" help={HELP.loanName} value={loan.name} required onInput={(name) => patch({ name })} />
+            <TextField field="name" label="Name" help={HELP.loanName} value={loan.name} required onInput={(name) => patch({ name })} />
           ) : null}
-          <NumberField
+          <NumberField field="principal"
             label="Principal"
             help={HELP.loanPrincipal}
             value={loan.principal}
             step={1000}
             onChange={(principal) => patch({ principal })}
           />
-          <NumberField
+          <NumberField field="downPayment"
             label="Down payment"
             help={HELP.loanDownPayment}
             value={loan.downPayment}
@@ -41,7 +42,7 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
             placeholder="0"
             onChange={(downPayment) => patch({ downPayment })}
           />
-          <NumberField
+          <NumberField field="interestRate"
             label="Interest rate"
             help={HELP.loanInterestRate}
             value={loan.interestRate}
@@ -49,7 +50,7 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
             suffix="% / yr"
             onChange={(interestRate) => patch({ interestRate })}
           />
-          <NumberField
+          <NumberField field="term"
             label="Term"
             help={HELP.loanTerm}
             value={loan.term}
@@ -57,7 +58,7 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
             suffix="months"
             onChange={(term) => patch({ term })}
           />
-          <MonthField
+          <MonthField field="startDate"
             label="First payment"
             help={HELP.loanStartDate}
             value={loan.startDate}
@@ -68,7 +69,7 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
       </EditorFields>
       <EditorFields title="Escrow and insurance">
         <div class="field-grid">
-          <NumberField
+          <NumberField field="escrow"
             label="Escrow"
             help={HELP.loanEscrow}
             value={loan.escrow}
@@ -77,7 +78,7 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
             suffix="/ mo"
             onChange={(escrow) => patch({ escrow })}
           />
-          <NumberField
+          <NumberField field="mortgageInsurance"
             label="Mortgage insurance"
             help={HELP.loanMortgageInsurance}
             value={loan.mortgageInsurance}
@@ -86,7 +87,7 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
             suffix="/ mo"
             onChange={(mortgageInsurance) => patch({ mortgageInsurance })}
           />
-          <NumberField
+          <NumberField field="mortgageInsuranceCutoff"
             label="MI cutoff"
             help={HELP.loanMortgageInsuranceCutoff}
             value={loan.mortgageInsuranceCutoff}
@@ -98,14 +99,14 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
       </EditorFields>
       <EditorFields title="Early payoff">
         <div class="field-grid">
-          <NumberField
+          <NumberField field="earlyPayoffThreshold"
             label="Early payoff threshold"
             help={HELP.loanEarlyPayoffThreshold}
             value={loan.earlyPayoffThreshold}
             step={500}
             onChange={(earlyPayoffThreshold) => patch({ earlyPayoffThreshold })}
           />
-          <MonthField
+          <MonthField field="earlyPayoffDate"
             label="Early payoff month"
             help={HELP.loanEarlyPayoffDate}
             value={loan.earlyPayoffDate}
@@ -113,7 +114,7 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
           />
         </div>
 
-        <CheckField
+        <CheckField field="sellProperty"
           label="Sell the property at payoff"
           help={HELP.loanSellProperty}
           checked={loan.sellProperty}
@@ -122,14 +123,14 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
 
         {loan.sellProperty ? (
           <div class="field-grid">
-            <NumberField
+            <NumberField field="sellPrice"
               label="Sale price"
               help={HELP.loanSellPrice}
               value={loan.sellPrice}
               step={1000}
               onChange={(sellPrice) => patch({ sellPrice })}
             />
-            <NumberField
+            <NumberField field="sellCostsNet"
               label="Net selling costs"
               help={HELP.loanSellCostsNet}
               value={loan.sellCostsNet}
@@ -229,8 +230,8 @@ export function LoanList({ loans, simulation, onChange }: LoanListProps) {
       ) : (
         <ul class="row-list">
           {loans.map((loan, index) => (
+            <At key={loan.id} sub={`loans.${index}`}>
             <LoanCard
-              key={loan.id}
               {...cards.cardProps(loan.id)}
               loan={loan}
               index={index}
@@ -243,6 +244,7 @@ export function LoanList({ loans, simulation, onChange }: LoanListProps) {
                 onChange([...loans.slice(0, index + 1), duplicate, ...loans.slice(index + 1)]);
               }}
             />
+            </At>
           ))}
         </ul>
       )}

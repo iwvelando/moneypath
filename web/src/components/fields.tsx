@@ -1,8 +1,9 @@
 import { createContext, type ComponentChildren } from 'preact';
-import { useContext, useEffect, useId, useState } from 'preact/hooks';
+import { useContext, useEffect, useId, useRef, useState } from 'preact/hooks';
 import { HelpTip } from './HelpTip';
 import { formatMonthInput, monthIsError, monthMessage } from '../config/month';
 import { sanitizeNumberInput } from '../util/number';
+import { Notes, notesFor, useDraftProblem, usePath, useProblemsAt, type Note } from './problems';
 
 /**
  * The labels of the fields an option changes on a baseline entry, for the form
@@ -20,9 +21,11 @@ interface FieldShellProps {
   help: string;
   controlId: string;
   helpId: string;
-  message?: string | null;
+  /** What to say under the control, errors first. */
+  notes?: readonly Note[];
   messageId?: string;
-  tone?: 'error' | 'hint';
+  /** The field's place in the config document, when it has one. */
+  path?: string | null;
   children: ComponentChildren;
   wide?: boolean;
 }
@@ -32,28 +35,44 @@ export function FieldShell({
   help,
   controlId,
   helpId,
-  message,
+  notes = [],
   messageId,
-  tone = 'hint',
+  path = null,
   children,
   wide,
 }: FieldShellProps) {
   const changed = useContext(ChangedLabels).has(label);
   return (
-    <div class={`field${wide ? ' field--wide' : ''}${changed ? ' is-changed' : ''}`}>
+    <div
+      class={`field${wide ? ' field--wide' : ''}${changed ? ' is-changed' : ''}`}
+      data-path={path ?? undefined}
+    >
       <div class="field__label">
         <label for={controlId}>{label}</label>
         <HelpTip id={helpId} label={label} text={help} />
         {changed ? <ChangedMark /> : null}
       </div>
       {children}
-      {message ? (
-        <p id={messageId} class={tone === 'error' ? 'field__message is-error' : 'field__message'}>
-          {message}
-        </p>
-      ) : null}
+      <Notes id={messageId} notes={notes} />
     </div>
   );
+}
+
+/**
+ * What a field says and how its control is marked: its own message, then what
+ * the engine reports for its place in the plan.
+ */
+function useFieldNotes(field: string | undefined, own: Note | null, helpId: string, messageId: string) {
+  const here = usePath(field);
+  const path = field === undefined ? null : here;
+  const notes = notesFor(own, useProblemsAt(path));
+  const invalid = notes.some((note) => note.tone === 'error');
+  return {
+    path,
+    notes,
+    invalid,
+    describedBy: notes.length > 0 ? `${helpId} ${messageId}` : helpId,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -66,14 +85,22 @@ interface TextFieldProps {
   placeholder?: string;
   required?: boolean;
   wide?: boolean;
+  /** The field's key in its entry of the config document. */
+  field?: string;
 }
 
-export function TextField({ label, help, value, onInput, placeholder, required, wide }: TextFieldProps) {
+export function TextField({ label, help, value, onInput, placeholder, required, wide, field }: TextFieldProps) {
   const base = useId();
   const controlId = `${base}-input`;
   const helpId = `${base}-help`;
   const messageId = `${base}-msg`;
   const missing = required === true && value.trim() === '';
+  const { path, notes, invalid, describedBy } = useFieldNotes(
+    field,
+    missing ? { tone: 'error', text: 'This field is required.' } : null,
+    helpId,
+    messageId,
+  );
   return (
     <FieldShell
       label={label}
@@ -81,18 +108,18 @@ export function TextField({ label, help, value, onInput, placeholder, required, 
       controlId={controlId}
       helpId={helpId}
       messageId={messageId}
-      message={missing ? 'This field is required.' : null}
-      tone="error"
+      notes={notes}
+      path={path}
       wide={wide}
     >
       <input
         id={controlId}
-        class={missing ? 'input is-invalid' : 'input'}
+        class={invalid ? 'input is-invalid' : 'input'}
         type="text"
         value={value}
         placeholder={placeholder}
-        aria-describedby={missing ? `${helpId} ${messageId}` : helpId}
-        aria-invalid={missing || undefined}
+        aria-describedby={describedBy}
+        aria-invalid={invalid || undefined}
         onInput={(event) => onInput((event.currentTarget as HTMLInputElement).value)}
       />
     </FieldShell>
@@ -116,6 +143,8 @@ interface NumberFieldProps {
    * an iPhone's decimal keypad has no minus key.
    */
   signed?: boolean;
+  /** The field's key in its entry of the config document. */
+  field?: string;
 }
 
 function roundStep(value: number, step: number): number {
@@ -126,6 +155,9 @@ function roundStep(value: number, step: number): number {
 /**
  * A numeric field that keeps a text draft so half-typed values ("-", "1.")
  * survive, and supports arrow-key stepping — Shift or Alt take bigger steps.
+ * Text that is not a number stays in the box with its error after the field
+ * is left, and the page is told, so a plan never runs on a value other than
+ * the one on screen.
  */
 export function NumberField({
   label,
@@ -137,6 +169,7 @@ export function NumberField({
   placeholder,
   suffix,
   signed = false,
+  field,
 }: NumberFieldProps) {
   const base = useId();
   const controlId = `${base}-input`;
@@ -144,13 +177,21 @@ export function NumberField({
   const messageId = `${base}-msg`;
 
   const [draft, setDraft] = useState(value === null ? '' : String(value));
-  const [focused, setFocused] = useState(false);
+  const focused = useRef(false);
 
+  // A value that changes from outside the field replaces what was typed.
   useEffect(() => {
-    if (!focused) setDraft(value === null ? '' : String(value));
-  }, [value, focused]);
+    if (!focused.current) setDraft(value === null ? '' : String(value));
+  }, [value]);
 
-  const invalid = draft.trim() !== '' && !Number.isFinite(Number(draft));
+  const malformed = draft.trim() !== '' && !Number.isFinite(Number(draft));
+  const { path, notes, invalid, describedBy } = useFieldNotes(
+    field,
+    malformed ? { tone: 'error', text: 'Enter a number.' } : null,
+    helpId,
+    messageId,
+  );
+  useDraftProblem(path, malformed ? 'Enter a number.' : null);
 
   const commit = (raw: string) => {
     setDraft(raw);
@@ -177,8 +218,8 @@ export function NumberField({
       controlId={controlId}
       helpId={helpId}
       messageId={messageId}
-      message={invalid ? 'Enter a number.' : null}
-      tone="error"
+      notes={notes}
+      path={path}
     >
       <div class="input-row">
         <input
@@ -189,12 +230,18 @@ export function NumberField({
           autoComplete="off"
           value={draft}
           placeholder={placeholder}
-          aria-describedby={invalid ? `${helpId} ${messageId}` : helpId}
+          aria-describedby={describedBy}
           aria-invalid={invalid || undefined}
-          onFocus={() => setFocused(true)}
-          onBlur={() => {
-            setFocused(false);
-            setDraft(value === null ? '' : String(value));
+          onFocus={() => {
+            focused.current = true;
+          }}
+          onBlur={(event) => {
+            focused.current = false;
+            // Read the box, not the last render: a blur can follow a keystroke at once.
+            const text = (event.currentTarget as HTMLInputElement).value;
+            if (text.trim() === '' || Number.isFinite(Number(text))) {
+              setDraft(value === null ? '' : String(value));
+            }
           }}
           onInput={(event) => {
             // Pasted values often carry "$", commas or spaces — keep only the
@@ -230,20 +277,28 @@ interface MonthFieldProps {
   onChange: (value: string) => void;
   required?: boolean;
   placeholder?: string;
+  /** The field's key in its entry of the config document. */
+  field?: string;
 }
 
 /**
  * A `YYYY-MM` field validated as you type. It asks a phone for the number
  * pad and puts the dash in itself, since that pad has none.
  */
-export function MonthField({ label, help, value, onChange, required, placeholder }: MonthFieldProps) {
+export function MonthField({ label, help, value, onChange, required, placeholder, field }: MonthFieldProps) {
   const base = useId();
   const controlId = `${base}-input`;
   const helpId = `${base}-help`;
   const messageId = `${base}-msg`;
 
   const message = monthMessage(value, { required: required === true });
-  const invalid = monthIsError(value, { required: required === true });
+  const wrong = monthIsError(value, { required: required === true });
+  const { path, notes, invalid, describedBy } = useFieldNotes(
+    field,
+    message === null ? null : { tone: wrong ? 'error' : 'hint', text: message },
+    helpId,
+    messageId,
+  );
 
   return (
     <FieldShell
@@ -252,8 +307,8 @@ export function MonthField({ label, help, value, onChange, required, placeholder
       controlId={controlId}
       helpId={helpId}
       messageId={messageId}
-      message={message}
-      tone={invalid ? 'error' : 'hint'}
+      notes={notes}
+      path={path}
     >
       <input
         id={controlId}
@@ -265,7 +320,7 @@ export function MonthField({ label, help, value, onChange, required, placeholder
         maxLength={7}
         value={value}
         placeholder={placeholder ?? 'YYYY-MM'}
-        aria-describedby={message ? `${helpId} ${messageId}` : helpId}
+        aria-describedby={describedBy}
         aria-invalid={invalid || undefined}
         onInput={(event) => {
           // Sync the DOM directly, as the number field does: the formatted
@@ -287,27 +342,33 @@ interface CheckFieldProps {
   help: string;
   checked: boolean;
   onChange: (checked: boolean) => void;
+  /** The field's key in its entry of the config document. */
+  field?: string;
 }
 
-export function CheckField({ label, help, checked, onChange }: CheckFieldProps) {
+export function CheckField({ label, help, checked, onChange, field }: CheckFieldProps) {
   const base = useId();
   const controlId = `${base}-input`;
   const helpId = `${base}-help`;
+  const messageId = `${base}-msg`;
   const changed = useContext(ChangedLabels).has(label);
+  const { path, notes, invalid, describedBy } = useFieldNotes(field, null, helpId, messageId);
   return (
-    <div class={changed ? 'field field--check is-changed' : 'field field--check'}>
+    <div class={changed ? 'field field--check is-changed' : 'field field--check'} data-path={path ?? undefined}>
       <div class="check-row">
         <input
           id={controlId}
           type="checkbox"
           checked={checked}
-          aria-describedby={helpId}
+          aria-describedby={describedBy}
+          aria-invalid={invalid || undefined}
           onChange={(event) => onChange((event.currentTarget as HTMLInputElement).checked)}
         />
         <label for={controlId}>{label}</label>
         <HelpTip id={helpId} label={label} text={help} />
         {changed ? <ChangedMark /> : null}
       </div>
+      <Notes id={messageId} notes={notes} />
     </div>
   );
 }
@@ -325,6 +386,8 @@ interface SelectFieldProps<T extends string> {
   placeholder?: string;
   /** Said under the field while nothing is picked, for a field that must have a pick. */
   missingMessage?: string;
+  /** The field's key in its entry of the config document. */
+  field?: string;
 }
 
 export function SelectField<T extends string>({
@@ -335,12 +398,19 @@ export function SelectField<T extends string>({
   onChange,
   placeholder,
   missingMessage,
+  field,
 }: SelectFieldProps<T>) {
   const base = useId();
   const controlId = `${base}-input`;
   const helpId = `${base}-help`;
   const messageId = `${base}-msg`;
   const missing = missingMessage !== undefined && value === '';
+  const { path, notes, invalid, describedBy } = useFieldNotes(
+    field,
+    missing ? { tone: 'error', text: missingMessage } : null,
+    helpId,
+    messageId,
+  );
   return (
     <FieldShell
       label={label}
@@ -348,15 +418,15 @@ export function SelectField<T extends string>({
       controlId={controlId}
       helpId={helpId}
       messageId={messageId}
-      message={missing ? missingMessage : null}
-      tone="error"
+      notes={notes}
+      path={path}
     >
       <select
         id={controlId}
-        class={missing ? 'input is-invalid' : 'input'}
+        class={invalid ? 'input is-invalid' : 'input'}
         value={value}
-        aria-describedby={missing ? `${helpId} ${messageId}` : helpId}
-        aria-invalid={missing || undefined}
+        aria-describedby={describedBy}
+        aria-invalid={invalid || undefined}
         onChange={(event) => onChange((event.currentTarget as HTMLSelectElement).value as T)}
       >
         {placeholder !== undefined ? (

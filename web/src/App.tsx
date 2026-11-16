@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { BrandMark, PathSketch } from './components/icons';
 import { Toolbar } from './components/Toolbar';
+import { Problems, problemSet } from './components/problems';
 import { Workspace } from './components/Workspace';
 import {
   adjustmentStatus,
@@ -15,7 +16,13 @@ import { starterConfig } from './config/starter';
 import { planUpload } from './config/upload';
 import type { ConfigModel } from './config/types';
 import { loadEngine, type EngineStatus } from './engine';
-import { EngineError, type FlipComparison, type FlipRequest, type ForecastResults } from './engine/types';
+import {
+  EngineError,
+  type FlipComparison,
+  type FlipRequest,
+  type ForecastResults,
+  type Problem,
+} from './engine/types';
 import { ResultsView } from './results/ResultsView';
 import {
   KEYS,
@@ -29,14 +36,6 @@ import { applyTheme, loadTheme, saveTheme, type Theme } from './state/theme';
 import { downloadText, readFileText } from './util/download';
 
 type TabId = 'workspace' | 'results';
-
-interface Notice {
-  id: number;
-  tone: 'info' | 'warn' | 'error';
-  text: string;
-}
-
-let noticeId = 0;
 
 export function App() {
   const restored = useMemo(() => loadEditorState(), []);
@@ -57,19 +56,35 @@ export function App() {
   const ranConfig = useRef<ConfigModel | null>(null);
   // The month that run took as the current one, so a flip of it agrees.
   const ranNow = useRef('');
-  const [notices, setNotices] = useState<Notice[]>([]);
+  // Why the last toolbar action (upload, download, reset) did not happen.
+  const [toolbarError, setToolbarError] = useState<string | null>(null);
+  // A run was asked for while the plan had errors; the run bar then counts them.
+  const [blocked, setBlocked] = useState(false);
+  // What happened to the saved draft, when it could not be used.
+  const [restoreNote, setRestoreNote] = useState<string | null>(
+    restored.source === 'starter' ? (restored.reason ?? null) : null,
+  );
+  const [unsaved, setUnsaved] = useState(false);
+  // Text in a number field that is not a number, by the field that holds it.
+  // The engine never sees it, so the fields report it themselves.
+  const [drafts, setDrafts] = useState<Record<string, { path: string; message: string }>>({});
+  // A new plan (uploaded, or the starter) starts the editor afresh.
+  const [planId, setPlanId] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
   const workspaceTabRef = useRef<HTMLButtonElement | null>(null);
 
-  const pushNotice = useCallback((tone: Notice['tone'], text: string) => {
-    noticeId += 1;
-    const id = noticeId;
-    setNotices((current) => [...current, { id, tone, text }]);
-  }, []);
-
-  const dismissNotice = useCallback((id: number) => {
-    setNotices((current) => current.filter((notice) => notice.id !== id));
+  const reportDraft = useCallback((field: string, path: string, message: string | null) => {
+    setDrafts((current) => {
+      const held = current[field];
+      if (message === null ? held === undefined : held?.path === path && held.message === message) {
+        return current;
+      }
+      const next = { ...current };
+      if (message === null) delete next[field];
+      else next[field] = { path, message };
+      return next;
+    });
   }, []);
 
   /* ---- engine ---- */
@@ -90,11 +105,7 @@ export function App() {
   /* ---- persistence ---- */
 
   useEffect(() => {
-    if (restored.source === 'starter' && restored.reason) pushNotice('warn', restored.reason);
-  }, [restored, pushNotice]);
-
-  useEffect(() => {
-    const handle = window.setTimeout(() => saveEditorState(config), 400);
+    const handle = window.setTimeout(() => setUnsaved(!saveEditorState(config)), 400);
     return () => window.clearTimeout(handle);
   }, [config]);
 
@@ -106,8 +117,55 @@ export function App() {
 
   const engine = engineStatus.state === 'ready' ? engineStatus.engine : null;
 
+  /* ---- what is wrong with the plan ---- */
+
+  // The engine checks the plan on every edit, so a problem shows under its
+  // field as it is typed and not first at the next run.
+  const found = useMemo<Problem[]>(() => {
+    if (!engine) return [];
+    try {
+      return engine.validate(toConfigYaml(config), { now: currentMonth() });
+    } catch {
+      // A run reports whatever stopped the check.
+      return [];
+    }
+  }, [engine, config]);
+
+  const problems = useMemo(() => {
+    const held = Object.values(drafts);
+    const paths = new Set(held.map((draft) => draft.path));
+    return problemSet(
+      [
+        // What the engine says about a field whose box holds something else
+        // is about a value no longer on screen; the field's own error stands.
+        ...found.filter((problem) => !paths.has(problem.path)),
+        ...held.map(({ path, message }): Problem => ({ level: 'error', path, where: '', message })),
+      ],
+      reportDraft,
+    );
+  }, [found, drafts, reportDraft]);
+  const errorCount = useMemo(
+    () => problems.all.filter((problem) => problem.level === 'error').length,
+    [problems],
+  );
+
+  // Once nothing is wrong, the run bar has nothing left to count.
+  useEffect(() => {
+    if (errorCount === 0) setBlocked(false);
+  }, [errorCount]);
+
+  // A failure belongs to the plan as it was. An edit moves on from it.
+  useEffect(() => {
+    setRunError(null);
+    setToolbarError(null);
+  }, [config]);
+
   const runForecast = useCallback(async () => {
     if (!engine) return;
+    if (errorCount > 0) {
+      setBlocked(true);
+      return;
+    }
     setRunning(true);
     setBusyLabel('Running the forecast…');
     setRunError(null);
@@ -132,7 +190,7 @@ export function App() {
     } finally {
       setRunning(false);
     }
-  }, [engine, config, optimize]);
+  }, [engine, config, optimize, errorCount]);
 
   // A tweak deep in the editor should be runnable in place, without scrolling
   // back to the toolbar. The pinned control in the workspace is the visible
@@ -151,6 +209,19 @@ export function App() {
 
   const downloadConfig = useCallback(async () => {
     if (!engine) return;
+    setToolbarError(null);
+    // The download is the plan on screen as the engine writes it. A field in
+    // error holds something the plan does not, so there is nothing to write
+    // yet, whatever an earlier run left behind.
+    if (errorCount > 0) {
+      setToolbarError(
+        errorCount === 1
+          ? 'One thing in your plan needs fixing before it can be downloaded.'
+          : `${errorCount} things in your plan need fixing before it can be downloaded.`,
+      );
+      setBlocked(true);
+      return;
+    }
     const currentInput = toConfigYaml(config);
     // Prefer the engine-canonical YAML from the last run when the editor has
     // not changed since — after an optimizer run that is the adjusted config.
@@ -159,23 +230,20 @@ export function App() {
       return;
     }
     setRunning(true);
-    setBusyLabel('Serializing the config…');
-    setRunError(null);
+    setBusyLabel('Preparing the download…');
     try {
       const canonical = await engine.forecast(currentInput, { optimize: false, now: currentMonth() });
       downloadText('moneypath.yaml', canonical.configYaml, 'application/yaml');
       setBusyLabel('Config downloaded.');
     } catch (error) {
       setBusyLabel(null);
-      setRunError(
-        error instanceof EngineError
-          ? `${error.message} (the config must be valid before it can be serialized)`
-          : `Unexpected engine failure: ${String(error)}`,
+      setToolbarError(
+        `The plan could not be downloaded. ${error instanceof EngineError ? error.message : `Unexpected engine failure: ${String(error)}`}`,
       );
     } finally {
       setRunning(false);
     }
-  }, [engine, config, results, lastRunInput]);
+  }, [engine, config, results, lastRunInput, errorCount]);
 
   const downloadCsv = useCallback(() => {
     if (!results) return;
@@ -206,15 +274,10 @@ export function App() {
   const applyAdjustmentsToPlan = useCallback(
     (adjustments: Adjustment[]) => {
       if (adjustments.length === 0) return;
+      // Each adjustment then reads "Applied to your plan" where it is listed.
       setConfig((current) => applyAdjustments(current, adjustments));
-      pushNotice(
-        'info',
-        adjustments.length === 1
-          ? 'Applied the adjustment to your plan. Run the forecast again to see it.'
-          : `Applied ${adjustments.length} adjustments to your plan. Run the forecast again to see them.`,
-      );
     },
-    [pushNotice],
+    [],
   );
 
   /* ---- flipping one choice ---- */
@@ -245,39 +308,37 @@ export function App() {
       if (!next) {
         return 'That path could not be added: its scenario, the choice or the option is no longer in your plan.';
       }
-      const added = next.scenarios.find((scenario) => !config.scenarios.includes(scenario));
       setConfig(next);
-      pushNotice('info', `Added “${added?.name ?? name}” to your plan. Run the forecast again to see it.`);
       return null;
     },
-    [config, pushNotice],
+    [config],
   );
 
   const uploadConfig = useCallback(
     async (file: File) => {
-      setRunError(null);
+      setToolbarError(null);
       setBusyLabel(`Reading ${file.name}…`);
       let text: string;
       try {
         text = await readFileText(file);
       } catch (error) {
         setBusyLabel(null);
-        pushNotice('error', `Could not read ${file.name}: ${String(error)}`);
+        setToolbarError(`${file.name} could not be read. ${String(error)}`);
         return;
       }
 
       const plan = planUpload(text);
       if (plan.action === 'error') {
         setBusyLabel(null);
-        pushNotice('error', plan.message);
+        setToolbarError(`${file.name} was not loaded. ${plan.message}`);
         return;
       }
 
       setConfig(refreshIds(fromConfigDocument(plan.document)));
-      setBusyLabel(`Loaded ${file.name}.`);
-      pushNotice('info', `Loaded ${file.name} into the editor.`);
+      setPlanId((current) => current + 1);
+      setBusyLabel(`Loaded ${file.name} into the editor.`);
     },
-    [pushNotice],
+    [],
   );
 
   const resetConfig = useCallback(() => {
@@ -288,12 +349,13 @@ export function App() {
     ranConfig.current = null;
     ranNow.current = '';
     setRunError(null);
+    setPlanId((current) => current + 1);
     setTab('workspace');
     setConfirmReset(false);
-    pushNotice('info', 'The editor was reset to the built-in starter config.');
+    setBusyLabel('The editor was reset to the built-in starter config.');
     // The confirmation unmounts, so park focus somewhere predictable.
     workspaceTabRef.current?.focus();
-  }, [pushNotice]);
+  }, []);
 
   // Move focus into the confirmation as soon as it appears.
   useEffect(() => {
@@ -360,6 +422,7 @@ export function App() {
       <Toolbar
         running={running}
         busyLabel={busyLabel}
+        error={toolbarError}
         engineReady={engine !== null}
         theme={theme}
         onUpload={(file) => void uploadConfig(file)}
@@ -399,34 +462,22 @@ export function App() {
         </div>
       ) : null}
 
-      {notices.length > 0 ? (
-        <ul class="notices" aria-label="Messages" aria-live="polite">
-          {notices.map((notice) => (
-            <li key={notice.id} class={`notice notice--${notice.tone}`}>
-              <span>{notice.text}</span>
-              <button
-                type="button"
-                class="notice__dismiss"
-                aria-label="Dismiss message"
-                onClick={() => dismissNotice(notice.id)}
-              >
-                <span aria-hidden="true">×</span>
-              </button>
-            </li>
-          ))}
-        </ul>
+      {restoreNote ? (
+        <div class="banner banner--warn banner--dismissable" role="status">
+          <p>{restoreNote}</p>
+          <button type="button" class="btn btn--quiet" onClick={() => setRestoreNote(null)}>
+            Dismiss
+          </button>
+        </div>
       ) : null}
 
-      {warnings.length > 0 ? (
-        <section class="banner banner--warn" aria-labelledby="warnings-heading">
-          <h2 id="warnings-heading">Validation warnings from the last run</h2>
-          <ul>
-            {warnings.map((warning) => (
-              <li key={warning}>{warning}</li>
-            ))}
-          </ul>
-          <p class="banner__note">Warnings never block a forecast — the run above completed.</p>
-        </section>
+      {unsaved ? (
+        <div class="banner banner--warn" role="status">
+          <p>
+            This browser is not saving your plan, so closing or reloading this page will lose it. Use
+            Download Config to keep a copy.
+          </p>
+        </div>
       ) : null}
 
       <main>
@@ -448,7 +499,9 @@ export function App() {
           aria-labelledby="tab-workspace"
           hidden={tab !== 'workspace'}
         >
+          <Problems.Provider value={problems}>
           <Workspace
+            key={planId}
             config={config}
             onChange={setConfig}
             optimizerEnabled={optimize}
@@ -458,9 +511,11 @@ export function App() {
             }}
             running={running}
             canRun={engine !== null}
+            blocked={blocked}
             runError={runError}
             onRun={() => void runForecast()}
           />
+          </Problems.Provider>
         </div>
         <div
           id="panel-results"
@@ -476,6 +531,17 @@ export function App() {
                   These numbers came from an earlier version of your plan. Go back to the
                   Planning Workspace and run the forecast again to bring them up to date.
                 </p>
+              ) : null}
+              {warnings.length > 0 ? (
+                <section class="run-warnings" aria-labelledby="warnings-heading">
+                  <h3 id="warnings-heading">Warnings from this run</h3>
+                  <p>None of these stopped the forecast.</p>
+                  <ul>
+                    {warnings.map((warning) => (
+                      <li key={warning}>{warning}</li>
+                    ))}
+                  </ul>
+                </section>
               ) : null}
               <ResultsView
                 results={results}

@@ -11,6 +11,7 @@ import {
   type SimulationModel,
 } from '../../config/types';
 import { CheckField, NumberField, TextField } from '../fields';
+import { At, PathProblems } from '../problems';
 import { IconGrowth } from '../icons';
 import { EventList, type WithdrawalStyle } from './EventList';
 
@@ -50,7 +51,7 @@ export function InvestmentFields({ investment, simulation, showName = true, onCh
       <EditorFields title="Account">
         <div class="field-grid">
           {showName ? (
-            <TextField
+            <TextField field="name"
               label="Name"
               help={HELP.investmentName}
               value={investment.name}
@@ -58,7 +59,7 @@ export function InvestmentFields({ investment, simulation, showName = true, onCh
               onInput={(name) => patch({ name })}
             />
           ) : null}
-          <NumberField
+          <NumberField field="startingValue"
             label="Starting value"
             help={HELP.investmentStartingValue}
             value={investment.startingValue}
@@ -66,7 +67,7 @@ export function InvestmentFields({ investment, simulation, showName = true, onCh
             placeholder="0"
             onChange={(startingValue) => patch({ startingValue })}
           />
-          <NumberField
+          <NumberField field="annualReturnRate"
             label="Annual return"
             help={HELP.investmentAnnualReturnRate}
             value={investment.annualReturnRate}
@@ -80,7 +81,7 @@ export function InvestmentFields({ investment, simulation, showName = true, onCh
       </EditorFields>
       <EditorFields title="Taxes and cash flow">
         <div class="field-grid">
-          <NumberField
+          <NumberField field="taxRate"
             label="Growth tax rate"
             help={HELP.investmentTaxRate}
             value={investment.taxRate}
@@ -89,7 +90,7 @@ export function InvestmentFields({ investment, simulation, showName = true, onCh
             suffix="%"
             onChange={(taxRate) => patch({ taxRate })}
           />
-          <NumberField
+          <NumberField field="withdrawalTaxRate"
             label="Withdrawal tax rate"
             help={HELP.investmentWithdrawalTaxRate}
             value={investment.withdrawalTaxRate}
@@ -101,13 +102,13 @@ export function InvestmentFields({ investment, simulation, showName = true, onCh
         </div>
 
         <div class="check-grid">
-          <CheckField
+          <CheckField field="contributionsFromCash"
             label="Contributions come out of simulated cash"
             help={HELP.investmentContributionsFromCash}
             checked={investment.contributionsFromCash}
             onChange={(contributionsFromCash) => patch({ contributionsFromCash })}
           />
-          <CheckField
+          <CheckField field="fundLoanPayoffs"
             label="Can fund loan payoffs"
             help={HELP.investmentFundLoanPayoffs}
             checked={investment.fundLoanPayoffs}
@@ -142,6 +143,7 @@ export function InvestmentFields({ investment, simulation, showName = true, onCh
             One style per investment — an account&rsquo;s withdrawals must either all be fixed
             amounts or all be percentages, never a mix. Switching converts every row.
           </p>
+          <PathProblems field="withdrawals" />
         </fieldset>
       </div>
 
@@ -243,8 +245,8 @@ export function InvestmentList({ investments, simulation, onChange }: Investment
       ) : (
         <ul class="row-list">
           {investments.map((investment, index) => (
+            <At key={investment.id} sub={`investments.${index}`}>
             <InvestmentCard
-              key={investment.id}
               {...cards.cardProps(investment.id)}
               investment={investment}
               index={index}
@@ -259,6 +261,7 @@ export function InvestmentList({ investments, simulation, onChange }: Investment
                 onChange([...investments.slice(0, index + 1), duplicate, ...investments.slice(index + 1)]);
               }}
             />
+            </At>
           ))}
         </ul>
       )}

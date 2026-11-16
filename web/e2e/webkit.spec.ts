@@ -240,7 +240,7 @@ test('an iPhone flips one choice of a scenario and keeps the path', async ({ pag
   await expect(kept).toHaveAttribute('aria-disabled', 'true');
   // Playwright waits for an enabled control; a second tap is the point here.
   await kept.tap({ force: true });
-  await expect(page.locator('.notices li')).toHaveCount(2); // the upload, and one kept path
+  await expect(flip.locator('.flip__keep [role="status"]')).toContainText('Added to your plan.');
   expect(await overflow(page), 'kept').toBeLessThanOrEqual(0);
 
   await page.getByRole('tab', { name: 'Planning Workspace' }).tap();

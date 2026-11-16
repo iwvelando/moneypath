@@ -8,45 +8,57 @@ import (
 
 // Validate checks cfg against spec chapter 03, fills every Resolved* field
 // (defaults applied, dates parsed), and returns validation warnings. now is
-// the current month, used when simulation.startDate is absent.
+// the current month, used when simulation.startDate is absent. A plan that
+// breaks a rule is refused with the first one it breaks; Check reports all.
 func Validate(cfg *Config, now Month) ([]string, error) {
-	var warns []string
-
-	if cfg.Version == nil {
-		return nil, fmt.Errorf("this file has no 'version' field, so it is not a moneypath plan; plans in the older finance-forecast format are no longer converted")
+	problems := Check(cfg, now)
+	if err := firstError(problems); err != nil {
+		return nil, err
 	}
-	if *cfg.Version != 2 {
-		return nil, fmt.Errorf("unsupported config version %d (expected 2)", *cfg.Version)
+	return warningsOf(problems), nil
+}
+
+// Check is Validate reporting every rule the plan breaks and every warning,
+// each with the field it concerns (spec chapter 02, Problems JSON). The
+// Resolved* fields are complete only when no problem is an error.
+func Check(cfg *Config, now Month) []Problem {
+	c := &checker{}
+
+	switch {
+	case cfg.Version == nil:
+		c.fail("version", "This file has no version, so it is not a moneypath plan. Plans in the older finance-forecast format are no longer converted.")
+	case *cfg.Version != 2:
+		c.fail("version", "This plan is version %d, and moneypath reads version 2.", *cfg.Version)
 	}
 
 	// Simulation.
 	sim := &cfg.Simulation
-	if sim.EndDate == "" {
-		return nil, fmt.Errorf("simulation.endDate is required")
-	}
-	end, err := ParseMonth(sim.EndDate)
-	if err != nil {
-		return nil, fmt.Errorf("simulation.endDate: %w", err)
-	}
-	start := now
+	start, haveStart := now, true
 	if sim.StartDate != "" {
-		if start, err = ParseMonth(sim.StartDate); err != nil {
-			return nil, fmt.Errorf("simulation.startDate: %w", err)
-		}
+		start, haveStart = c.month("simulation.startDate", "start month", sim.StartDate)
 	}
-	if end < start {
-		return nil, fmt.Errorf("simulation.endDate %s is before startDate %s", end, start)
+	var end Month
+	haveEnd := false
+	if sim.EndDate == "" {
+		c.fail("simulation.endDate", "The end month is required.")
+	} else {
+		end, haveEnd = c.month("simulation.endDate", "end month", sim.EndDate)
 	}
+	c.window = haveStart && haveEnd
+	if c.window && end < start {
+		c.fail("simulation.endDate", "The end month (%s) is before the start month (%s).", end, start)
+		c.window = false
+	}
+	c.start, c.end = start, end
 	sim.ResolvedStart, sim.ResolvedEnd = start, end
 	if sim.StartingCash == nil {
-		warns = append(warns, "simulation.startingCash is absent; treating it as 0.00")
+		c.warn("simulation.startingCash", "No starting cash is given, so the plan starts with 0.00.")
 		sim.ResolvedStartingCash = 0
 	} else {
 		sim.ResolvedStartingCash = *sim.StartingCash
 	}
-
 	if sim.CashInterestRate < 0 {
-		return nil, fmt.Errorf("simulation.cashInterestRate must be at least 0 (got %v)", sim.CashInterestRate)
+		c.fail("simulation.cashInterestRate", "The cash interest rate must be at least 0.")
 	}
 
 	// Recommendations.
@@ -54,184 +66,226 @@ func Validate(cfg *Config, now Month) ([]string, error) {
 	if cfg.Recommendations != nil && cfg.Recommendations.EmergencyFundMonths != nil {
 		n := *cfg.Recommendations.EmergencyFundMonths
 		if n < 0 {
-			return nil, fmt.Errorf("recommendations.emergencyFundMonths must be >= 0")
+			c.fail("recommendations.emergencyFundMonths", "The emergency fund months must be at least 0.")
 		}
 		cfg.ResolvedEmergencyFundMonths = n
 	}
 
 	// Scenarios.
 	if len(cfg.Scenarios) == 0 {
-		return nil, fmt.Errorf("at least one scenario is required")
+		c.fail("scenarios", "A plan needs at least one scenario.")
 	}
 	seen := map[string]bool{}
 	for i, sc := range cfg.Scenarios {
-		if sc == nil || sc.Name == "" {
-			return nil, fmt.Errorf("scenarios[%d] has no name", i)
+		path := join("scenarios", i)
+		if sc == nil {
+			c.fail(path, "This scenario is empty.")
+			continue
 		}
-		if seen[sc.Name] {
-			return nil, fmt.Errorf("duplicate scenario name %q", sc.Name)
+		switch {
+		case sc.Name == "":
+			c.fail(join(path, "name"), "The scenario needs a name.")
+		case seen[sc.Name]:
+			c.fail(join(path, "name"), "Another scenario is already named “%s”. Give each scenario its own name.", sc.Name)
 		}
 		seen[sc.Name] = true
 		sc.ResolvedActive = sc.Active == nil || *sc.Active
 	}
 
-	if err := validateSection(&cfg.Common, "common", "optimize is not allowed on common events", start, end, &warns); err != nil {
-		return nil, err
-	}
-	if err := validateChoices(cfg, start, end, &warns); err != nil {
-		return nil, err
-	}
-	for _, sc := range cfg.Scenarios {
-		where := fmt.Sprintf("scenario %q", sc.Name)
-		if err := validateSection(&sc.Section, where, "", start, end, &warns); err != nil {
-			return nil, err
+	c.section(&cfg.Common, "common", "An optimizer cannot be used on a baseline event; put the event in a scenario.")
+	c.choices(cfg)
+	for i, sc := range cfg.Scenarios {
+		if sc != nil {
+			c.section(&sc.Section, join("scenarios", i), "")
 		}
 	}
-	if err := resolveScenarios(cfg); err != nil {
-		return nil, err
+	c.resolveScenarios(cfg)
+
+	for i := range c.problems {
+		c.problems[i].Where = locate(cfg.doc, c.problems[i].Path)
 	}
-	return warns, nil
+	return c.problems
 }
 
-// validateSection checks one list of entries. noOptimize, when set, is why an
-// event of this list cannot carry an optimize block.
-func validateSection(s *Section, where, noOptimize string, start, end Month, warns *[]string) error {
+// checker gathers the problems of one plan.
+type checker struct {
+	problems []Problem
+	// The simulation's months, and whether both are known. An entry is held
+	// against them only when they are.
+	start, end Month
+	window     bool
+}
+
+func (c *checker) fail(path, format string, args ...any) {
+	c.problems = append(c.problems, Problem{Level: LevelError, Path: path, Message: fmt.Sprintf(format, args...)})
+}
+
+func (c *checker) warn(path, format string, args ...any) {
+	c.problems = append(c.problems, Problem{Level: LevelWarning, Path: path, Message: fmt.Sprintf(format, args...)})
+}
+
+// month parses a month the reader knows by label, such as "end month".
+func (c *checker) month(path, label, s string) (Month, bool) {
+	m, err := ParseMonth(s)
+	if err != nil {
+		c.fail(path, "The %s, “%s”, is not a month. Write the year and the month, like 2030-01.", label, s)
+		return 0, false
+	}
+	return m, true
+}
+
+// section checks one list of entries at path. noOptimize, when set, is why
+// an event of this list cannot carry an optimizer.
+func (c *checker) section(s *Section, path, noOptimize string) {
 	for i, ev := range s.Events {
-		if err := validateEvent(ev, where, i, noOptimize, start, end, warns); err != nil {
-			return err
-		}
+		c.event(ev, join(path, "events", i), noOptimize)
 	}
 	for i, l := range s.Loans {
-		if err := validateLoan(l, where, i, start, end, warns); err != nil {
-			return err
-		}
+		c.loan(l, join(path, "loans", i))
 	}
 	names := map[string]bool{}
 	for i, inv := range s.Investments {
-		if err := validateInvestment(inv, where, i, start, end, warns); err != nil {
-			return err
+		p := join(path, "investments", i)
+		c.investment(inv, p)
+		if inv == nil || inv.Name == "" {
+			continue
 		}
 		if names[inv.Name] {
-			return fmt.Errorf("%s: duplicate investment name %q", where, inv.Name)
+			c.fail(join(p, "name"), "Another investment here is already named “%s”. Give each its own name.", inv.Name)
 		}
 		names[inv.Name] = true
 	}
-	return nil
 }
 
-func validateEvent(ev *Event, where string, i int, noOptimize string, start, end Month, warns *[]string) error {
-	name := eventLabel(ev, i)
+// event checks a cash-flow event.
+func (c *checker) event(ev *Event, path, noOptimize string) {
+	if ev == nil {
+		c.fail(path, "This event is empty.")
+		return
+	}
 	if ev.Amount == nil {
-		return fmt.Errorf("%s: event %s: amount is required", where, name)
+		c.fail(join(path, "amount"), "The amount is required.")
 	}
 	if ev.Percentage != nil {
-		return fmt.Errorf("%s: event %s: percentage is only valid on investment withdrawals", where, name)
+		c.fail(join(path, "percentage"), "A percentage can only be used on an investment’s withdrawal.")
 	}
-	if err := resolveEvent(ev, fmt.Sprintf("%s: event %s", where, name), start, end, warns); err != nil {
-		return err
-	}
+	c.schedule(ev, path)
 	if ev.Optimize != nil {
 		if noOptimize != "" {
-			return fmt.Errorf("%s: event %s: %s", where, name, noOptimize)
+			c.fail(join(path, "optimize"), "%s", noOptimize)
+			return
 		}
-		if err := validateOptimize(ev, fmt.Sprintf("%s: event %s", where, name)); err != nil {
-			return err
-		}
+		c.optimize(ev.Optimize, join(path, "optimize"))
 	}
-	return nil
 }
 
-func eventLabel(ev *Event, i int) string {
-	if ev.Name != "" {
-		return fmt.Sprintf("%q", ev.Name)
-	}
-	return fmt.Sprintf("#%d", i+1)
-}
-
-// resolveEvent applies schedule defaults and shared checks (chapter 03
-// §Event, chapter 04 §2).
-func resolveEvent(ev *Event, where string, start, end Month, warns *[]string) error {
+// schedule applies schedule defaults and shared checks (chapter 03 §Event,
+// chapter 04 §2).
+func (c *checker) schedule(ev *Event, path string) {
 	ev.ResolvedFrequency = 1
 	if ev.Frequency != nil {
 		if *ev.Frequency < 1 {
-			return fmt.Errorf("%s: frequency must be >= 1", where)
+			c.fail(join(path, "frequency"), "The frequency must be a whole number of months, 1 or more.")
+		} else {
+			ev.ResolvedFrequency = *ev.Frequency
 		}
-		ev.ResolvedFrequency = *ev.Frequency
 	}
-	ev.ResolvedStart = start
+	haveStart, haveEnd := c.window, c.window
+	ev.ResolvedStart = c.start
 	if ev.StartDate != "" {
-		s, err := ParseMonth(ev.StartDate)
-		if err != nil {
-			return fmt.Errorf("%s: startDate: %w", where, err)
-		}
-		ev.ResolvedStart = s
+		ev.ResolvedStart, haveStart = c.month(join(path, "startDate"), "start month", ev.StartDate)
 	}
-	ev.ResolvedEnd = end
+	ev.ResolvedEnd = c.end
 	if ev.EndDate != "" {
-		e, err := ParseMonth(ev.EndDate)
-		if err != nil {
-			return fmt.Errorf("%s: endDate: %w", where, err)
+		ev.ResolvedEnd, haveEnd = c.month(join(path, "endDate"), "end month", ev.EndDate)
+	}
+	if haveStart && haveEnd && ev.ResolvedStart > ev.ResolvedEnd {
+		switch {
+		case ev.StartDate == "":
+			c.fail(join(path, "endDate"), "The end month (%s) is before the simulation starts (%s).", ev.ResolvedEnd, ev.ResolvedStart)
+		case ev.EndDate == "":
+			c.fail(join(path, "startDate"), "The start month (%s) is after the simulation ends (%s).", ev.ResolvedStart, ev.ResolvedEnd)
+		default:
+			c.fail(join(path, "startDate"), "The start month (%s) is after the end month (%s).", ev.ResolvedStart, ev.ResolvedEnd)
 		}
-		ev.ResolvedEnd = e
+		return
 	}
-	if ev.ResolvedStart > ev.ResolvedEnd {
-		return fmt.Errorf("%s: startDate %s is after endDate %s", where, ev.ResolvedStart, ev.ResolvedEnd)
+	if !c.window {
+		return
 	}
-	if ev.ResolvedStart >= end && ev.ResolvedStart != start {
-		*warns = append(*warns, fmt.Sprintf("%s: starts at or after the simulation end (%s)", where, end))
+	if haveStart && ev.ResolvedStart >= c.end && ev.ResolvedStart != c.start {
+		c.warn(join(path, "startDate"), "This starts at or after the end of the simulation (%s).", c.end)
 	}
-	if ev.ResolvedEnd > end {
-		*warns = append(*warns, fmt.Sprintf("%s: ends after the simulation end (%s)", where, end))
+	if haveEnd && ev.ResolvedEnd > c.end {
+		c.warn(join(path, "endDate"), "This ends after the simulation does (%s), so the later months are not counted.", c.end)
 	}
-	return nil
 }
 
-func validateLoan(l *Loan, where string, i int, start, end Month, warns *[]string) error {
-	if l.Name == "" {
-		return fmt.Errorf("%s: loans[%d]: name is required", where, i)
+// payment checks an event that moves a positive amount and nothing else: a
+// loan's extra principal payment or an investment's contribution.
+func (c *checker) payment(ev *Event, path string) {
+	if ev == nil {
+		c.fail(path, "This entry is empty.")
+		return
 	}
-	w := fmt.Sprintf("%s: loan %q", where, l.Name)
+	if ev.Amount == nil || *ev.Amount <= 0 {
+		c.fail(join(path, "amount"), "The amount must be more than 0.")
+	}
+	if ev.Percentage != nil {
+		c.fail(join(path, "percentage"), "A percentage cannot be used here.")
+	}
+	if ev.Optimize != nil {
+		c.fail(join(path, "optimize"), "An optimizer cannot be used here.")
+	}
+	c.schedule(ev, path)
+}
+
+func (c *checker) loan(l *Loan, path string) {
+	if l == nil {
+		c.fail(path, "This loan is empty.")
+		return
+	}
+	at := func(field string) string { return join(path, field) }
+	if l.Name == "" {
+		c.fail(at("name"), "The loan needs a name.")
+	}
 	if l.Principal <= 0 {
-		return fmt.Errorf("%s: principal must be > 0", w)
+		c.fail(at("principal"), "The principal must be more than 0.")
 	}
 	if l.Term < 1 {
-		return fmt.Errorf("%s: term must be >= 1", w)
+		c.fail(at("term"), "The term must be 1 month or more.")
 	}
 	if l.InterestRate < 0 {
-		return fmt.Errorf("%s: interestRate must be >= 0", w)
+		c.fail(at("interestRate"), "The interest rate must be at least 0.")
 	}
-	if l.DownPayment < 0 || l.DownPayment >= l.Principal {
-		return fmt.Errorf("%s: downPayment must be >= 0 and < principal", w)
+	if l.DownPayment < 0 || (l.Principal > 0 && l.DownPayment >= l.Principal) {
+		c.fail(at("downPayment"), "The down payment must be at least 0 and less than the principal.")
 	}
 	if l.Escrow < 0 {
-		return fmt.Errorf("%s: escrow must be >= 0", w)
+		c.fail(at("escrow"), "The escrow must be at least 0.")
 	}
 	if l.MortgageInsurance < 0 {
-		return fmt.Errorf("%s: mortgageInsurance must be >= 0", w)
+		c.fail(at("mortgageInsurance"), "The mortgage insurance must be at least 0.")
 	}
 	if l.MortgageInsuranceCutoff < 0 || l.MortgageInsuranceCutoff > 100 {
-		return fmt.Errorf("%s: mortgageInsuranceCutoff must be between 0 and 100", w)
+		c.fail(at("mortgageInsuranceCutoff"), "The mortgage insurance cutoff must be at least 0 and at most 100.")
 	}
 	if l.EarlyPayoffThreshold < 0 {
-		return fmt.Errorf("%s: earlyPayoffThreshold must be >= 0", w)
+		c.fail(at("earlyPayoffThreshold"), "The early payoff threshold must be at least 0.")
 	}
+	haveStart := false
 	if l.StartDate == "" {
-		return fmt.Errorf("%s: startDate is required", w)
+		c.fail(at("startDate"), "The first payment month is required.")
+	} else {
+		l.ResolvedStart, haveStart = c.month(at("startDate"), "first payment month", l.StartDate)
 	}
-	s, err := ParseMonth(l.StartDate)
-	if err != nil {
-		return fmt.Errorf("%s: startDate: %w", w, err)
-	}
-	l.ResolvedStart = s
 	l.ResolvedEarlyPayoffDate = -1
 	if l.EarlyPayoffDate != "" {
-		d, err := ParseMonth(l.EarlyPayoffDate)
-		if err != nil {
-			return fmt.Errorf("%s: earlyPayoffDate: %w", w, err)
-		}
-		l.ResolvedEarlyPayoffDate = d
-		if d <= s {
-			*warns = append(*warns, fmt.Sprintf("%s: earlyPayoffDate %s is not after the loan start %s", w, d, s))
+		if d, ok := c.month(at("earlyPayoffDate"), "early payoff month", l.EarlyPayoffDate); ok {
+			l.ResolvedEarlyPayoffDate = d
+			if haveStart && d <= l.ResolvedStart {
+				c.warn(at("earlyPayoffDate"), "The early payoff month (%s) is not after the first payment (%s).", d, l.ResolvedStart)
+			}
 		}
 	}
 	l.ResolvedSellPrice = l.Principal
@@ -239,92 +293,71 @@ func validateLoan(l *Loan, where string, i int, start, end Month, warns *[]strin
 		l.ResolvedSellPrice = *l.SellPrice
 	}
 	if l.SellProperty && l.EarlyPayoffDate == "" && l.EarlyPayoffThreshold == 0 {
-		*warns = append(*warns, fmt.Sprintf("%s: sellProperty has no effect without earlyPayoffDate or earlyPayoffThreshold", w))
+		c.warn(at("sellProperty"), "Selling the property has no effect without an early payoff month or an early payoff threshold.")
 	}
 	if l.MortgageInsurance > 0 && l.MortgageInsuranceCutoff == 0 {
-		*warns = append(*warns, fmt.Sprintf("%s: mortgageInsurance without mortgageInsuranceCutoff applies for the whole life of the loan", w))
+		c.warn(at("mortgageInsuranceCutoff"), "With no cutoff, the mortgage insurance is charged for the whole life of the loan.")
 	}
 	for j, ev := range l.ExtraPrincipalPayments {
-		ew := fmt.Sprintf("%s: extraPrincipalPayments %s", w, eventLabel(ev, j))
-		if ev.Amount == nil || *ev.Amount <= 0 {
-			return fmt.Errorf("%s: amount must be > 0", ew)
-		}
-		if ev.Percentage != nil {
-			return fmt.Errorf("%s: percentage is not allowed", ew)
-		}
-		if ev.Optimize != nil {
-			return fmt.Errorf("%s: optimize is not allowed", ew)
-		}
-		if err := resolveEvent(ev, ew, start, end, warns); err != nil {
-			return err
-		}
+		c.payment(ev, join(path, "extraPrincipalPayments", j))
 	}
-	return nil
 }
 
-func validateInvestment(inv *Investment, where string, i int, start, end Month, warns *[]string) error {
-	if inv.Name == "" {
-		return fmt.Errorf("%s: investments[%d]: name is required", where, i)
+func (c *checker) investment(inv *Investment, path string) {
+	if inv == nil {
+		c.fail(path, "This investment is empty.")
+		return
 	}
-	w := fmt.Sprintf("%s: investment %q", where, inv.Name)
+	at := func(field string) string { return join(path, field) }
+	if inv.Name == "" {
+		c.fail(at("name"), "The investment needs a name.")
+	}
 	if inv.StartingValue < 0 {
-		return fmt.Errorf("%s: startingValue must be >= 0", w)
+		c.fail(at("startingValue"), "The starting value must be at least 0.")
 	}
 	if inv.TaxRate < 0 || inv.TaxRate >= 100 {
-		return fmt.Errorf("%s: taxRate must be at least 0 and less than 100", w)
+		c.fail(at("taxRate"), "The growth tax rate must be at least 0 and less than 100.")
 	}
 	if inv.WithdrawalTaxRate < 0 || inv.WithdrawalTaxRate >= 100 {
-		return fmt.Errorf("%s: withdrawalTaxRate must be at least 0 and less than 100", w)
+		c.fail(at("withdrawalTaxRate"), "The withdrawal tax rate must be at least 0 and less than 100.")
 	}
 	for j, ev := range inv.Contributions {
-		ew := fmt.Sprintf("%s: contributions %s", w, eventLabel(ev, j))
-		if ev.Amount == nil || *ev.Amount <= 0 {
-			return fmt.Errorf("%s: amount must be > 0", ew)
-		}
-		if ev.Percentage != nil {
-			return fmt.Errorf("%s: percentage is not allowed on contributions", ew)
-		}
-		if ev.Optimize != nil {
-			return fmt.Errorf("%s: optimize is not allowed", ew)
-		}
-		if err := resolveEvent(ev, ew, start, end, warns); err != nil {
-			return err
-		}
+		c.payment(ev, join(path, "contributions", j))
 	}
-	style := 0 // 1 = amount, 2 = percentage
+	amounts, percentages := false, false
 	for j, ev := range inv.Withdrawals {
-		ew := fmt.Sprintf("%s: withdrawals %s", w, eventLabel(ev, j))
-		hasAmount := ev.Amount != nil
-		hasPct := ev.Percentage != nil
-		if hasAmount == hasPct {
-			return fmt.Errorf("%s: exactly one of amount or percentage is required", ew)
+		p := join(path, "withdrawals", j)
+		if ev == nil {
+			c.fail(p, "This withdrawal is empty.")
+			continue
 		}
-		if hasAmount && *ev.Amount <= 0 {
-			return fmt.Errorf("%s: amount must be > 0", ew)
+		hasAmount, hasPct := ev.Amount != nil, ev.Percentage != nil
+		switch {
+		case hasAmount == hasPct:
+			c.fail(join(p, "amount"), "A withdrawal needs either an amount or a percentage, and not both.")
+		case hasAmount:
+			amounts = true
+			if *ev.Amount <= 0 {
+				c.fail(join(p, "amount"), "The amount must be more than 0.")
+			}
+		default:
+			percentages = true
+			if *ev.Percentage <= 0 {
+				c.fail(join(p, "percentage"), "The percentage must be more than 0.")
+			}
 		}
-		if hasPct && *ev.Percentage <= 0 {
-			return fmt.Errorf("%s: percentage must be > 0", ew)
-		}
-		this := 1
-		if hasPct {
-			this = 2
-		}
-		if style != 0 && style != this {
-			return fmt.Errorf("%s: an investment must not mix amount-style and percentage-style withdrawals", w)
-		}
-		style = this
 		if ev.Optimize != nil {
-			return fmt.Errorf("%s: optimize is not allowed", ew)
+			c.fail(join(p, "optimize"), "An optimizer cannot be used here.")
 		}
-		if err := resolveEvent(ev, ew, start, end, warns); err != nil {
-			return err
-		}
+		c.schedule(ev, p)
 	}
-	return nil
+	if amounts && percentages {
+		c.fail(at("withdrawals"), "An investment’s withdrawals must all be amounts or all be percentages, never a mix.")
+	}
 }
 
-func validateOptimize(ev *Event, where string) error {
-	o := ev.Optimize
+func (c *checker) optimize(o *Optimize, path string) {
+	at := func(field string) string { return join(path, field) }
 	field := strings.ToLower(strings.NewReplacer("_", "", "-", "").Replace(o.Field))
 	switch field {
 	case "amount":
@@ -336,7 +369,8 @@ func validateOptimize(ev *Event, where string) error {
 	case "enddate":
 		o.ResolvedField = "endDate"
 	default:
-		return fmt.Errorf("%s: optimize.field must be amount, frequency, startDate, or endDate", where)
+		c.fail(at("field"), "The field to adjust must be the amount, the frequency, the start month or the end month.")
+		return
 	}
 	o.ResolvedTol = 0.01
 	if o.ResolvedField != "amount" {
@@ -344,46 +378,57 @@ func validateOptimize(ev *Event, where string) error {
 	}
 	if o.Tolerance != nil {
 		if *o.Tolerance <= 0 {
-			return fmt.Errorf("%s: optimize.tolerance must be > 0", where)
+			c.fail(at("tolerance"), "The tolerance must be more than 0.")
+		} else {
+			o.ResolvedTol = *o.Tolerance
 		}
-		o.ResolvedTol = *o.Tolerance
 	}
 	o.ResolvedMaxIter = 50
 	if o.MaxIterations != nil {
 		if *o.MaxIterations < 1 {
-			return fmt.Errorf("%s: optimize.maxIterations must be >= 1", where)
+			c.fail(at("maxIterations"), "The max iterations must be 1 or more.")
+		} else {
+			o.ResolvedMaxIter = *o.MaxIterations
 		}
-		o.ResolvedMaxIter = *o.MaxIterations
 	}
 	switch o.ResolvedField {
 	case "amount", "frequency":
+		if o.Min == nil {
+			c.fail(at("min"), "The lower bound is required.")
+		}
+		if o.Max == nil {
+			c.fail(at("max"), "The upper bound is required.")
+		}
 		if o.Min == nil || o.Max == nil {
-			return fmt.Errorf("%s: optimize.min and optimize.max are required for field %s", where, o.ResolvedField)
+			return
 		}
 		if !(*o.Min < *o.Max) {
-			return fmt.Errorf("%s: optimize.min must be < optimize.max", where)
+			c.fail(at("min"), "The lower bound must be less than the upper bound.")
 		}
 		if o.ResolvedField == "frequency" {
-			if *o.Min < 1 || *o.Min != math.Trunc(*o.Min) || *o.Max != math.Trunc(*o.Max) {
-				return fmt.Errorf("%s: optimize frequency bounds must be integers with min >= 1", where)
+			if *o.Min < 1 || *o.Min != math.Trunc(*o.Min) {
+				c.fail(at("min"), "The lower bound must be a whole number of months, 1 or more.")
+			}
+			if *o.Max != math.Trunc(*o.Max) {
+				c.fail(at("max"), "The upper bound must be a whole number of months.")
 			}
 		}
 	default: // startDate, endDate
-		if o.MinDate == "" || o.MaxDate == "" {
-			return fmt.Errorf("%s: optimize.minDate and optimize.maxDate are required for field %s", where, o.ResolvedField)
+		var mn, mx Month
+		haveMin, haveMax := false, false
+		if o.MinDate == "" {
+			c.fail(at("minDate"), "The earliest month is required.")
+		} else {
+			mn, haveMin = c.month(at("minDate"), "earliest month", o.MinDate)
 		}
-		mn, err := ParseMonth(o.MinDate)
-		if err != nil {
-			return fmt.Errorf("%s: optimize.minDate: %w", where, err)
+		if o.MaxDate == "" {
+			c.fail(at("maxDate"), "The latest month is required.")
+		} else {
+			mx, haveMax = c.month(at("maxDate"), "latest month", o.MaxDate)
 		}
-		mx, err := ParseMonth(o.MaxDate)
-		if err != nil {
-			return fmt.Errorf("%s: optimize.maxDate: %w", where, err)
-		}
-		if mn > mx {
-			return fmt.Errorf("%s: optimize.minDate must be <= optimize.maxDate", where)
+		if haveMin && haveMax && mn > mx {
+			c.fail(at("minDate"), "The earliest month must not be after the latest month.")
 		}
 		o.ResolvedMinDate, o.ResolvedMaxDate = mn, mx
 	}
-	return nil
 }

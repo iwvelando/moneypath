@@ -35,9 +35,18 @@ These are the properties that must survive any redesign:
   view needs to be deep-linkable (chapter 02, "Build artifacts").
 - **Accessible by construction**: semantic roles, keyboard operability, `aria-*` on tabs,
   tooltips and status regions. This is a floor, not an aspiration.
-- **Engine warnings never block a run.** Validation warnings are shown prominently;
-  only hard config errors stop a forecast, and they surface inline without losing
-  editor state.
+- **Engine warnings never block a run.** Only hard config errors stop a forecast, and
+  they never cost the reader their editor state.
+- **A problem is shown where it is, for as long as it is true.** The engine checks the
+  plan on every edit (chapter 02, "Problems JSON"), and each error or warning appears
+  under the field it is about. A warning is styled more quietly than an error and
+  begins "Warning: ". An entry that is collapsed says when something inside it needs
+  attention. Nothing typed is discarded or corrected in silence: text that is not a
+  number stays in its field with its error. A failure that belongs to no field
+  appears beside the control that started the action, added to the text there, never
+  in place of it. Only what concerns the whole app is a page banner: an engine that
+  did not load, a saved draft that could not be restored, a browser that is not saving
+  the plan. There is no list of dismissable messages.
 
 ## Capabilities
 
@@ -78,8 +87,9 @@ The app covers, at a coarse grain:
   entry keeps selections and targets intact. What the editor cannot make valid it keeps
   and flags, never drops or repairs: a target the baseline does not have stays under the
   name as written, and a scenario with no pick for a choice shows that dropdown unset.
-- **Running forecasts**, with a busy indicator and errors that appear where the run was
-  started, never by moving the reader somewhere else. The editor is long and a tweak is
+- **Running forecasts**, with a busy indicator. A run asked for while the plan has
+  errors is refused where it was started: the bar counts them and offers to go to the
+  first, opening whatever holds it. The warnings of a run come with its results. The editor is long and a tweak is
   usually followed by a run, so the run action stays reachable from any scroll position
   rather than only from the top of the page.
 - **Working with the optimizer** — one place to switch it on, to see which events

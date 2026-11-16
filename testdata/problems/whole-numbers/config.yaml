@@ -1,0 +1,10 @@
+version: 2
+simulation: {startDate: 2025-01, endDate: 2030-01, startingCash: 0}
+common:
+  loans:
+    - {name: Car, principal: 1000, interestRate: 5, term: 12.5, startDate: 2025-01}
+scenarios:
+  - name: plan
+    events:
+      - {name: Gym, amount: &fee -60.5, frequency: 0.3}
+      - {name: Club, amount: -20, frequency: *fee}

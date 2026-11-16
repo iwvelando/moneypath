@@ -133,6 +133,23 @@ export interface ForecastOptions {
   flip?: FlipRequest;
 }
 
+/**
+ * One thing wrong with a plan, or one warning about it. `path` is the field's
+ * place in the config document (`common.loans.0.term`), `where` that place in
+ * words, and `message` a sentence that does not repeat the place.
+ */
+export interface Problem {
+  level: 'error' | 'warning';
+  path: string;
+  where: string;
+  message: string;
+}
+
+/** A problem as text on its own: the place, then the sentence. */
+export function problemText(problem: Problem): string {
+  return problem.where ? `${problem.where}: ${problem.message}` : problem.message;
+}
+
 /** An error surfaced by the engine bridge (`{"error": "..."}`) or by loading. */
 export class EngineError extends Error {
   constructor(message: string) {
@@ -145,4 +162,6 @@ export interface Engine {
   /** The build version string from `moneypathVersion()`. */
   version(): string;
   forecast(configYaml: string, options: ForecastOptions): Promise<ForecastResults>;
+  /** Checks a plan without running it. Quick enough to call on every edit. */
+  validate(configYaml: string, options: { now?: string }): Problem[];
 }

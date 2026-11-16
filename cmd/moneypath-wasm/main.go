@@ -3,6 +3,7 @@
 // moneypath-wasm exposes the engine to JavaScript (spec chapter 02):
 //
 //	moneypathForecast(configYAML, optionsJSON) -> results JSON | {"error": …}
+//	moneypathValidate(configYAML, optionsJSON) -> problems JSON
 //	moneypathVersion()                         -> version string
 package main
 
@@ -70,6 +71,26 @@ func forecastFn(_ js.Value, args []js.Value) any {
 	return string(out)
 }
 
+func validateFn(_ js.Value, args []js.Value) any {
+	if len(args) < 1 {
+		return errorJSON(fmt.Errorf("moneypathValidate requires a config argument"))
+	}
+	var opts forecastOptions
+	if len(args) >= 2 && args[1].Type() == js.TypeString && args[1].String() != "" {
+		if err := json.Unmarshal([]byte(args[1].String()), &opts); err != nil {
+			return errorJSON(fmt.Errorf("invalid options JSON: %w", err))
+		}
+	}
+	now := currentMonth()
+	if opts.Now != "" {
+		var err error
+		if now, err = config.ParseMonth(opts.Now); err != nil {
+			return errorJSON(fmt.Errorf("invalid options.now: %w", err))
+		}
+	}
+	return string(app.ProblemsJSON([]byte(args[0].String()), now))
+}
+
 func currentMonth() config.Month {
 	t := time.Now()
 	return config.Month(t.Year()*12 + int(t.Month()) - 1)
@@ -77,6 +98,7 @@ func currentMonth() config.Month {
 
 func main() {
 	js.Global().Set("moneypathForecast", js.FuncOf(forecastFn))
+	js.Global().Set("moneypathValidate", js.FuncOf(validateFn))
 	js.Global().Set("moneypathVersion", js.FuncOf(func(js.Value, []js.Value) any {
 		return version
 	}))

@@ -2,7 +2,9 @@ package config
 
 import (
 	"fmt"
+	"math"
 	"reflect"
+	"strconv"
 	"strings"
 
 	"gopkg.in/yaml.v3"
@@ -11,19 +13,41 @@ import (
 // Parse decodes a v2 YAML document. Unknown keys are returned as warnings
 // (spec chapter 03: they must not be hard errors).
 func Parse(data []byte) (*Config, []string, error) {
+	cfg, problems := parse(data)
+	if err := firstError(problems); err != nil {
+		return nil, nil, err
+	}
+	return cfg, warningsOf(problems), nil
+}
+
+// parse decodes a document into a config, or says why it could not. The
+// config is nil when any problem is an error.
+func parse(data []byte) (*Config, []Problem) {
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return nil, nil, fmt.Errorf("parsing config: %w", err)
+		return nil, decodeProblems(err, nil, "")
+	}
+	var root *yaml.Node
+	if len(doc.Content) > 0 {
+		root = doc.Content[0]
 	}
 	var cfg Config
 	if err := doc.Decode(&cfg); err != nil {
-		return nil, nil, fmt.Errorf("parsing config: %w", err)
+		problems := decodeProblems(err, root, "")
+		for i := range problems {
+			problems[i].Where = locate(root, problems[i].Path)
+		}
+		return nil, problems
 	}
-	var warnings []string
-	if len(doc.Content) > 0 {
-		collectUnknownKeys(doc.Content[0], reflect.TypeOf(Config{}), "", &warnings)
+	cfg.doc = root
+	var problems []Problem
+	if root != nil {
+		collectUnknownKeys(root, reflect.TypeOf(Config{}), "", &problems)
 	}
-	return &cfg, warnings, nil
+	for i := range problems {
+		problems[i].Where = locate(root, problems[i].Path)
+	}
+	return &cfg, problems
 }
 
 // knownFields maps yaml key -> field type for a struct type, flattening
@@ -32,6 +56,9 @@ func knownFields(t reflect.Type) map[string]reflect.Type {
 	out := map[string]reflect.Type{}
 	for i := 0; i < t.NumField(); i++ {
 		f := t.Field(i)
+		if !f.IsExported() {
+			continue
+		}
 		tag := f.Tag.Get("yaml")
 		parts := strings.Split(tag, ",")
 		name := parts[0]
@@ -58,11 +85,26 @@ func knownFields(t reflect.Type) map[string]reflect.Type {
 	return out
 }
 
-func collectUnknownKeys(node *yaml.Node, t reflect.Type, path string, warnings *[]string) {
+// collectUnknownKeys walks the document beside the type it was decoded into
+// and reports what decoding lets through in silence: a key the type does not
+// have, and a fraction where a whole number belongs.
+func collectUnknownKeys(node *yaml.Node, t reflect.Type, path string, problems *[]Problem) {
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
+	// A value reached through an alias is the value it stands for, at the
+	// place the alias is written.
+	if node.Kind == yaml.AliasNode && node.Alias != nil {
+		node = node.Alias
+	}
 	switch node.Kind {
+	case yaml.ScalarNode:
+		// yaml reads 1.5 into a whole-number field as 1 without a word.
+		if t.Kind() == reflect.Int && node.ShortTag() == "!!float" {
+			if v, err := strconv.ParseFloat(node.Value, 64); err == nil && v != math.Trunc(v) {
+				*problems = append(*problems, Problem{Level: LevelError, Path: path, Message: kindSentence("int")})
+			}
+		}
 	case yaml.MappingNode:
 		if t.Kind() != reflect.Struct {
 			return
@@ -76,22 +118,23 @@ func collectUnknownKeys(node *yaml.Node, t reflect.Type, path string, warnings *
 			keyNode, valNode := node.Content[i], node.Content[i+1]
 			key := keyNode.Value
 			ft, ok := fields[key]
-			p := key
-			if path != "" {
-				p = path + "." + key
-			}
+			p := join(path, key)
 			if !ok {
-				*warnings = append(*warnings, fmt.Sprintf("unknown key %q", p))
+				*problems = append(*problems, Problem{
+					Level:   LevelWarning,
+					Path:    p,
+					Message: fmt.Sprintf("“%s” is not a setting moneypath knows, so it is ignored.", key),
+				})
 				continue
 			}
-			collectUnknownKeys(valNode, ft, p, warnings)
+			collectUnknownKeys(valNode, ft, p, problems)
 		}
 	case yaml.SequenceNode:
 		if t.Kind() != reflect.Slice && t.Kind() != reflect.Array {
 			return
 		}
 		for i, item := range node.Content {
-			collectUnknownKeys(item, t.Elem(), fmt.Sprintf("%s[%d]", path, i), warnings)
+			collectUnknownKeys(item, t.Elem(), join(path, i), problems)
 		}
 	}
 }

@@ -149,6 +149,51 @@ Anything a user can read — error strings, UI copy, field help — follows the 
 internal references (spec paths, chapter numbers), and no notation the reader has
 to decode.
 
+## Errors, warnings and messages
+
+The rules are in AGENTS.md under the same heading. How they are built:
+
+- **The engine reports problems, not a string.** `config.Check` gathers every rule a
+  plan breaks and every warning as a `config.Problem`: a level, the path of the field
+  in the config document (`common.loans.0.term`), that place in words, and one
+  sentence (`spec/02`, "Problems JSON"). `moneypathValidate` returns them without
+  running anything, and the app calls it on every edit (`App.tsx`).
+- **A form says where it is, a field adds its key.** `At` (`web/src/components/problems.tsx`)
+  sets the path of the form inside it, the same path the engine uses: list entries by
+  position, an option's change under `change.<kind>.<n>.set`. Each field component
+  takes `field="term"` and shows the problems at that path under itself. A problem
+  with an entry or a list as a whole has a `PathProblems` there.
+- **The entry and the run bar follow from the same list.** A collapsed entry shows
+  "Check details" when any error is inside its path. A refused run counts the errors
+  in the pinned bar and leads to the first; an error no control claims is written out
+  there in full, which is the safety net and should stay empty.
+
+### Adding a validation rule
+
+1. Edit `spec/03-config-v2.md` first; it is a Contract chapter.
+2. Add a case to `TestProblemsNameTheirField` (or `TestChoiceProblemsNameTheirField`)
+   in `config/problem_test.go` with the path, the place in words and the sentence, and
+   break the rule in one of the plans of `TestProblemTextIsPlain`.
+3. Pin it in `testdata/problems/`: add the broken value to a case's `config.yaml` and
+   write the problem into its `expected.yaml` by hand, or add a case. This is the
+   fixture that lands with the chapter edit.
+4. Report it from `config/` with `c.fail(path, …)` or `c.warn(path, …)`. The sentence
+   names the field by its label in the app, states the rule in plain words, and ends
+   with a full stop. The place is worked out from the path; do not write it into the
+   sentence.
+5. If the field is new to the editor, give its control `field=` and add the broken
+   value to the plan in `App.test.tsx`, "places every error the editor can produce
+   under a control".
+6. Field help states the same limit the engine enforces (`web/src/config/help.ts`).
+
+### Adding a message that is not about a field
+
+Put it beside the control that started the action: the run bar for a run, the toolbar
+line for upload, download and reset, the flip panel for a flip or a keep. Use
+`role="alert"` for a failure and `role="status"` for a confirmation, and keep the text
+that was already there. A failure is cleared by the next attempt or the next edit, not
+by a dismiss button.
+
 ## Delivering a change
 
 These steps apply to every implementer and reviewer, whichever agent or session.

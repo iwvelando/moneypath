@@ -1,0 +1,17 @@
+description: >
+  A fraction where a whole number belongs is an error, never rounded, whether
+  written in place or reached through an alias. It is reported once: the rule
+  about the number's size is not held against it as well.
+problems:
+  - level: error
+    path: common.loans.0.term
+    where: Baseline, loan “Car”
+    message: This must be a whole number.
+  - level: error
+    path: scenarios.0.events.0.frequency
+    where: Scenario “plan”, event “Gym”
+    message: This must be a whole number.
+  - level: error
+    path: scenarios.0.events.1.frequency
+    where: Scenario “plan”, event “Club”
+    message: This must be a whole number.

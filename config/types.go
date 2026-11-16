@@ -1,5 +1,7 @@
 package config
 
+import "gopkg.in/yaml.v3"
+
 // Config is a moneypath v2 plan document (spec chapter 03).
 //
 // Optional scalars whose absence matters use pointer types; Resolved*
@@ -15,6 +17,10 @@ type Config struct {
 	// ResolvedEmergencyFundMonths is recommendations.emergencyFundMonths
 	// with the default (6) applied. 0 disables the recommendation.
 	ResolvedEmergencyFundMonths float64 `yaml:"-"`
+
+	// doc is the document the config was parsed from, kept so a problem can
+	// name the entries on the way to its field. Nil for a config built in code.
+	doc *yaml.Node
 }
 
 type Simulation struct {

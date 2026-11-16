@@ -138,12 +138,12 @@ scenarios:
 		flip Flip
 		want string
 	}{
-		{flipPlan, Flip{"go", "Home", "Move"}, `"go" is not an active scenario in this plan; the active scenarios are: stay`},
-		{inactive, Flip{"parked", "Home", "Move"}, `"parked" is not an active scenario in this plan; the active scenarios are: stay`},
-		{noChoices, Flip{"only", "Home", "Move"}, `this plan has no choices, so there is nothing to flip`},
-		{flipPlan, Flip{"stay", "House", "Move"}, `this plan has no choice named "House"; its choices are: Home, Gym`},
-		{flipPlan, Flip{"stay", "Home", "Sell"}, `the choice "Home" has no option named "Sell"; its options are: Stay, Move`},
-		{flipPlan, Flip{"stay", "Home", "Stay"}, `scenario "stay" already takes "Stay" for the choice "Home"; name another of its options`},
+		{flipPlan, Flip{"go", "Home", "Move"}, "“go” is not an active scenario in this plan. The active scenarios are: stay."},
+		{inactive, Flip{"parked", "Home", "Move"}, "“parked” is not an active scenario in this plan. The active scenarios are: stay."},
+		{noChoices, Flip{"only", "Home", "Move"}, "This plan has no choices, so there is nothing to flip."},
+		{flipPlan, Flip{"stay", "House", "Move"}, "This plan has no choice named “House”. Its choices are: Home, Gym."},
+		{flipPlan, Flip{"stay", "Home", "Sell"}, "The choice “Home” has no option named “Sell”. Its options are: Stay, Move."},
+		{flipPlan, Flip{"stay", "Home", "Stay"}, "The scenario “stay” already takes “Stay” for the choice “Home”. Pick another of its options."},
 	} {
 		f, err := flipOf(t, c.doc, false, c.flip)
 		if err == nil {
@@ -179,7 +179,7 @@ scenarios:
 	if err == nil {
 		t.Fatal("no error")
 	}
-	for _, want := range []string{`with "Fund" for the choice "Savings"`, `duplicate investment name "Index fund"`} {
+	for _, want := range []string{"With “Fund” for the choice “Savings”, this path cannot be run.", "“Index fund” names more than one investment"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error = %q, want it to contain %q", err, want)
 		}

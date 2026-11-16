@@ -67,6 +67,23 @@ func RunForecast(in ForecastInput) (*Forecast, error) {
 	return f, nil
 }
 
+// ProblemsJSON validates a config without running it and returns everything
+// wrong with it (spec chapter 02, Problems JSON).
+func ProblemsJSON(configYAML []byte, now config.Month) []byte {
+	_, problems := config.Load(configYAML, now)
+	if problems == nil {
+		problems = []config.Problem{}
+	}
+	out, err := json.Marshal(struct {
+		Problems []config.Problem `json:"problems"`
+	}{problems})
+	if err != nil {
+		// Problems are four strings each; this cannot fail.
+		return []byte(`{"problems":[]}`)
+	}
+	return out
+}
+
 // --- Results JSON (normative shape, spec chapter 02) ---
 
 type resultsJSON struct {

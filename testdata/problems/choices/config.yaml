@@ -1,0 +1,18 @@
+version: 2
+simulation: {startDate: 2025-01, endDate: 2030-01, startingCash: 0}
+common:
+  loans:
+    - {name: Mortgage, principal: 100000, interestRate: -4, term: 360, startDate: 2021-01}
+choices:
+  - name: Housing
+    options:
+      - name: Keep
+      - name: Refinance
+        change:
+          loans:
+            - name: Mortgage
+              set: {term: 0}
+        remove:
+          events: [Gym]
+scenarios:
+  - name: plan

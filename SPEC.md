@@ -49,6 +49,8 @@ Supporting material:
 - `examples/example.yaml` — a fully commented v2 configuration exercising most features.
 - `examples/choices.yaml` — a commented plan whose scenarios select options of choices.
 - `testdata/conformance/` — v2 configs with expected outputs; the engine MUST reproduce them.
+- `testdata/problems/` — v2 configs that are not sound, with the problems validation
+  MUST report for them.
 
 For how to build, test, and change the project, see [DEVELOPMENT.md](DEVELOPMENT.md).
 

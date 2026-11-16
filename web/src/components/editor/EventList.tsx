@@ -19,6 +19,7 @@ import {
   type SimulationModel,
 } from '../../config/types';
 import { ChangedLabels, MonthField, NumberField, SelectField, TextField } from '../fields';
+import { At } from '../problems';
 import { IconCalendar } from '../icons';
 
 /* ------------------------------------------------------------------ */
@@ -47,6 +48,7 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
       <div class="field-grid">
         <SelectField<OptimizeField>
           label="Field to adjust"
+          field="field"
           help={HELP.optimizeField}
           value={optimize.field}
           options={OPTIMIZE_FIELDS.map((field) => ({ value: field, label: OPTIMIZE_FIELD_LABEL[field] }))}
@@ -56,6 +58,7 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
           <>
             <MonthField
               label="Earliest month"
+              field="minDate"
               help={HELP.optimizeMinDate}
               value={optimize.minDate}
               required
@@ -63,6 +66,7 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
             />
             <MonthField
               label="Latest month"
+              field="maxDate"
               help={HELP.optimizeMaxDate}
               value={optimize.maxDate}
               required
@@ -73,6 +77,7 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
           <>
             <NumberField
               label="Lower bound"
+              field="min"
               help={HELP.optimizeMin}
               value={optimize.min}
               step={optimize.field === 'frequency' ? 1 : 50}
@@ -81,6 +86,7 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
             />
             <NumberField
               label="Upper bound"
+              field="max"
               help={HELP.optimizeMax}
               value={optimize.max}
               step={optimize.field === 'frequency' ? 1 : 50}
@@ -91,6 +97,7 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
         )}
         <NumberField
           label="Tolerance"
+          field="tolerance"
           help={HELP.optimizeTolerance}
           value={optimize.tolerance}
           step={optimize.field === 'amount' ? 0.01 : 1}
@@ -98,6 +105,7 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
         />
         <NumberField
           label="Max iterations"
+          field="maxIterations"
           help={HELP.optimizeMaxIterations}
           value={optimize.maxIterations}
           step={5}
@@ -111,6 +119,14 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
 /* ------------------------------------------------------------------ */
 
 export type WithdrawalStyle = 'amount' | 'percentage';
+
+/** The key of each kind of event list in the config document. */
+const LIST_KEY: Record<EventKind, string> = {
+  cashflow: 'events',
+  extraPrincipalPayment: 'extraPrincipalPayments',
+  contribution: 'contributions',
+  withdrawal: 'withdrawals',
+};
 
 /** The rows of a list are their own entries: what marks the list does not mark their fields. */
 const NO_LABELS: ReadonlySet<string> = new Set();
@@ -147,6 +163,7 @@ export function EventFields({
           {showName ? (
             <TextField
               label="Name"
+              field="name"
               help={HELP.eventName}
               value={event.name}
               onInput={(name) => patch({ name })}
@@ -155,6 +172,7 @@ export function EventFields({
           {usePercentage ? (
             <NumberField
               label="Percentage"
+              field="percentage"
               help={HELP.eventPercentageWithdrawal}
               value={event.percentage}
               step={0.5}
@@ -164,6 +182,7 @@ export function EventFields({
           ) : (
             <NumberField
               label="Amount"
+              field="amount"
               help={eventAmountHelp(kind)}
               value={event.amount}
               step={kind === 'cashflow' ? 50 : 25}
@@ -177,6 +196,7 @@ export function EventFields({
         <div class="field-grid">
           <NumberField
             label="Frequency"
+            field="frequency"
             help={HELP.eventFrequency}
             value={event.frequency}
             step={1}
@@ -186,6 +206,7 @@ export function EventFields({
           />
           <MonthField
             label="Start month"
+            field="startDate"
             help={HELP.eventStartDate}
             value={event.startDate}
             placeholder="Simulation start"
@@ -193,6 +214,7 @@ export function EventFields({
           />
           <MonthField
             label="End month"
+            field="endDate"
             help={HELP.eventEndDate}
             value={event.endDate}
             placeholder="Simulation end"
@@ -293,13 +315,15 @@ function EventRow({
       />
 
       {event.optimize && kind === 'cashflow' ? (
-        <OptimizeForm
-          event={event}
-          optimize={event.optimize}
-          simulation={simulation}
-          onChange={(optimize) => patch({ optimize })}
-          onRemove={() => patch({ optimize: null })}
-        />
+        <At sub="optimize">
+          <OptimizeForm
+            event={event}
+            optimize={event.optimize}
+            simulation={simulation}
+            onChange={(optimize) => patch({ optimize })}
+            onRemove={() => patch({ optimize: null })}
+          />
+        </At>
       ) : null}
     </EditorCard>
   );
@@ -366,25 +390,26 @@ export function EventList({
         <ul class="row-list">
           <ChangedLabels.Provider value={NO_LABELS}>
             {events.map((event, index) => (
-              <EventRow
-              key={event.id}
-              {...cards.cardProps(event.id)}
-              event={event}
-              index={index}
-              kind={kind}
-              simulation={simulation}
-              allowOptimize={allowOptimize}
-              withdrawalStyle={withdrawalStyle}
-              moveAction={moveAction}
-              onChange={(next) => replace(index, next)}
-              onRemove={() => onChange(events.filter((_, i) => i !== index))}
-              onDuplicate={() => {
-                const duplicate = cloneEvent(event);
-                cards.openNew(duplicate.id);
-                onChange([...events.slice(0, index + 1), duplicate, ...events.slice(index + 1)]);
-              }}
-            />
-          ))}
+              <At key={event.id} sub={`${LIST_KEY[kind]}.${index}`}>
+                <EventRow
+                  {...cards.cardProps(event.id)}
+                  event={event}
+                  index={index}
+                  kind={kind}
+                  simulation={simulation}
+                  allowOptimize={allowOptimize}
+                  withdrawalStyle={withdrawalStyle}
+                  moveAction={moveAction}
+                  onChange={(next) => replace(index, next)}
+                  onRemove={() => onChange(events.filter((_, i) => i !== index))}
+                  onDuplicate={() => {
+                    const duplicate = cloneEvent(event);
+                    cards.openNew(duplicate.id);
+                    onChange([...events.slice(0, index + 1), duplicate, ...events.slice(index + 1)]);
+                  }}
+                />
+              </At>
+            ))}
           </ChangedLabels.Provider>
         </ul>
       )}

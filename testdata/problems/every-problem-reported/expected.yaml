@@ -1,0 +1,40 @@
+description: >
+  Every broken rule is reported, not only the first, each at its field, with
+  warnings among them; an unnamed entry is numbered from 1.
+problems:
+  - level: warning
+    path: simulation.startingCash
+    where: Simulation
+    message: No starting cash is given, so the plan starts with 0.00.
+  - level: error
+    path: simulation.cashInterestRate
+    where: Simulation
+    message: The cash interest rate must be at least 0.
+  - level: error
+    path: common.events.0.amount
+    where: Baseline, event “Pay”
+    message: The amount is required.
+  - level: error
+    path: common.loans.0.principal
+    where: Baseline, loan “Car”
+    message: The principal must be more than 0.
+  - level: error
+    path: common.loans.0.term
+    where: Baseline, loan “Car”
+    message: The term must be 1 month or more.
+  - level: error
+    path: common.loans.0.interestRate
+    where: Baseline, loan “Car”
+    message: The interest rate must be at least 0.
+  - level: error
+    path: common.investments.0.taxRate
+    where: Baseline, investment “Brokerage”
+    message: The growth tax rate must be at least 0 and less than 100.
+  - level: error
+    path: common.investments.0.withdrawalTaxRate
+    where: Baseline, investment “Brokerage”
+    message: The withdrawal tax rate must be at least 0 and less than 100.
+  - level: warning
+    path: scenarios.0.events.0.endDate
+    where: Scenario “plan”, event 1
+    message: This ends after the simulation does (2030-01), so the later months are not counted.
