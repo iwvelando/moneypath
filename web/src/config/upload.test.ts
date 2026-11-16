@@ -27,16 +27,24 @@ describe('upload plan', () => {
     }
   });
 
-  it('routes a version-less config to migration', () => {
+  it('refuses a version-less config as one that is no longer converted', () => {
     const plan = planUpload(V1);
-    expect(plan.action).toBe('migrate');
-    if (plan.action === 'migrate') expect(plan.reason).toMatch(/version/);
+    expect(plan.action).toBe('error');
+    if (plan.action === 'error') {
+      expect(plan.message).toBe(
+        'This file has no `version` field, so it is not a moneypath plan. Plans in the older finance-forecast format are no longer converted.',
+      );
+    }
   });
 
-  it('routes a config carrying common.deathDate to migration even when versioned', () => {
+  it('refuses a config carrying common.deathDate even when versioned', () => {
     const plan = planUpload('version: 2\ncommon:\n  deathDate: 2090-01\n');
-    expect(plan.action).toBe('migrate');
-    if (plan.action === 'migrate') expect(plan.reason).toMatch(/deathDate/);
+    expect(plan.action).toBe('error');
+    if (plan.action === 'error') {
+      expect(plan.message).toBe(
+        'This file uses `common.deathDate`, which belongs to the older finance-forecast format. Plans in that format are no longer converted.',
+      );
+    }
   });
 
   it('rejects an unparseable file', () => {

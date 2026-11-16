@@ -282,7 +282,7 @@ as is treating withdrawal tax as levied only on the growth portion.
 
 ## 5. Emergency-fund recommendation
 
-Skipped when the effective target `N` months is 0 (config default 6; CLI can override).
+Skipped when the target `N` months is 0 (config default 6).
 
 - `monthlyExpenses(m)` = Σ|amount| over **negative** event occurrences at `m` (scenario
   and common, counted individually — income never nets against expenses) + Σ loan

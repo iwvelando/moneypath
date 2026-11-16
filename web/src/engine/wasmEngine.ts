@@ -6,26 +6,25 @@
  *   `new URL('./moneypath.wasm', import.meta.url)`, so it lands in dist/assets
  *   with a content-derived filename and a relative URL.
  * - `wasm_exec.js` is bundled like any other module (side-effect import); it is
- *   not an unhashed copy in public/.
+ *   not an unhashed copy in public/. The build copies it from the Go toolchain
+ *   that compiles the wasm, since the two only work as a pair.
  * - `.wasm` may not be served as `application/wasm`, so streaming instantiation
  *   falls back to `WebAssembly.instantiate(await response.arrayBuffer())`.
  */
 
 import '../vendor/wasm_exec.js';
-import { decodeForecast, decodeMigrate } from './bridge';
+import { decodeForecast } from './bridge';
 import {
   EngineError,
   type Engine,
   type ForecastOptions,
   type ForecastResults,
-  type MigrateResult,
 } from './types';
 
 const wasmUrl = new URL('./moneypath.wasm', import.meta.url);
 
 interface MoneypathGlobals {
   moneypathForecast?: (configYAML: string, optionsJSON: string) => string;
-  moneypathMigrate?: (legacyYAML: string) => string;
   moneypathVersion?: () => string;
 }
 
@@ -35,11 +34,7 @@ function bridgeGlobals(): MoneypathGlobals {
 
 function bridgeReady(): boolean {
   const g = bridgeGlobals();
-  return (
-    typeof g.moneypathForecast === 'function' &&
-    typeof g.moneypathMigrate === 'function' &&
-    typeof g.moneypathVersion === 'function'
-  );
+  return typeof g.moneypathForecast === 'function' && typeof g.moneypathVersion === 'function';
 }
 
 async function instantiate(go: Go): Promise<WebAssembly.Instance> {
@@ -98,13 +93,6 @@ class WasmEngine implements Engine {
     if (typeof fn !== 'function') throw new EngineError('The moneypath engine is not loaded.');
     await yieldToPaint();
     return decodeForecast(fn(configYaml, JSON.stringify(options)));
-  }
-
-  async migrate(legacyYaml: string): Promise<MigrateResult> {
-    const fn = bridgeGlobals().moneypathMigrate;
-    if (typeof fn !== 'function') throw new EngineError('The moneypath engine is not loaded.');
-    await yieldToPaint();
-    return decodeMigrate(fn(legacyYaml));
   }
 }
 

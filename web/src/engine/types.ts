@@ -125,11 +125,6 @@ export interface ForecastResults {
   configYaml: string;
 }
 
-export interface MigrateResult {
-  configYaml: string;
-  notices: string[];
-}
-
 export interface ForecastOptions {
   optimize?: boolean;
   /** `YYYY-MM`; pins the engine's idea of the current month. */
@@ -153,5 +148,4 @@ export interface Engine {
   /** The build version string from `moneypathVersion()`. */
   version(): string;
   forecast(configYaml: string, options: ForecastOptions): Promise<ForecastResults>;
-  migrate(legacyYaml: string): Promise<MigrateResult>;
 }

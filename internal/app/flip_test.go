@@ -2,7 +2,6 @@ package app
 
 import (
 	"encoding/json"
-	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -95,7 +94,7 @@ func TestFlipMatchesAHandBuiltScenario(t *testing.T) {
 		}
 
 		plain := forecastOf(t, flipPlan, optimize)
-		if f.CSV != plain.CSV || f.Pretty != plain.Pretty || f.ConfigYAML != plain.ConfigYAML {
+		if f.CSV != plain.CSV || f.ConfigYAML != plain.ConfigYAML {
 			t.Errorf("optimize=%v: the flip changed the forecast output", optimize)
 		}
 		if len(f.Result.Scenarios) != 1 {
@@ -151,19 +150,15 @@ scenarios:
 			t.Errorf("%+v: no error; flip = %+v", c.flip, f.Flip)
 			continue
 		}
-		var refused *FlipError
-		if !errors.As(err, &refused) {
-			t.Errorf("%+v: error %q is not a FlipError", c.flip, err)
-		}
 		if err.Error() != c.want {
 			t.Errorf("%+v: error = %q, want %q", c.flip, err, c.want)
 		}
 	}
 }
 
-// A flipped path the plan's rules refuse is a problem with the plan, not with
-// how the flip was asked for.
-func TestFlipIntoAnInvalidPathIsAConfigError(t *testing.T) {
+// A flipped path the plan's rules refuse is reported with the flip that led to
+// it.
+func TestFlipIntoAnInvalidPathIsRefused(t *testing.T) {
 	doc := `
 version: 2
 simulation: {startDate: 2025-01, endDate: 2025-06, startingCash: 100}
@@ -183,10 +178,6 @@ scenarios:
 	_, err := flipOf(t, doc, false, Flip{"mine", "Savings", "Fund"})
 	if err == nil {
 		t.Fatal("no error")
-	}
-	var refused *FlipError
-	if errors.As(err, &refused) {
-		t.Errorf("error %q should not be a FlipError", err)
 	}
 	for _, want := range []string{`with "Fund" for the choice "Savings"`, `duplicate investment name "Index fund"`} {
 		if !strings.Contains(err.Error(), want) {
@@ -258,20 +249,5 @@ func TestResultsJSONCarriesTheFlip(t *testing.T) {
 	}
 	if strings.TrimSpace(string(got.Flip.Total.BreakEven)) == "null" {
 		t.Errorf("total break-even is null, want an array")
-	}
-}
-
-// The two output forms of the CLI's flipped comparison.
-func TestFlipOutput(t *testing.T) {
-	f, err := flipOf(t, flipPlan, false, Flip{Scenario: "stay", Choice: "Home", Option: "Move"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	pretty, csv := FlipOutput(f)
-	if !strings.HasPrefix(pretty, "--- stay (Home: Move) minus stay ---\nCash break-even: 2025-03 (stay moves ahead), 2025-05 (stay (Home: Move) moves ahead)\n") {
-		t.Errorf("pretty =\n%s", pretty)
-	}
-	if !strings.HasPrefix(csv, `"date","liquid (stay (Home: Move) minus stay)","total (stay (Home: Move) minus stay)"`+"\n") {
-		t.Errorf("csv =\n%s", csv)
 	}
 }

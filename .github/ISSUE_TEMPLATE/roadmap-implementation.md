@@ -29,12 +29,12 @@ Excluded:
 
 <!-- Chapters changed and their status. For a Contract chapter: the rule being added or
      changed, and the fixtures that will pin it. What existing configs, saved drafts,
-     CSV output and CLI/WASM parity must keep doing. -->
+     CSV output and native/WASM parity must keep doing. -->
 
 ## User path
 
 <!-- Web: where the user enters, edits, runs, reads and downloads, and which existing
-     controls and patterns are reused. CLI: flags and output. Omit what does not apply. -->
+     controls and patterns are reused. Omit what does not apply. -->
 
 ## Acceptance criteria
 

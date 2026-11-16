@@ -41,8 +41,8 @@ Decisions are then compared by their margins as well as their ending balances.
   of scope.
 - **A planner, not a tracker.** The plan describes the future from today's position. No
   history, no actuals, no account linking.
-- **One engine.** Every figure a user reads is computed in Go and available to both the
-  CLI and the web app. The frontend edits plans and renders results.
+- **One engine.** Every figure a user reads is computed in Go and reaches the
+  web app through the engine. The frontend edits plans and renders results.
 - **Existing plans keep their numbers.** A plan that uses none of a new feature produces
   the output it does today. New figures arrive as new series or fields beside the
   existing ones; liquid and total keep their meaning.

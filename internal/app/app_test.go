@@ -115,7 +115,7 @@ scenarios:
 }
 
 // Spec chapter 03/04: the cash interest rate reaches results and the echoed
-// config that the web app and CLI share (a 12% rate is 1% a month).
+// config the web app sends (a 12% rate is 1% a month).
 func TestResultsCarryCashInterest(t *testing.T) {
 	out := runPlan(t, `
 version: 2
@@ -256,32 +256,16 @@ scenarios: [{name: a}, {name: b, events: [{name: Pay, amount: 10}]}]
 	}
 }
 
-// Spec chapter 05: a named pair renders in both output forms, and names that
-// cannot be compared are refused in words a user can act on.
-func TestCompareScenarios(t *testing.T) {
-	now, _ := config.ParseMonth("2025-01")
-	f, err := RunForecast(ForecastInput{ConfigYAML: []byte(crossingPlan), Now: now})
-	if err != nil {
-		t.Fatal(err)
+// A plan in the older finance-forecast format is refused in words that offer
+// no conversion: there is none.
+func TestRunForecastRefusesAFinanceForecastPlan(t *testing.T) {
+	old := "startDate: 2025-06\ncommon:\n  startingValue: 30000\n  deathDate: 2090-01\nscenarios:\n  - name: current path\n    active: true\n"
+	_, err := RunForecast(ForecastInput{ConfigYAML: []byte(old)})
+	if err == nil {
+		t.Fatal("a finance-forecast plan was forecast")
 	}
-	pretty, csv, err := CompareScenarios(f, "buy", "rent")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if !strings.HasPrefix(pretty, "--- buy minus rent ---\nCash break-even: 2025-04 (buy moves ahead)\n") {
-		t.Errorf("pretty =\n%s", pretty)
-	}
-	if !strings.HasPrefix(csv, `"date","liquid (buy minus rent)","total (buy minus rent)"`+"\n") {
-		t.Errorf("csv =\n%s", csv)
-	}
-
-	for _, c := range []struct{ a, b, want string }{
-		{"buy", "lease", `"lease" is not an active scenario in this plan; the active scenarios are: rent, buy`},
-		{"skipped", "rent", `"skipped" is not an active scenario in this plan; the active scenarios are: rent, buy`},
-		{"buy", "buy", `a scenario cannot be compared with itself; name two different scenarios`},
-	} {
-		if _, _, err := CompareScenarios(f, c.a, c.b); err == nil || err.Error() != c.want {
-			t.Errorf("CompareScenarios(%q, %q) error = %v, want %q", c.a, c.b, err, c.want)
-		}
+	want := "this file has no 'version' field, so it is not a moneypath plan; plans in the older finance-forecast format are no longer converted"
+	if err.Error() != want {
+		t.Errorf("error = %q, want %q", err, want)
 	}
 }

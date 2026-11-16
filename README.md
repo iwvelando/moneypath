@@ -3,19 +3,20 @@
 <img src="web/public/moneypath.svg" alt="Curving paths branching into possible futures, marked by waypoints" width="260" height="100" />
 
 Personal-finance scenario simulator: describe your financial life — income, expenses,
-loans, investments — in one YAML file, sketch alternative futures as scenarios, and see
-month-by-month projections of cash and net worth for each. One Go engine, two doors: a
-CLI, and a fully static web app that runs the same engine in your browser via
-WebAssembly (your data never leaves your machine).
+loans, investments — sketch alternative futures as scenarios, and see month-by-month
+projections of cash and net worth for each. It is a fully static web app whose Go engine
+runs in your browser via WebAssembly (your data never leaves your machine). A plan
+downloads as one YAML file and uploads again.
 
 **Try it at [moneypath.isaacvelando.com](https://moneypath.isaacvelando.com)**: the same
 static app, served from a CDN. Nothing you enter is sent anywhere; your plan stays in
 your browser's local storage.
 
 moneypath is the successor to
-[finance-forecast](https://github.com/iwvelando/finance-forecast): `moneypath migrate`
-converts its configs, and [spec/07](spec/07-migration.md) lists the behaviors that
-deliberately changed on the way.
+[finance-forecast](https://github.com/iwvelando/finance-forecast). It has no command-line
+tool and does not convert finance-forecast configs. The tag
+[`last-cli-and-migrate`](https://github.com/iwvelando/moneypath/tree/last-cli-and-migrate)
+is the last revision that had both.
 
 [SPEC.md](SPEC.md) is where the config format and engine semantics are pinned down, with
 `testdata/` wired into `go test` as conformance gates.
@@ -26,27 +27,17 @@ the repository's milestones and issues.
 ## Quick start
 
 ```sh
-# CLI only (no frontend toolchain needed):
-go build -o bin/moneypath ./cmd/moneypath
-./bin/moneypath forecast --config examples/example.yaml
-./bin/moneypath forecast --config examples/choices.yaml   # scenarios as selections
-./bin/moneypath forecast --config plan.yaml --output-format csv --optimize
-
-# Convert a legacy finance-forecast config:
-./bin/moneypath migrate old-config.yaml -o plan.yaml
-
-# Full build (engine wasm → web bundle → binary with the web app embedded):
-make build          # needs Go and Node
-./bin/moneypath serve   # → http://localhost:8080
+make dist           # engine wasm → web bundle in web/dist/ (needs Go and Node)
+make preview-lan    # that build, served over HTTPS on your network
+cd web && npm run dev   # the dev server, after `make wasm`
 ```
 
 `make dist` produces `web/dist/`, the complete static site — deploy it by copying the
-tree to any static file host (it works from any sub-path). The native binary embeds a
-copy of the same tree to back `moneypath serve`.
+tree to any static file host (it works from any sub-path). `examples/` holds two
+commented plans to upload.
 
 Contributing? Start with [DEVELOPMENT.md](DEVELOPMENT.md) — in particular run
-`./scripts/dev-setup.sh` once (git hooks + a skip-worktree flag for the embedded-web
-placeholder that `make dist` overwrites locally).
+`make dev-setup` once (it turns on the git hooks).
 
 ## Layout
 
@@ -54,22 +45,20 @@ placeholder that `make dist` overwrites locally).
 |---|---|
 | `config/` | v2 YAML config: parse, validate, month arithmetic |
 | `engine/` | pure simulation core (loans, investments, emergency fund, optimizer) |
-| `render/` | CSV and pretty renderers shared by CLI and WASM |
-| `legacy/` | v1 → v2 `migrate` conversion |
-| `internal/app/` | shared CLI/WASM entry: run pipeline + results JSON |
-| `cmd/moneypath/` | CLI (`forecast`, `migrate`, `serve`, `version`) |
-| `cmd/moneypath-wasm/` | WASM bridge (`moneypathForecast` / `moneypathMigrate` / `moneypathVersion`) |
+| `render/` | the CSV download's renderer |
+| `internal/app/` | what the bridge calls: run pipeline + results JSON |
+| `cmd/moneypath-wasm/` | WASM bridge (`moneypathForecast` / `moneypathVersion`) |
 | `web/` | static web app (Vite + TypeScript + Preact); `web/e2e/` holds its browser tests |
 | `deploy/` | the production Content-Security-Policy |
 | `.github/` | CI that verifies every change and deploys `main` |
 | `.agents/` | skills for coding agents working in this repo |
-| `conformance/` | fixture harness, CLI↔WASM parity, static-bundle identity checks |
+| `conformance/` | fixture harness, native↔WASM parity, static-bundle checks |
 
 ## Tests
 
 ```sh
-make test-go   # engine/config/render/legacy units + all conformance fixtures
-               # + CLI↔WASM parity (needs node; skipped without it)
+make test-go   # engine/config/render units + all conformance fixtures
+               # + native↔WASM parity (needs node; skipped without it)
 make test-web  # frontend vitest suite
 make test-browser  # Playwright against the production build (see DEVELOPMENT.md)
 make pre-pr    # everything above plus WebKit: the local gate before a pull request

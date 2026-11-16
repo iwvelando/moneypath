@@ -1,6 +1,6 @@
 ---
 name: Bug
-about: Something the app or CLI computes, shows, downloads or reports wrongly
+about: Something the app computes, shows, downloads or reports wrongly
 title: ""
 labels: "bug"
 ---
@@ -18,4 +18,4 @@ labels: "bug"
 
 ## Where
 
-<!-- CLI (with `moneypath version`) or web app; browser and operating system at a broad level; whether it happens on the live site. -->
+<!-- Browser and operating system at a broad level; whether it happens on the live site; the version shown in the page footer. -->

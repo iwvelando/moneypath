@@ -19,7 +19,6 @@ import {
   type FlipRequest,
   type ForecastOptions,
   type ForecastResults,
-  type MigrateResult,
   type ResultRow,
   type ScenarioMetrics,
 } from './types';
@@ -256,62 +255,6 @@ class MockEngine implements Engine {
       warnings,
       configYaml: stringifyYaml(doc, { lineWidth: 0 }),
     };
-  }
-
-  async migrate(legacyYaml: string): Promise<MigrateResult> {
-    await new Promise((resolve) => setTimeout(resolve, 80));
-    let doc: unknown;
-    try {
-      doc = parseYaml(legacyYaml);
-    } catch (error) {
-      throw new EngineError(`legacy config is not valid YAML: ${(error as Error).message}`);
-    }
-    if (!isObject(doc)) throw new EngineError('legacy config is empty');
-    if (doc['version'] === 2) throw new EngineError('config already declares version: 2');
-    const common = isObject(doc['common']) ? doc['common'] : {};
-    if (common['deathDate'] === undefined) {
-      throw new EngineError("legacy config has no common.deathDate; nothing to migrate");
-    }
-
-    const notices: string[] = [];
-    if (doc['logging'] !== undefined) {
-      notices.push("dropped 'logging' block: logging is configured via CLI flags in v2");
-    }
-    if (doc['output'] !== undefined) {
-      notices.push("dropped 'output' block: output format is configured via CLI flags in v2");
-    }
-
-    const scenarios = Array.isArray(doc['scenarios']) ? doc['scenarios'] : [];
-    const migrated = {
-      version: 2,
-      simulation: {
-        ...(typeof doc['startDate'] === 'string' ? { startDate: doc['startDate'] } : {}),
-        endDate: common['deathDate'],
-        startingCash: common['startingValue'] ?? 0,
-      },
-      ...(doc['recommendations'] !== undefined ? { recommendations: doc['recommendations'] } : {}),
-      common: {
-        ...(common['events'] !== undefined ? { events: common['events'] } : {}),
-        ...(common['loans'] !== undefined ? { loans: common['loans'] } : {}),
-        ...(common['investments'] !== undefined ? { investments: common['investments'] } : {}),
-      },
-      scenarios: scenarios.map((scenario) => {
-        if (!isObject(scenario)) return scenario;
-        const active = scenario['active'];
-        if (active === undefined) {
-          notices.push(
-            `scenario '${String(scenario['name'] ?? '')}': 'active' was absent (v1 default was inactive); emitting active: false`,
-          );
-        }
-        return { ...scenario, active: active === undefined ? false : active };
-      }),
-    };
-
-    notices.push(
-      'some migrated features behave differently in v2 — review the forecast against your expectations',
-    );
-
-    return { configYaml: stringifyYaml(migrated, { lineWidth: 0 }), notices };
   }
 }
 

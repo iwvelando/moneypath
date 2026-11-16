@@ -5,7 +5,8 @@ Build artifacts) are Contract; the rest is descriptive. See SPEC.md.*
 
 ## Shape
 
-One Go module, `github.com/iwvelando/moneypath`, built into two artifacts plus a frontend:
+One Go module, `github.com/iwvelando/moneypath`, compiled to WebAssembly and bundled
+with a frontend into one static site:
 
 ```
 ┌────────────────────────────────────────────────────────┐
@@ -14,28 +15,31 @@ One Go module, `github.com/iwvelando/moneypath`, built into two artifacts plus a
 │  engine/    pure simulation core (no I/O, no logging   │
 │             framework, no globals)                     │
 │  config/    v2 YAML parse + validate                   │
-│  legacy/    v1 YAML parse + v1→v2 conversion           │
-│  render/    pretty-table and CSV rendering of results  │
-│  cmd/moneypath/          CLI (forecast|migrate|serve|  │
-│                          version)                      │
+│  render/    CSV rendering of results                   │
+│  internal/app/           run pipeline + results JSON   │
 │  cmd/moneypath-wasm/     WASM entry (syscall/js bridge)│
 └────────────────────────────────────────────────────────┘
-         │                            │
-   native binary                 moneypath.wasm
-   (CLI + serve)                      │
-                              web/  (TypeScript + Vite)
-                              → dist/  fully static site
+                          │
+                    moneypath.wasm
+                          │
+                  web/  (TypeScript + Vite)
+                  → dist/  fully static site
 ```
+
+The Go packages also build natively. Nothing ships that way: it is how `go test` runs
+the unit tests and the conformance fixtures.
 
 Package names/layout above are RECOMMENDED, not normative — but the **boundaries** are
 normative:
 
 - `engine` MUST be pure: config in, results out. No file access, no clock reads (the
-  caller supplies "now"), no logging dependencies, no environment access. This is what
-  guarantees CLI/WASM parity.
-- CSV and pretty rendering MUST live in shared Go code used by both the CLI and the WASM
-  bridge. The web app's "Download CSV" MUST serve the engine-rendered CSV string, never a
-  JavaScript re-implementation.
+  caller supplies "now"), no logging dependencies, no environment access. It returns
+  warnings and notes as data. This is what lets the fixtures, checked natively, speak for
+  the WASM build the site ships.
+- CSV rendering MUST live in Go. The web app's "Download CSV" MUST serve the
+  engine-rendered CSV string, never a JavaScript re-implementation.
+- The WASM entry is transport only: it decodes arguments, calls `internal/app`, and
+  encodes the answer.
 - The frontend MUST NOT contain any finance math. It renders results and edits configs.
 
 ## WASM bridge
@@ -50,8 +54,6 @@ The WASM module exposes to JavaScript (names normative):
   Options also accept `"flip"`, `{"scenario": "…", "choice": "…", "option": "…"}`, which
   asks for the comparison described under `flip` below. A flip that cannot be made
   returns `{"error": "..."}` and no results.
-- `moneypathMigrate(legacyYAML string) → string` — returns
-  `{"configYaml": "...", "notices": ["..."]}` or `{"error": "..."}` (see chapter 07).
 - `moneypathVersion() → string` — the build version string.
 
 ### Results JSON (normative shape)
@@ -64,7 +66,7 @@ The WASM module exposes to JavaScript (names normative):
     {"date": "2025-06",
      "values": [{"liquid": 30000.0, "total": 55000.0, "notes": ["…"]}, …]}
   ],
-  "csv": "…engine-rendered CSV, exactly as the CLI would print…",
+  "csv": "…engine-rendered CSV (chapter 05)…",
   "metrics": [
     {"keyFigures": {"lowestCash": 0.0, "lowestCashDate": "2025-06",
                     "endingCash": 0.0, "endingTotal": 0.0},
@@ -146,8 +148,9 @@ for the date fields.
   stepped with calendar-month arithmetic (Go `time.AddDate(0, n, 0)` semantics).
 - Rendered currency values are formatted to exactly two decimals (`%.2f` semantics —
   round half away from zero is NOT required; use Go's default `%.2f` behavior).
-- **Parity requirement:** for any config, the CSV string produced by the native CLI and
-  by the WASM build MUST be byte-identical. This is a conformance test (chapter 08).
+- **Parity requirement:** for any config, the CSV string produced by the engine built
+  natively, which the conformance fixtures are checked against, and by the WASM build,
+  which the site ships, MUST be byte-identical. This is a conformance test (chapter 08).
 - Engine-internal balance comparisons that need cent precision (e.g. "did the loan reach
   zero") MUST round to 2 decimals before comparing, so float drift never changes behavior.
 
@@ -165,29 +168,22 @@ for the date fields.
 
 ## Build artifacts (normative)
 
-One source tree produces two artifacts:
-
-- **`dist/`** — the complete static site: `index.html`, hashed JS/CSS, and
-  `moneypath.wasm`, with no other runtime dependency. This is the shippable artifact.
-  Publishing MUST be nothing more than copying the tree to a static file host (object
-  storage behind a CDN, a plain web server, a local directory). No build step, rewrite
-  rule, or server configuration may be required to make it work.
-- **The native binary**, which embeds a copy of that same `dist/` tree via `go:embed` to
-  back `moneypath serve`.
+The source tree produces one artifact, **`dist/`**: the complete static site —
+`index.html`, hashed JS/CSS, and `moneypath.wasm`, with no other runtime dependency.
+Publishing MUST be nothing more than copying the tree to a static file host (object
+storage behind a CDN, a plain web server, a local directory). No build step, rewrite
+rule, or server configuration may be required to make it work.
 
 The build never assumes a particular host, even though one public deployment exists
 (chapter 01, "Scope"); these properties of the build are what keep every host an option:
 
-- **Build order.** Three stages: (1) compile the engine wasm (`GOOS=js GOARCH=wasm`);
+- **Build order.** Two stages: (1) compile the engine wasm (`GOOS=js GOARCH=wasm`);
   (2) run the bundler with that wasm as a *bundler input* — imported as a hashed asset
   (e.g. `new URL('./moneypath.wasm', import.meta.url)` or equivalent), never dropped into
-  a verbatim-copied `public/` directory — producing `dist/`; (3) the native Go build
-  embeds `dist/`. Both artifacts of a given release build MUST come from the same `dist/`
-  tree, so `moneypath serve` and a published copy serve byte-identical files. The embed is
-  a copy of the artifact, never a substitute for producing it: a *release* build that
-  yields only a binary is incomplete. During development a placeholder `dist/` MAY be
-  embedded so engine work doesn't depend on the frontend toolchain; the chapter 08
-  embedded-tree identity check keeps a stub or stale tree out of any release.
+  a verbatim-copied `public/` directory — producing `dist/`.
+- **Matched glue.** The Go wasm glue (`wasm_exec.js`) and the compiler only work as a
+  pair. The build MUST take the glue from the Go toolchain that compiles the wasm; a
+  copy is never committed.
 - **Content hashing.** Every asset the app fetches at runtime — JS, CSS,
   `moneypath.wasm`, and the Go wasm glue (`wasm_exec.js`, bundled like any other module) —
   MUST have a content-derived filename. This guarantees a fetched `index.html` always
@@ -205,15 +201,3 @@ The build never assumes a particular host, even though one public deployment exi
   sections are in-page state, not URL routes. The app MUST NOT require deep-linkable
   URLs, history rewriting, or a host-side 404-to-`index.html` rewrite. The only path a
   host must resolve is the deploy root, serving `index.html`.
-
-## `moneypath serve`
-
-Serves the embedded `dist/` (via `go:embed`) on a configurable address. Static files
-only; no other routes. It exists so CLI users can open the web UI locally without
-installing anything else — it is a convenience, not the deployment path.
-
-## Logging
-
-The CLI MAY log operational diagnostics (config warnings, timing) to stderr, controlled
-by `--log-level`. Simulation results go to stdout only. The engine itself never logs —
-it returns warnings/notes as data.

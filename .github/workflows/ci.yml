@@ -27,7 +27,7 @@ jobs:
       - run: make fmt-check vet
       # Engine wasm, license notices, typecheck, bundle, and the dist/ check.
       - run: make dist NPM_INSTALL="npm ci"
-      # With dist/ built, this includes the CLI/WASM parity and bundle identity checks.
+      # With dist/ built, this includes the native/WASM parity and bundle checks.
       - run: make test-go
       - run: make test-web
       - run: npx playwright install --with-deps chromium

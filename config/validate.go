@@ -4,24 +4,7 @@ import (
 	"fmt"
 	"math"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
-
-// LooksLegacy reports whether raw YAML appears to be a v1 (finance-forecast
-// era) config: no version field, or a common.deathDate key (spec chapter 05).
-func LooksLegacy(data []byte) bool {
-	var doc struct {
-		Version *int `yaml:"version"`
-		Common  struct {
-			DeathDate *string `yaml:"deathDate"`
-		} `yaml:"common"`
-	}
-	if err := yaml.Unmarshal(data, &doc); err != nil {
-		return false
-	}
-	return doc.Version == nil || doc.Common.DeathDate != nil
-}
 
 // Validate checks cfg against spec chapter 03, fills every Resolved* field
 // (defaults applied, dates parsed), and returns validation warnings. now is
@@ -30,7 +13,7 @@ func Validate(cfg *Config, now Month) ([]string, error) {
 	var warns []string
 
 	if cfg.Version == nil {
-		return nil, fmt.Errorf("missing 'version' field — legacy configs can be converted with 'moneypath migrate'")
+		return nil, fmt.Errorf("this file has no 'version' field, so it is not a moneypath plan; plans in the older finance-forecast format are no longer converted")
 	}
 	if *cfg.Version != 2 {
 		return nil, fmt.Errorf("unsupported config version %d (expected 2)", *cfg.Version)

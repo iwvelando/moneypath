@@ -4,7 +4,7 @@
  * `{"error": "..."}` with a human-readable message.
  */
 
-import { EngineError, type ForecastResults, type MigrateResult } from './types';
+import { EngineError, type ForecastResults } from './types';
 
 function parseJson(raw: string, what: string): unknown {
   try {
@@ -41,19 +41,5 @@ export function decodeForecast(raw: string): ForecastResults {
     flip: results.flip ?? null,
     warnings: Array.isArray(results.warnings) ? results.warnings : [],
     configYaml: results.configYaml ?? '',
-  };
-}
-
-export function decodeMigrate(raw: string): MigrateResult {
-  const parsed = parseJson(raw, 'migration');
-  const message = errorMessage(parsed);
-  if (message !== null) throw new EngineError(message);
-  const result = parsed as Partial<MigrateResult>;
-  if (typeof result.configYaml !== 'string') {
-    throw new EngineError('The engine returned a migration result in an unexpected shape.');
-  }
-  return {
-    configYaml: result.configYaml,
-    notices: Array.isArray(result.notices) ? result.notices : [],
   };
 }

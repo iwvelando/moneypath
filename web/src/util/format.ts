@@ -1,7 +1,8 @@
 /**
  * Display formatting. Deliberately locale-independent (manual grouping rather
- * than `toLocaleString`) so the UI matches the CLI's currency rendering from
- * spec/05: `$` + thousands separators + 2 decimals, negatives as `-$1,234.56`.
+ * than `toLocaleString`) so the UI matches the engine's display values, such as
+ * the optimizer's: `$` + thousands separators + 2 decimals, negatives as
+ * `-$1,234.56`.
  */
 
 function group(digits: string): string {

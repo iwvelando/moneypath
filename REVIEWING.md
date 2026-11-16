@@ -35,12 +35,11 @@ touches:
 | A new or changed number in a fixture | Derive it independently, by hand or a throwaway calculation, not by running the engine and pasting the output. |
 | A comparison that decides behavior (a payoff, a floor, a threshold) | Both sides are rounded to cents first. Test just below, at and just above the boundary. |
 | Anything under `engine/` | Still pure: no I/O, no clock read, no logging. "Now" arrives as an argument. |
-| CSV or results output | Native and WASM stay byte-identical (`TestCLIWASMParity`), which needs a real `make dist` build, not the placeholder. |
+| CSV or results output | Native and WASM stay byte-identical (`TestNativeWASMParity`). The bundle check needs a real `make dist` build. |
 | A field added to the web editor model | An old saved draft, which lacks the key, restores with the field blank; the sparse-draft tests reach it. `make typecheck` passes. |
 | Any text a user can read | No spec paths, chapter numbers, fixture names or Go identifiers; no notation to decode. |
 | Controls, focus, touch, layout | Nothing scrolls sideways at 360 px. WebKit behavior is in `web/e2e/webkit.spec.ts`. Phone-only checks are listed as pending, not passed. |
 | A new kind of resource (worker, font, `data:` image, fetch) | `deploy/content-security-policy.txt` changed, and the matching cloud-accounts change lands first. |
-| The legacy migration | The v1 format chapter is frozen; only an error in it is corrected. |
 | A new runtime dependency | Its license reaches `web/dist/` (`make notices`, `check-dist.mjs`). Dependabot merges later updates unreviewed, so the tests must cover what the dependency does. |
 | A `@smoke` test | Fast and read-only: it runs against the live site. |
 

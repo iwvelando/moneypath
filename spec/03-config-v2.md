@@ -327,8 +327,8 @@ error: the optimizer chooses a value against one scenario's floor and writes it 
 plan, and those entries are shared by more than one scenario. A target goes in a
 scenario's own events. Optimizer semantics are in chapter 04 §Optimizer.
 
-## What v2 removed relative to v1
+## Files that are not version 2
 
-`logging:` and `output:` blocks are no longer part of the plan config — they were tool
-settings, not plan data, and are now CLI flags (chapter 05). The optimizer `kind` and
-`target` keys are gone (there was only ever one supported value of each). See chapter 07.
+A file with no `version` field is refused. So is a plan written for finance-forecast,
+the tool moneypath succeeds, which had no such field; nothing converts one. Both
+refusals say so plainly.

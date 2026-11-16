@@ -9,6 +9,9 @@ public/LICENSE.txt
 public/GO-LICENSE.txt
 public/THIRD-PARTY-NOTICES.txt
 
+# Go's wasm glue, copied from the toolchain that builds the engine (`make wasm`)
+src/vendor/wasm_exec.js
+
 # Playwright
 test-results/
 playwright-report/

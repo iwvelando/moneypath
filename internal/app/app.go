@@ -1,26 +1,22 @@
-// Package app is the shared entry used by both the CLI and the WASM
-// bridge: config bytes in, forecast plus rendered surfaces out. Keeping
-// this in one place is what guarantees CLI/WASM parity (spec chapter 02).
+// Package app is the entry the WASM bridge calls: config bytes in, forecast
+// plus rendered surfaces out. It runs natively too, which is how the tests
+// and the conformance fixtures reach it (spec chapter 02).
 package app
 
 import (
 	"encoding/json"
-	"fmt"
-	"strings"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/iwvelando/moneypath/config"
 	"github.com/iwvelando/moneypath/engine"
-	"github.com/iwvelando/moneypath/legacy"
 	"github.com/iwvelando/moneypath/render"
 )
 
 type ForecastInput struct {
-	ConfigYAML      []byte
-	Now             config.Month // current month; used when startDate is absent
-	Optimize        bool
-	EmergencyMonths *float64 // CLI/UI override; nil = use config
+	ConfigYAML []byte
+	Now        config.Month // current month; used when startDate is absent
+	Optimize   bool
 	// Flip also compares one scenario with its flipped path; nil = no flip.
 	Flip *Flip
 }
@@ -30,7 +26,6 @@ type Forecast struct {
 	Result   *engine.Result
 	Warnings []string
 	CSV      string
-	Pretty   string
 	// ConfigYAML is the config as run, re-serialized (reflects optimizer
 	// adjustments when they were enabled).
 	ConfigYAML string
@@ -40,9 +35,6 @@ type Forecast struct {
 
 // RunForecast parses, validates, and simulates a v2 config.
 func RunForecast(in ForecastInput) (*Forecast, error) {
-	if config.LooksLegacy(in.ConfigYAML) {
-		return nil, fmt.Errorf("this looks like a legacy (v1) config; convert it with 'moneypath migrate'")
-	}
 	cfg, parseWarns, err := config.Parse(in.ConfigYAML)
 	if err != nil {
 		return nil, err
@@ -51,10 +43,7 @@ func RunForecast(in ForecastInput) (*Forecast, error) {
 	if err != nil {
 		return nil, err
 	}
-	res, err := engine.Run(cfg, engine.Options{
-		Optimize:            in.Optimize,
-		EmergencyFundMonths: in.EmergencyMonths,
-	})
+	res, err := engine.Run(cfg, engine.Options{Optimize: in.Optimize})
 	if err != nil {
 		return nil, err
 	}
@@ -68,7 +57,6 @@ func RunForecast(in ForecastInput) (*Forecast, error) {
 		Result:     res,
 		Warnings:   warnings,
 		CSV:        render.CSV(res),
-		Pretty:     render.Pretty(res),
 		ConfigYAML: string(echoed),
 	}
 	if in.Flip != nil {
@@ -77,35 +65,6 @@ func RunForecast(in ForecastInput) (*Forecast, error) {
 		}
 	}
 	return f, nil
-}
-
-// CompareScenarios renders one named scenario minus another in both output
-// forms (spec chapter 05). Its errors are for the user: both names must be
-// active scenarios of the plan, and different ones.
-func CompareScenarios(f *Forecast, scenario, against string) (pretty, csv string, err error) {
-	find := func(name string) (*engine.ScenarioResult, error) {
-		names := make([]string, 0, len(f.Result.Scenarios))
-		for _, sc := range f.Result.Scenarios {
-			if sc.Name == name {
-				return sc, nil
-			}
-			names = append(names, sc.Name)
-		}
-		return nil, fmt.Errorf("%q is not an active scenario in this plan; the active scenarios are: %s",
-			name, strings.Join(names, ", "))
-	}
-	a, err := find(scenario)
-	if err != nil {
-		return "", "", err
-	}
-	b, err := find(against)
-	if err != nil {
-		return "", "", err
-	}
-	if a == b {
-		return "", "", fmt.Errorf("a scenario cannot be compared with itself; name two different scenarios")
-	}
-	return render.ComparisonPretty(f.Result, a, b), render.ComparisonCSV(f.Result, a, b), nil
 }
 
 // --- Results JSON (normative shape, spec chapter 02) ---
@@ -334,19 +293,4 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 		out.Flip = entry
 	}
 	return json.Marshal(out)
-}
-
-// MigrationJSON renders the moneypathMigrate result shape (spec chapter 02).
-func MigrationJSON(input []byte) ([]byte, error) {
-	converted, notices, err := legacy.Migrate(input)
-	if err != nil {
-		return nil, err
-	}
-	if notices == nil {
-		notices = []string{}
-	}
-	return json.Marshal(map[string]any{
-		"configYaml": string(converted),
-		"notices":    notices,
-	})
 }

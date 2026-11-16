@@ -18,7 +18,7 @@ import (
 // other targets require the smallest adjustment from the configured original.
 // Chosen values are written back into cfg before the final forecast.
 func runOptimized(cfg *config.Config, opts Options) (*Result, error) {
-	if emergencyMonths(cfg, opts) <= 0 {
+	if cfg.ResolvedEmergencyFundMonths <= 0 {
 		return nil, fmt.Errorf("optimization requires the emergency-fund recommendation, which is disabled")
 	}
 

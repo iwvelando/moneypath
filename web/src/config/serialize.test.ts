@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import {
   fromConfigDocument,
-  isLegacyDocument,
+  isFinanceForecastDocument,
   normalizeOptimizeField,
   serializeEvent,
   serializeInvestment,
@@ -193,16 +193,16 @@ describe('optimize field spellings', () => {
   });
 });
 
-describe('legacy detection', () => {
+describe('finance-forecast detection', () => {
   it('flags a config with no version field', () => {
-    expect(isLegacyDocument({ common: { startingValue: 1 } })).toBe(true);
+    expect(isFinanceForecastDocument({ common: { startingValue: 1 } })).toBe(true);
   });
 
   it('flags a config carrying common.deathDate even if versioned', () => {
-    expect(isLegacyDocument({ version: 2, common: { deathDate: '2090-01' } })).toBe(true);
+    expect(isFinanceForecastDocument({ version: 2, common: { deathDate: '2090-01' } })).toBe(true);
   });
 
   it('does not flag a plain v2 config', () => {
-    expect(isLegacyDocument({ version: 2, common: { events: [] } })).toBe(false);
+    expect(isFinanceForecastDocument({ version: 2, common: { events: [] } })).toBe(false);
   });
 });

@@ -1,8 +1,7 @@
-import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { expect, test, type Download, type Page } from '@playwright/test';
 import { parse } from 'yaml';
-import { CHOICES_EXAMPLE, openApp, problems, runForecast, uploadChoices } from './helpers';
+import { CHOICES_EXAMPLE, engineForecast, openApp, problems, runForecast, uploadChoices } from './helpers';
 
 async function text(download: Promise<Download>): Promise<string> {
   return readFileSync(await (await download).path(), 'utf8');
@@ -20,19 +19,14 @@ async function downloadConfig(page: Page): Promise<Record<string, unknown>> {
   return parse(await text(download)) as Record<string, unknown>;
 }
 
-test('an uploaded plan with choices forecasts as the CLI does and keeps its choices', async ({ page }) => {
+test('an uploaded plan with choices forecasts as the file itself does and keeps its choices', async ({ page }) => {
   const found = problems(page);
   await openApp(page);
   await uploadChoices(page);
   await runForecast(page);
 
-  // The same file through the command line, built from this checkout.
-  const cli = execFileSync(
-    'go',
-    ['run', './cmd/moneypath', 'forecast', '--config', 'examples/choices.yaml', '--output-format', 'csv'],
-    { cwd: '..', encoding: 'utf8' },
-  );
-  expect(await downloadCsv(page)).toBe(cli);
+  // The same file given straight to the engine, without the editor in between.
+  expect(await downloadCsv(page)).toBe(engineForecast(CHOICES_EXAMPLE)['csv']);
 
   const written = await downloadConfig(page);
   const source = parse(readFileSync(CHOICES_EXAMPLE, 'utf8')) as Record<string, unknown>;
@@ -84,7 +78,7 @@ test('a new path is one flipped option, and an option is edited once for every s
   }
 });
 
-test('one flipped choice reads as the CLI reports it, and is kept as a scenario only when asked', async ({ page }) => {
+test('one flipped choice reads as the engine reports it, and is kept as a scenario only when asked', async ({ page }) => {
   const found = problems(page);
   await openApp(page);
   await uploadChoices(page);
@@ -97,20 +91,18 @@ test('one flipped choice reads as the CLI reports it, and is kept as a scenario 
   await flip.getByRole('combobox', { name: 'Instead of Stay' }).selectOption({ label: 'Go freelance' });
   await expect(flip.locator('.chart__svg')).toBeVisible();
 
-  // The same flip through the command line, built from this checkout.
-  const cli = execFileSync(
-    'go',
-    ['run', './cmd/moneypath', 'forecast', '--config', 'examples/choices.yaml',
-      '--compare', 'sell', '--flip', 'Job', '--to', 'Go freelance'],
-    { cwd: '..', encoding: 'utf8' },
-  ).split('\n');
-  const months = (line: string): string[] =>
-    [...line.matchAll(/(\d{4}-\d{2}) \((.+?) moves ahead\)/g)].map((m) => `${m[1]}: ${m[2]} moves ahead`);
+  // The same flip asked of the engine directly, on the file as shipped.
+  type Series = { breakEven: { date: string; flipped: boolean }[] };
+  const direct = engineForecast(CHOICES_EXAMPLE, {
+    flip: { scenario: 'sell', choice: 'Job', option: 'Go freelance' },
+  })['flip'] as { name: string; cash: Series; total: Series };
+  const months = (series: Series): string[] =>
+    series.breakEven.map((be) => `${be.date}: ${be.flipped ? direct.name : 'sell'} moves ahead`);
   const shown = async (label: string): Promise<string[]> =>
     (await flip.locator('.difference__breakeven > div', { hasText: `${label} break-even` }).locator('li').allTextContents())
       .map((item) => item.trim());
-  const cash = months(cli.find((line) => line.startsWith('Cash break-even'))!);
-  const total = months(cli.find((line) => line.startsWith('Total break-even'))!);
+  const cash = months(direct.cash);
+  const total = months(direct.total);
   expect(cash.length).toBeGreaterThan(0);
   expect(await shown('Liquid')).toEqual(cash);
   expect(await shown('Total')).toEqual(total);

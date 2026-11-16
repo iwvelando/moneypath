@@ -14,9 +14,6 @@ import (
 type Options struct {
 	// Optimize runs the chapter 04 §7 optimizer before the final forecast.
 	Optimize bool
-	// EmergencyFundMonths overrides recommendations.emergencyFundMonths
-	// when non-nil (0 disables the recommendation).
-	EmergencyFundMonths *float64
 }
 
 // Result is the outcome of one Run. Scenario series all share the
@@ -117,13 +114,6 @@ func Run(cfg *config.Config, opts Options) (*Result, error) {
 	return forecast(cfg, opts), nil
 }
 
-func emergencyMonths(cfg *config.Config, opts Options) float64 {
-	if opts.EmergencyFundMonths != nil {
-		return *opts.EmergencyFundMonths
-	}
-	return cfg.ResolvedEmergencyFundMonths
-}
-
 func forecast(cfg *config.Config, opts Options) *Result {
 	res := &Result{
 		Start: cfg.Simulation.ResolvedStart,
@@ -133,7 +123,7 @@ func forecast(cfg *config.Config, opts Options) *Result {
 		if !sc.ResolvedActive {
 			continue
 		}
-		res.Scenarios = append(res.Scenarios, simulateScenario(cfg, sc, emergencyMonths(cfg, opts)))
+		res.Scenarios = append(res.Scenarios, simulateScenario(cfg, sc, cfg.ResolvedEmergencyFundMonths))
 	}
 	return res
 }
