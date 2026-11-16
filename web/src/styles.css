@@ -2842,6 +2842,11 @@ input[type='checkbox'], input[type='radio'] {
   cursor: default;
 }
 
+.flip__keep .flip__error {
+  color: var(--danger);
+  scroll-margin-block: 12px;
+}
+
 /* --------------------------------------------------------------- choices */
 
 .option__usage {

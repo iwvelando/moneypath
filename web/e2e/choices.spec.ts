@@ -146,7 +146,8 @@ test('an earlier flip stays readable but needs a fresh forecast before it can be
   };
   await chooseFreelance();
   await flip.getByRole('button', { name: 'Keep as a scenario' }).click();
-  await expect(page.locator('.notices')).toContainText(
+  await expect(flip.locator('.flip__keep [role="alert"]')).toBeInViewport();
+  await expect(flip.locator('.flip__keep [role="alert"]')).toContainText(
     'Your plan has changed. Run the forecast again before keeping this path.',
   );
   const before = await downloadConfig(page);

@@ -390,7 +390,7 @@ describe('the app', () => {
     expect(container.querySelector('.flip .chart')).not.toBeNull();
     await act(async () => button('Keep as a scenario').click());
     await settle(500);
-    expect(container.querySelector('.notices')?.textContent).toContain(
+    expect(container.querySelector('.flip__keep [role="alert"]')?.textContent).toContain(
       'Your plan has changed. Run the forecast again before keeping this path.',
     );
     const savedScenarios = () =>

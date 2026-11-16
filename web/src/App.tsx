@@ -240,23 +240,18 @@ export function App() {
 
   // Like an optimizer adjustment, a flipped path enters the plan only when asked.
   const keepFlip = useCallback(
-    (scenarioId: string, choiceId: string, optionId: string, name: string): boolean => {
+    (scenarioId: string, choiceId: string, optionId: string, name: string): string | null => {
       if (config !== ranConfig.current) {
-        pushNotice('error', 'Your plan has changed. Run the forecast again before keeping this path.');
-        return false;
+        return 'Your plan has changed. Run the forecast again before keeping this path.';
       }
       const next = keepFlippedScenario(config, scenarioId, choiceId, optionId, name);
       if (!next) {
-        pushNotice(
-          'error',
-          'That path could not be added: its scenario, the choice or the option is no longer in your plan.',
-        );
-        return false;
+        return 'That path could not be added: its scenario, the choice or the option is no longer in your plan.';
       }
       const added = next.scenarios.find((scenario) => !config.scenarios.includes(scenario));
       setConfig(next);
       pushNotice('info', `Added “${added?.name ?? name}” to your plan. Run the forecast again to see it.`);
-      return true;
+      return null;
     },
     [config, pushNotice],
   );

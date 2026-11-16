@@ -251,3 +251,31 @@ test('an iPhone flips one choice of a scenario and keeps the path', async ({ pag
   const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
   expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
 });
+
+test('an iPhone shows a refused Keep beside the button', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await uploadChoices(page);
+  await runForecast(page);
+  await page.getByRole('tab', { name: 'Planning Workspace' }).tap();
+  await page.getByRole('textbox', { name: 'Starting cash', exact: true }).fill('12345');
+  await page.getByRole('tab', { name: 'Results', exact: true }).tap();
+  const flip = page.locator('.flip');
+  await flip.getByRole('combobox', { name: 'Choice' }).selectOption({ label: 'Job' });
+  await flip.getByRole('combobox', { name: 'Instead of Stay' }).selectOption({ label: 'Go freelance' });
+  const keep = flip.getByRole('button', { name: 'Keep as a scenario' });
+  await expect(keep).toBeVisible();
+  // A reader may stop scrolling as soon as the button appears. The message
+  // must come into view even when the button is at the bottom of the screen.
+  await keep.evaluate((button) => {
+    window.scrollBy(0, button.getBoundingClientRect().bottom - window.innerHeight + 4);
+  });
+  await keep.tap();
+  const message = flip.locator('.flip__keep [role="alert"]');
+  await expect(message).toContainText('Your plan has changed. Run the forecast again before keeping this path.');
+  await expect(message).toBeInViewport({ ratio: 1 });
+  await expect(keep).not.toHaveAttribute('aria-disabled', 'true');
+  expect(await overflow(page), 'refusal').toBeLessThanOrEqual(0);
+  const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
+  expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
+});

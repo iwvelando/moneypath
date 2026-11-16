@@ -106,7 +106,7 @@ function showScenarios(names: string[], plan?: ConfigModel): void {
         onDownloadCsv={() => {}}
         statusOf={(_: Adjustment) => 'missing'}
         onApply={() => {}}
-        flip={plan ? { plan, run: () => new Promise(() => {}), onKeep: () => true } : undefined}
+        flip={plan ? { plan, run: () => new Promise(() => {}), onKeep: () => null } : undefined}
       />,
       host,
     );

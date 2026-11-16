@@ -64,9 +64,9 @@ function answer(request: FlipRequest): FlipComparison {
 }
 
 type Run = (request: FlipRequest) => Promise<FlipComparison>;
-type Keep = (scenarioId: string, choiceId: string, optionId: string, name: string) => boolean;
+type Keep = (scenarioId: string, choiceId: string, optionId: string, name: string) => string | null;
 
-function show(run: Run, onKeep: Keep = () => true, data: ForecastResults = results): void {
+function show(run: Run, onKeep: Keep = () => null, data: ForecastResults = results): void {
   act(() => {
     render(<Flip results={data} scenario={0} subject={subject} run={run} onKeep={onKeep} />, host);
   });
@@ -147,7 +147,7 @@ describe('flipping one choice of a scenario', () => {
   });
 
   it('keeps the flipped path once, and says so', async () => {
-    const onKeep = vi.fn<Keep>(() => true);
+    const onKeep = vi.fn<Keep>(() => null);
     show(async (request) => answer(request), onKeep);
     await pick(1, 'op-move');
     const button = keepButton()!;
@@ -163,18 +163,22 @@ describe('flipping one choice of a scenario', () => {
   });
 
   it('leaves the offer standing when the plan could not take the path', async () => {
-    show(async (request) => answer(request), () => false);
+    const message = 'Your plan has changed. Run the forecast again before keeping this path.';
+    show(async (request) => answer(request), () => message);
     await pick(1, 'op-move');
     act(() => keepButton()!.click());
     expect(keepButton()).not.toBeNull();
     expect(text()).not.toContain('Added to your plan.');
+    expect(host.querySelector('.flip__keep [role="alert"]')?.textContent).toBe(message);
+    await pick(1, 'op-sell');
+    expect(host.querySelector('.flip__keep [role="alert"]')).toBeNull();
   });
 
   it('starts over for a new run', async () => {
     const run = vi.fn(async (request: FlipRequest) => answer(request));
     show(run);
     await pick(1, 'op-move');
-    show(run, () => true, { ...results });
+    show(run, () => null, { ...results });
     expect(picker(1).value).toBe('');
     expect(text()).not.toContain('moves ahead');
   });

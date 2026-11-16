@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from 'preact/hooks';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { FlipSubject } from '../config/choices';
 import { EngineError, type FlipComparison, type FlipRequest, type ForecastResults } from '../engine/types';
 import { Chart } from './Chart';
@@ -11,15 +11,15 @@ interface FlipProps {
   subject: FlipSubject;
   /** Asks the engine for the flip, against the plan these results came from. */
   run: (request: FlipRequest) => Promise<FlipComparison>;
-  /** Adds the flipped path to the plan; false when the plan could not take it. */
-  onKeep: (scenarioId: string, choiceId: string, optionId: string, name: string) => boolean;
+  /** Adds the flipped path to the plan; returns an explanation on refusal, otherwise null. */
+  onKeep: (scenarioId: string, choiceId: string, optionId: string, name: string) => string | null;
 }
 
 type Outcome =
   | { state: 'idle' }
   | { state: 'running' }
   | { state: 'failed'; message: string }
-  | { state: 'done'; flip: FlipComparison; kept: boolean };
+  | { state: 'done'; flip: FlipComparison; kept: boolean; keepError: string | null };
 
 /**
  * One scenario with a single choice made differently, against the scenario
@@ -32,8 +32,17 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
   const [choiceId, setChoiceId] = useState('');
   const [optionId, setOptionId] = useState('');
   const [outcome, setOutcome] = useState<Outcome>({ state: 'idle' });
+  const keepMessage = useRef<HTMLParagraphElement | null>(null);
   // Only the latest request may report; an earlier one finishing late is dropped.
   const request = useRef(0);
+
+  // The button may sit at the bottom of a phone screen. Bring its refusal
+  // into view without moving focus away from the button.
+  useLayoutEffect(() => {
+    if (outcome.state === 'done' && outcome.keepError) {
+      keepMessage.current?.scrollIntoView?.({ block: 'nearest' });
+    }
+  }, [outcome]);
 
   // A new run, or another scenario, starts from nothing picked.
   useEffect(() => {
@@ -66,7 +75,7 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
     setOutcome({ state: 'running' });
     run({ scenario: scenarioName, choice: choice.name, option: picked.name }).then(
       (flip) => {
-        if (request.current === mine) setOutcome({ state: 'done', flip, kept: false });
+        if (request.current === mine) setOutcome({ state: 'done', flip, kept: false, keepError: null });
       },
       (error: unknown) => {
         if (request.current !== mine) return;
@@ -80,9 +89,8 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
 
   const keep = (flip: FlipComparison) => {
     if (!option) return;
-    if (onKeep(subject.scenarioId, choice.id, option.id, flip.name)) {
-      setOutcome({ state: 'done', flip, kept: true });
-    }
+    const keepError = onKeep(subject.scenarioId, choice.id, option.id, flip.name);
+    setOutcome({ state: 'done', flip, kept: keepError === null, keepError });
   };
 
   return (
@@ -179,10 +187,14 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
               >
                 {outcome.kept ? 'Kept as a scenario' : 'Keep as a scenario'}
               </button>
-              <p role="status">
-                {outcome.kept
+              <p
+                ref={keepMessage}
+                role={outcome.keepError ? 'alert' : 'status'}
+                class={outcome.keepError ? 'flip__error' : undefined}
+              >
+                {outcome.keepError ?? (outcome.kept
                   ? 'Added to your plan. Run the forecast again to see it beside the others.'
-                  : `Adds “${outcome.flip.name}” to your plan. Until then this comparison changes nothing.`}
+                  : `Adds “${outcome.flip.name}” to your plan. Until then this comparison changes nothing.`)}
               </p>
             </div>
           </>

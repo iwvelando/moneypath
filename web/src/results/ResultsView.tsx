@@ -28,7 +28,8 @@ export interface FlipAccess {
   /** The plan these results came from. */
   plan: ConfigModel;
   run: (request: FlipRequest) => Promise<FlipComparison>;
-  onKeep: (scenarioId: string, choiceId: string, optionId: string, name: string) => boolean;
+  /** Adds the path, or returns an explanation displayed beside Keep. */
+  onKeep: (scenarioId: string, choiceId: string, optionId: string, name: string) => string | null;
 }
 
 interface SummaryPanelProps {
