@@ -81,14 +81,11 @@ export function App() {
       setEngineStatus(status);
       // Browser tests wait on this rather than guessing when the engine is up.
       document.documentElement.dataset.engine = status.state;
-      if (status.state === 'ready' && status.fallbackReason) {
-        pushNotice('warn', status.fallbackReason);
-      }
     });
     return () => {
       cancelled = true;
     };
-  }, [pushNotice]);
+  }, []);
 
   /* ---- persistence ---- */
 
@@ -500,9 +497,6 @@ export function App() {
         <span>
           Engine version <code>{version}</code>
         </span>
-        {engineStatus.state === 'ready' && engineStatus.engine.kind === 'mock' ? (
-          <span class="tag tag--warn">mock engine — synthetic numbers</span>
-        ) : null}
         <span>Nothing you enter leaves your machine.</span>
         <a href="https://github.com/iwvelando/moneypath">About this site</a>
       </footer>

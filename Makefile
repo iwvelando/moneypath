@@ -60,7 +60,8 @@ test: test-go test-web
 test-go:
 	go test ./...
 
-test-web:
+# The unit tests run the real engine, so they build it first.
+test-web: wasm
 	cd web && npm run test -- --run
 
 # Browser tests against `vite preview` of the production build, under the

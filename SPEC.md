@@ -32,7 +32,7 @@ precisely would mostly be a source of contradictions.
 | Chapter | Status | Contents |
 |---|---|---|
 | [spec/01-product.md](spec/01-product.md) | Contract | What the tool is, who it's for, scope and non-goals |
-| [spec/02-architecture.md](spec/02-architecture.md) | Mixed | One Go engine → WASM; static frontend; determinism and build-artifact rules |
+| [spec/02-architecture.md](spec/02-architecture.md) | Mixed | One Go engine → WASM; static frontend; determinism rules; how the build works |
 | [spec/03-config-v2.md](spec/03-config-v2.md) | Contract | The v2 config format: every field, type, default, validation rule |
 | [spec/04-engine-semantics.md](spec/04-engine-semantics.md) | Contract | **Normative** simulation rules: events, loans, investments, emergency fund, optimizer |
 | [spec/05-csv.md](spec/05-csv.md) | Contract | The CSV download, byte for byte |
@@ -57,7 +57,6 @@ For how to build, test, and change the project, see [DEVELOPMENT.md](DEVELOPMENT
 - Go for all calculation. The browser runs the Go engine via WebAssembly — there is
   exactly one implementation of the finance math.
 - The web app is a static site: no backend compute, no persistent storage, no network calls
-  at runtime (beyond fetching its own static assets). The build MUST emit a standalone
-  `dist/` tree that deploys by copying it to any static file host (chapter 02, "Build
-  artifacts").
+  at runtime (beyond fetching its own static assets). The build emits one `dist/` tree,
+  and publishing is copying it (chapter 02, "Build artifacts").
 - Deterministic output: the same config produces byte-identical CSV everywhere.

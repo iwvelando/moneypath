@@ -27,8 +27,6 @@ export default defineConfig(({ mode }) => ({
   preview: { headers: { 'Content-Security-Policy': csp } },
   test: {
     environment: 'jsdom',
-    // `?mockEngine` forces the mock engine so DOM tests never touch wasm.
-    environmentOptions: { jsdom: { url: 'http://localhost/?mockEngine' } },
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
   },

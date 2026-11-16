@@ -44,8 +44,7 @@ In scope:
   verifies every change and publishes `dist/` on each merge to `main`, by copying the tree
   to a static bucket behind a CDN and nothing more. The hosting itself (bucket, CDN,
   certificate, DNS, the deploy role) is infrastructure-as-code in a separate repository,
-  `iwvelando/cloud-accounts`; this one holds no IaC. The deployment is one host among
-  many, not a target the build bends to: `dist/` stays host-agnostic (chapter 02).
+  `iwvelando/cloud-accounts`; this one holds no IaC.
 
 Out of scope (design must not preclude them, but build none of them):
 

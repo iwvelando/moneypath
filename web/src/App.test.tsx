@@ -2,16 +2,17 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
+import { addMonths } from './config/month';
 import { starterConfig } from './config/starter';
-import { emptyChoice, emptyOption, type ConfigModel } from './config/types';
+import { emptyChoice, emptyEvent, emptyOption, type ConfigModel } from './config/types';
 import { EDITOR_STATE_VERSION, KEYS } from './state/persistence';
 import { storageKeys } from './test/setup';
 
 /**
- * A DOM smoke test of the whole app against the mock engine (forced by the
- * `?mockEngine` URL configured for the jsdom environment). It exercises the
- * paths that only break at runtime: first render, autosave, running a
- * forecast, and switching to Results.
+ * A DOM smoke test of the whole app against the real engine: the wasm build,
+ * which `src/test/setup.ts` serves from disk. It exercises the paths that only
+ * break at runtime: first render, autosave, running a forecast, and switching
+ * to Results.
  */
 
 let container: HTMLDivElement;
@@ -30,10 +31,40 @@ function button(label: string): HTMLButtonElement {
   return found;
 }
 
+/** Save a plan as the draft the app restores when it starts. */
+function seedPlan(config: ConfigModel): void {
+  window.localStorage.setItem(
+    KEYS.editorState,
+    JSON.stringify({ version: EDITOR_STATE_VERSION, config }),
+  );
+}
+
+/**
+ * The starter plan with one decision, Home, that every scenario answers Stay.
+ * Move costs money up front and saves some every month after, so flipping to
+ * it falls behind at first and moves ahead later.
+ */
+function planWithAChoice(): ConfigModel {
+  const config = starterConfig();
+  const stay = emptyOption('Stay');
+  const move = emptyOption('Move');
+  // The start month reports the opening balances, so the cost lands a month in.
+  const moveMonth = addMonths(config.simulation.startDate, 1)!;
+  move.events = [
+    { ...emptyEvent(), name: 'Moving costs', amount: -10000, startDate: moveMonth, endDate: moveMonth },
+    { ...emptyEvent(), name: 'Lower rent', amount: 500 },
+  ];
+  const home = { ...emptyChoice('Home'), options: [stay, move] };
+  config.choices = [home];
+  for (const scenario of config.scenarios) scenario.select = { [home.id]: stay.id };
+  return config;
+}
+
 /**
  * Seed a saved plan whose first scenario carries an optimize block, with the
- * optimizer toggle already on. The mock engine reports its adjustments against
- * the first scenario, so this is the shape that exercises applying them.
+ * optimizer toggle already on. The event is spending, so the optimizer looks
+ * for the most the plan can afford, which is far more than the configured
+ * amount.
  */
 function seedPlanWithOptimizer(): void {
   const config = starterConfig();
@@ -41,16 +72,16 @@ function seedPlanWithOptimizer(): void {
   scenario.events = [
     {
       id: 'optimized-event',
-      name: 'Transition income',
-      amount: 1500,
+      name: 'Sabbatical spending',
+      amount: -100,
       percentage: null,
       frequency: null,
       startDate: '',
       endDate: '',
       optimize: {
         field: 'amount',
-        min: 0,
-        max: 5000,
+        min: -5000,
+        max: 0,
         minDate: '',
         maxDate: '',
         tolerance: null,
@@ -58,10 +89,7 @@ function seedPlanWithOptimizer(): void {
       },
     },
   ];
-  window.localStorage.setItem(
-    KEYS.editorState,
-    JSON.stringify({ version: EDITOR_STATE_VERSION, config }),
-  );
+  seedPlan(config);
   window.localStorage.setItem(KEYS.optimize, 'true');
 }
 
@@ -131,6 +159,11 @@ describe('the app', () => {
   });
 
   it('runs a forecast and shows chart, summary and table on the Results tab', async () => {
+    // Mortgage insurance with no cutoff runs for the whole loan, which the
+    // engine warns about.
+    const config = starterConfig();
+    config.common.loans[0]!.mortgageInsurance = 50;
+    seedPlan(config);
     await act(async () => {
       render(<App />, container);
     });
@@ -336,7 +369,7 @@ describe('the app', () => {
 
     // Running does not touch the plan, and the card says so rather than
     // leaving the editor and the results quietly disagreeing.
-    expect(savedAmount()).toBe(1500);
+    expect(savedAmount()).toBe(-100);
     expect(container.textContent).toContain('Your plan keeps the values you configured');
     expect(container.querySelector('.toolbar__hint')).not.toBeNull();
 
@@ -345,7 +378,8 @@ describe('the app', () => {
     });
     await settle(600);
 
-    expect(savedAmount()).toBe(2680.5);
+    expect(savedAmount()).toBeLessThan(-100);
+    expect(savedAmount()).toBeGreaterThanOrEqual(-5000);
     expect(container.querySelector('.adjustments__applied')?.textContent).toContain(
       'Applied to your plan.',
     );
@@ -354,13 +388,8 @@ describe('the app', () => {
   });
 
   it('requires a fresh forecast before keeping a flip after the plan changes', async () => {
-    const config = starterConfig();
-    const stay = emptyOption('Stay');
-    const move = emptyOption('Move');
-    const home = { ...emptyChoice('Home'), options: [stay, move] };
-    config.choices = [home];
-    for (const scenario of config.scenarios) scenario.select = { [home.id]: stay.id };
-    window.localStorage.setItem(KEYS.editorState, JSON.stringify({ version: EDITOR_STATE_VERSION, config }));
+    const config = planWithAChoice();
+    seedPlan(config);
 
     await act(async () => render(<App />, container));
     await settle();
@@ -408,15 +437,10 @@ describe('the app', () => {
   });
 
   it('flips one choice from the results and keeps the path as a scenario when asked', async () => {
-    const config = starterConfig();
-    const stay = emptyOption('Stay');
-    const move = emptyOption('Move');
-    const home = { ...emptyChoice('Home'), options: [stay, move] };
-    config.choices = [home];
-    for (const scenario of config.scenarios) scenario.select = { [home.id]: stay.id };
+    const config = planWithAChoice();
     const first = config.scenarios[0]!.name;
     const count = config.scenarios.length;
-    window.localStorage.setItem(KEYS.editorState, JSON.stringify({ version: EDITOR_STATE_VERSION, config }));
+    seedPlan(config);
 
     await act(async () => {
       render(<App />, container);

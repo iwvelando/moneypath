@@ -24,8 +24,8 @@ const assets = readdirSync('dist/assets');
 assert.ok(assets.some((name) => name.endsWith('.js')), 'No JavaScript in dist/assets');
 const wasm = assets.filter((name) => name.endsWith('.wasm'));
 assert.equal(wasm.length, 1, `Expected one engine in dist/assets, found ${wasm.length}`);
-// The placeholder from ensure-wasm.mjs is 8 bytes; the real engine is megabytes.
-assert.ok(statSync(`dist/assets/${wasm[0]}`).size > 1_000_000, 'dist/ holds the placeholder engine, not the real one');
+// The real engine is megabytes; anything smaller is a broken build.
+assert.ok(statSync(`dist/assets/${wasm[0]}`).size > 1_000_000, 'The engine in dist/assets is too small to be the real one');
 
 assert.equal(readFileSync('dist/LICENSE.txt', 'utf8'), readFileSync('../LICENSE', 'utf8'));
 assert.match(readFileSync('dist/GO-LICENSE.txt', 'utf8'), /The Go Authors/);

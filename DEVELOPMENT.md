@@ -32,9 +32,12 @@ static file host; it works from any sub-path.
 
 Go's glue, `wasm_exec.js`, runs the wasm and only works with the compiler that built
 it. `make wasm` copies it from that toolchain; both files are gitignored. For the
-dev server, run `make wasm` and then `npm run dev` in `web/`. Before a first engine
-build, `web/scripts/ensure-wasm.mjs` supplies an empty wasm and the installed Go's
-glue, which is enough for `make test-web`.
+dev server, run `make wasm` and then `npm run dev` in `web/`.
+
+The frontend unit tests run the real engine: `web/src/test/setup.ts` answers the app's
+request for the wasm from the build on disk. `make test-web` rebuilds the engine first.
+`npm test` and `npm run dev` in `web/` build it only when it is missing
+(`web/scripts/ensure-wasm.mjs`), so run `make wasm` after editing Go.
 
 Engine work needs no frontend toolchain: `go test ./...` runs the units and the
 conformance fixtures natively.
