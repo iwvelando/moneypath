@@ -17,6 +17,7 @@ import {
   targetCandidates,
 } from './choices';
 import { fromConfigDocument, refreshIds, toConfigDocument } from './serialize';
+import { moveEventToCommon, moveEventToScenarios } from './move';
 import { cloneScenario, emptyEvent, emptyScenario, type ConfigModel } from './types';
 
 // vitest runs from web/.
@@ -64,6 +65,21 @@ describe('choices in the config document', () => {
     config.choices.reverse();
     const select = scenarios(toConfigDocument(config))[0]!['select'] as Record<string, string>;
     expect(Object.keys(select)).toEqual(['Job', 'Housing']);
+  });
+
+  it('keeps a selection when a choice has a JavaScript prototype property name', () => {
+    const doc = JSON.parse(`{
+      "version": 2,
+      "choices": [{ "name": "__proto__", "options": [{ "name": "Keep" }] }],
+      "scenarios": [{ "name": "a", "select": { "__proto__": "Keep" } }]
+    }`) as Record<string, unknown>;
+    const config = fromConfigDocument(doc);
+    const picked = config.choices[0]!;
+    expect(config.scenarios[0]!.select[picked.id]).toBe(picked.options[0]!.id);
+    const written = scenarios(toConfigDocument(config))[0]!['select'];
+    expect(written).toEqual(JSON.parse('{"__proto__":"Keep"}'));
+    picked.name = 'constructor';
+    expect(scenarios(toConfigDocument(config))[0]!['select']).toEqual({ constructor: 'Keep' });
   });
 
   it('follows a renamed choice, option and baseline entry', () => {
@@ -239,6 +255,20 @@ describe('which baseline entries an option may target', () => {
     const change = option(deleted, 'Housing', 'Sell and rent').change.loans[0]!;
     expect(change.targetName).toBe('House loan');
     expect(targetCandidates(deleted, choice(deleted, 'Housing').id, '').length).toBe(4);
+  });
+
+  it('relinks a targeted event moved out of the baseline and back before it is renamed', () => {
+    const config = example();
+    const salary = config.common.events.find((event) => event.name === 'Salary')!;
+    const scenarioId = config.scenarios[0]!.id;
+    const movedOut = moveEventToScenarios(config, salary.id, [scenarioId], 'move');
+    expect(describeOption(movedOut, choice(movedOut, 'Job').id, option(movedOut, 'Job', 'Go freelance')).attention).toBe(true);
+    const movedEvent = movedOut.scenarios[0]!.events[0]!;
+    const movedBack = moveEventToCommon(movedOut, scenarioId, movedEvent.id, []);
+    movedBack.common.events[0]!.name = 'Pay';
+    const renamed = linkTargets(movedBack);
+    const written = (toConfigDocument(renamed)['choices'] as { options: { remove?: unknown }[] }[])[1]!.options[1]!;
+    expect(written.remove).toEqual({ events: ['Pay', 'Gym'] });
   });
 });
 

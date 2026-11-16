@@ -170,7 +170,7 @@ function serializeScenario(scenario: ScenarioModel, choices: ChoiceModel[]): Jso
   const out: JsonObject = { name: scenario.name.trim(), active: scenario.active };
   // Written in choice order. A choice the scenario picks nothing for is left
   // out, so the engine names it; the editor never guesses a pick.
-  const select: JsonObject = {};
+  const select: JsonObject = Object.create(null) as JsonObject;
   for (const choice of choices) {
     const option = choice.options.find((candidate) => candidate.id === scenario.select[choice.id]);
     if (option) select[choice.name.trim()] = option.name.trim();

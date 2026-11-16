@@ -9,6 +9,7 @@
  */
 
 import { cloneEvent, type ConfigModel, type EventModel } from './types';
+import { linkTargets } from './choices';
 
 export interface ReplicateRef {
   scenarioId: string;
@@ -65,7 +66,7 @@ export function moveEventToCommon(
   if (!moved) return config;
 
   const removedIds = new Set([eventId, ...removeReplicates.map((r) => r.eventId)]);
-  return {
+  return linkTargets({
     ...config,
     common: {
       ...config.common,
@@ -75,7 +76,7 @@ export function moveEventToCommon(
       ...scenario,
       events: scenario.events.filter((event) => !removedIds.has(event.id)),
     })),
-  };
+  });
 }
 
 /**
@@ -93,7 +94,7 @@ export function moveEventToScenarios(
   if (!source || scenarioIds.length === 0) return config;
 
   const targets = new Set(scenarioIds);
-  return {
+  return linkTargets({
     ...config,
     common: {
       ...config.common,
@@ -107,5 +108,5 @@ export function moveEventToScenarios(
         ? { ...scenario, events: [cloneEvent(source), ...scenario.events] }
         : scenario,
     ),
-  };
+  });
 }
