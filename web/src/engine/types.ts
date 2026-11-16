@@ -68,6 +68,38 @@ export interface ScenarioComparison {
   total: SeriesComparison;
 }
 
+/** What to flip: an active scenario, one of the plan's choices, and the option to switch it to. */
+export interface FlipRequest {
+  scenario: string;
+  choice: string;
+  option: string;
+}
+
+/** A month in which the lead changes hands; `flipped` when the flipped path moves ahead. */
+export interface FlipBreakEvenMonth {
+  date: string;
+  flipped: boolean;
+}
+
+/** `difference` is index-aligned with `rows`. */
+export interface FlipSeries {
+  difference: number[];
+  breakEven: FlipBreakEvenMonth[];
+}
+
+/**
+ * A scenario's flipped path minus the scenario; decided by the engine.
+ * `scenario` indexes `scenarios`, and `name` is the flipped path's name.
+ */
+export interface FlipComparison {
+  scenario: number;
+  choice: string;
+  option: string;
+  name: string;
+  cash: FlipSeries;
+  total: FlipSeries;
+}
+
 export interface ScenarioValue {
   liquid?: number | null;
   total?: number | null;
@@ -87,6 +119,8 @@ export interface ForecastResults {
   metrics: ScenarioMetrics[];
   /** Every ordered pair of scenarios; empty with fewer than two. */
   comparisons?: ScenarioComparison[] | null;
+  /** Present only when the run was asked for a flip. */
+  flip?: FlipComparison | null;
   warnings?: string[] | null;
   configYaml: string;
 }
@@ -100,6 +134,8 @@ export interface ForecastOptions {
   optimize?: boolean;
   /** `YYYY-MM`; pins the engine's idea of the current month. */
   now?: string;
+  /** Also compare one scenario with its flipped path. */
+  flip?: FlipRequest;
 }
 
 /** An error surfaced by the engine bridge (`{"error": "..."}`) or by loading. */

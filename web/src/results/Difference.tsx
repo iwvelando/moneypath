@@ -12,7 +12,7 @@ interface BreakEvenProps {
   scenarios: string[];
 }
 
-function BreakEven({ label, months, scenarios }: BreakEvenProps) {
+export function BreakEven({ label, months, scenarios }: BreakEvenProps) {
   return (
     <div>
       <dt>{label} break-even</dt>

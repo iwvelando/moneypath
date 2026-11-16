@@ -8,13 +8,14 @@ import {
   applyAdjustments,
   type Adjustment,
 } from './config/adjustments';
+import { keepFlippedScenario } from './config/choices';
 import { currentMonth } from './config/month';
 import { fromConfigDocument, refreshIds, toConfigYaml } from './config/serialize';
 import { starterConfig } from './config/starter';
 import { parseMigratedYaml, planUpload } from './config/upload';
 import type { ConfigModel } from './config/types';
 import { loadEngine, type EngineStatus } from './engine';
-import { EngineError, type ForecastResults } from './engine/types';
+import { EngineError, type FlipComparison, type FlipRequest, type ForecastResults } from './engine/types';
 import { ResultsView } from './results/ResultsView';
 import {
   KEYS,
@@ -54,6 +55,8 @@ export function App() {
   // The config object that produced `results`. Editing replaces the config
   // immutably, so identity alone tells us the numbers have gone stale.
   const ranConfig = useRef<ConfigModel | null>(null);
+  // The month that run took as the current one, so a flip of it agrees.
+  const ranNow = useRef('');
   const [notices, setNotices] = useState<Notice[]>([]);
   const [confirmReset, setConfirmReset] = useState(false);
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -113,13 +116,15 @@ export function App() {
     setRunError(null);
     const configYaml = toConfigYaml(config);
     const started = performance.now();
+    const now = currentMonth();
     try {
-      const forecast = await engine.forecast(configYaml, { optimize, now: currentMonth() });
+      const forecast = await engine.forecast(configYaml, { optimize, now });
       setDurationMs(performance.now() - started);
       setResults(forecast);
       setRanWithOptimizer(optimize);
       setLastRunInput(configYaml);
       ranConfig.current = config;
+      ranNow.current = now;
       setTab('results');
       setBusyLabel('Forecast complete.');
     } catch (error) {
@@ -215,6 +220,42 @@ export function App() {
     [pushNotice],
   );
 
+  /* ---- flipping one choice ---- */
+
+  // The flip is of the plan the results came from, run the way they were, so
+  // it stays true to them even after the editor has moved on.
+  const runFlip = useCallback(
+    async (request: FlipRequest): Promise<FlipComparison> => {
+      if (!engine || lastRunInput === null) throw new EngineError('The engine is not available.');
+      const forecast = await engine.forecast(lastRunInput, {
+        optimize: ranWithOptimizer,
+        now: ranNow.current,
+        flip: request,
+      });
+      if (!forecast.flip) throw new EngineError('The engine did not report the comparison.');
+      return forecast.flip;
+    },
+    [engine, lastRunInput, ranWithOptimizer],
+  );
+
+  // Like an optimizer adjustment, a flipped path enters the plan only when asked.
+  const keepFlip = useCallback(
+    (scenarioId: string, choiceId: string, optionId: string, name: string): string | null => {
+      if (config !== ranConfig.current) {
+        return 'Your plan has changed. Run the forecast again before keeping this path.';
+      }
+      const next = keepFlippedScenario(config, scenarioId, choiceId, optionId, name);
+      if (!next) {
+        return 'That path could not be added: its scenario, the choice or the option is no longer in your plan.';
+      }
+      const added = next.scenarios.find((scenario) => !config.scenarios.includes(scenario));
+      setConfig(next);
+      pushNotice('info', `Added “${added?.name ?? name}” to your plan. Run the forecast again to see it.`);
+      return null;
+    },
+    [config, pushNotice],
+  );
+
   const uploadConfig = useCallback(
     async (file: File) => {
       setRunError(null);
@@ -277,6 +318,7 @@ export function App() {
     setResults(null);
     setLastRunInput(null);
     ranConfig.current = null;
+    ranNow.current = '';
     setRunError(null);
     setTab('workspace');
     setConfirmReset(false);
@@ -474,6 +516,9 @@ export function App() {
                 onDownloadCsv={downloadCsv}
                 statusOf={statusOf}
                 onApply={applyAdjustmentsToPlan}
+                flip={
+                  ranConfig.current ? { plan: ranConfig.current, run: runFlip, onKeep: keepFlip } : undefined
+                }
               />
             </>
           ) : null}

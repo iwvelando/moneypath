@@ -15,6 +15,7 @@ moneypath forecast --config plan.yaml [--output-format pretty|csv]
                    [--optimize] [--write-config FILE]
                    [--emergency-months N] [--now YYYY-MM] [--log-level L]
                    [--compare SCENARIO --against SCENARIO]
+                   [--compare SCENARIO --flip CHOICE --to OPTION]
 ```
 
 - `--config` (required): path to a v2 YAML config. A v1 config (detected by a missing
@@ -44,6 +45,18 @@ moneypath forecast --config plan.yaml [--output-format pretty|csv]
   plan; one flag without the other, a name that is not an active scenario, or the same
   name twice is a usage error (exit 2) that prints no results. Every other flag keeps
   its meaning: with `--optimize` the comparison is of the final forecast.
+- `--compare A --flip CHOICE --to OPTION`: print what one decision changes for
+  scenario A. The scenario is compared with its flipped path (chapter 02, Results
+  JSON, `flip`): A with OPTION selected for CHOICE and nothing else changed. The output
+  is the comparison output of the flipped path minus A, the flipped path being named
+  `A (CHOICE: OPTION)`. The plan is not changed, and `--write-config` writes it without
+  the flipped path. `--flip` and `--to` go together, need `--compare`, and cannot be
+  combined with `--against`. Breaking those rules is a usage error (exit 2) that prints
+  no results. So is naming a scenario that is not active, a choice the plan does not
+  have, an option the choice does not have, or the option A already selects; the
+  message lists the names that would work. A flipped path that fails validation is a
+  config error (exit 1). With `--optimize` the flipped path is optimized as a scenario
+  written that way would be.
 
 ### `moneypath migrate`
 
@@ -117,7 +130,9 @@ ____    | ________________ | _______________ | _____
 
 ## Comparison output
 
-What `--compare A --against B` prints instead of the formats above.
+What `--compare A --against B` prints instead of the formats above. `--compare A --flip
+CHOICE --to OPTION` prints the same, with `A (CHOICE: OPTION)` in the place of A and A
+in the place of B.
 
 With `pretty`:
 

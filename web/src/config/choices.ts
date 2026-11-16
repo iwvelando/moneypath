@@ -10,6 +10,7 @@
 
 import { formatMoney } from '../util/format';
 import {
+  cloneScenario,
   emptyChoice,
   emptyOption,
   newId,
@@ -386,5 +387,88 @@ export function describeOption(config: ConfigModel, choiceId: string, option: Op
     primary: parts.length ? parts.join(' · ') : 'Changes nothing',
     detail: usedBy(config, choiceId, option.id),
     attention: dangling || option.name.trim() === '',
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/* flipping one choice                                                  */
+/* ------------------------------------------------------------------ */
+
+export interface FlipOption {
+  id: string;
+  /** As the engine reads it. */
+  name: string;
+}
+
+/** A choice a scenario could take differently: what it picks now, and what else there is. */
+export interface FlipChoice {
+  id: string;
+  name: string;
+  current: FlipOption;
+  others: FlipOption[];
+}
+
+export interface FlipSubject {
+  scenarioId: string;
+  choices: FlipChoice[];
+}
+
+/**
+ * What can be flipped for one scenario of a forecast. The engine reports the
+ * plan's active scenarios in plan order, so `activeIndex` is the scenario's
+ * position in the results. Names are trimmed as the plan is written, since
+ * they are what a flip is asked for by.
+ */
+export function flipSubject(plan: ConfigModel, activeIndex: number): FlipSubject | null {
+  const scenario = plan.scenarios.filter((candidate) => candidate.active)[activeIndex];
+  if (!scenario) return null;
+  const choices: FlipChoice[] = [];
+  for (const choice of plan.choices) {
+    const current = choice.options.find((option) => option.id === scenario.select[choice.id]);
+    if (!current) continue;
+    const others = choice.options
+      .filter((option) => option !== current)
+      .map((option) => ({ id: option.id, name: option.name.trim() }));
+    if (others.length === 0) continue;
+    choices.push({
+      id: choice.id,
+      name: choice.name.trim(),
+      current: { id: current.id, name: current.name.trim() },
+      others,
+    });
+  }
+  return { scenarioId: scenario.id, choices };
+}
+
+/**
+ * The plan with a scenario's flipped path added after it: a copy of the
+ * scenario picking `optionId` for `choiceId`. `name` gains a number when
+ * another scenario already has it. Null when the scenario, the choice or the
+ * option is no longer in the plan.
+ */
+export function keepFlippedScenario(
+  config: ConfigModel,
+  scenarioId: string,
+  choiceId: string,
+  optionId: string,
+  name: string,
+): ConfigModel | null {
+  const index = config.scenarios.findIndex((scenario) => scenario.id === scenarioId);
+  const scenario = config.scenarios[index];
+  const choice = config.choices.find((candidate) => candidate.id === choiceId);
+  if (!scenario || !choice || !choice.options.some((option) => option.id === optionId)) return null;
+
+  const taken = new Set(config.scenarios.map((candidate) => candidate.name.trim()));
+  let unique = name;
+  for (let n = 2; taken.has(unique); n += 1) unique = `${name} ${n}`;
+
+  const kept: ScenarioModel = {
+    ...cloneScenario(scenario),
+    name: unique,
+    select: { ...scenario.select, [choiceId]: optionId },
+  };
+  return {
+    ...config,
+    scenarios: [...config.scenarios.slice(0, index + 1), kept, ...config.scenarios.slice(index + 1)],
   };
 }

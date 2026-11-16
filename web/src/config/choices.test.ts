@@ -9,6 +9,8 @@ import {
   changedFields,
   describeOption,
   effectiveEntry,
+  flipSubject,
+  keepFlippedScenario,
   linkTargets,
   optionUsers,
   removeChoice,
@@ -344,5 +346,88 @@ describe('an entry as an option changes it', () => {
     const job = choice(config, 'Job');
     const gone = linkTargets({ ...config, common: { ...config.common, investments: [] } });
     expect(describeOption(gone, job.id, option(gone, 'Job', 'Go freelance')).attention).toBe(true);
+  });
+});
+
+describe('flipping one choice', () => {
+  it('lists, for a scenario of the results, each choice and the options it could switch to', () => {
+    const config = example();
+    const subject = flipSubject(config, 1)!;
+    expect(subject.scenarioId).toBe(config.scenarios[1]!.id);
+    expect(
+      subject.choices.map((c) => ({ name: c.name, current: c.current.name, others: c.others.map((o) => o.name) })),
+    ).toEqual([
+      { name: 'Housing', current: 'Sell and rent', others: ['Keep the house'] },
+      { name: 'Job', current: 'Stay', others: ['Go freelance'] },
+    ]);
+    expect(subject.choices[0]!.id).toBe(choice(config, 'Housing').id);
+    expect(subject.choices[0]!.others[0]!.id).toBe(option(config, 'Housing', 'Keep the house').id);
+  });
+
+  it('counts the scenarios the engine ran, which are the active ones', () => {
+    const config = example();
+    config.scenarios[0]!.active = false;
+    expect(flipSubject(config, 0)!.scenarioId).toBe(config.scenarios[1]!.id);
+    expect(flipSubject(config, 2)).toBeNull();
+  });
+
+  it('leaves out a choice with nothing to switch to, and names as the engine reads them', () => {
+    const config = example();
+    choice(config, 'Housing').options = [option(config, 'Housing', 'Sell and rent')];
+    option(config, 'Job', 'Go freelance').name = 'Go freelance  ';
+    choice(config, 'Job').name = ' Job ';
+    const subject = flipSubject(config, 1)!;
+    expect(subject.choices.map((c) => c.name)).toEqual(['Job']);
+    expect(subject.choices[0]!.others.map((o) => o.name)).toEqual(['Go freelance']);
+  });
+
+  it('has nothing to offer a plan without choices', () => {
+    expect(flipSubject(plain(), 0)!.choices).toEqual([]);
+  });
+
+  it('keeps the flipped path as a copy placed after its scenario', () => {
+    const config = example();
+    const sell = config.scenarios[1]!;
+    sell.events = [{ ...emptyEvent(), name: 'Storage', amount: -80 }];
+    const housing = choice(config, 'Housing');
+    const keep = option(config, 'Housing', 'Keep the house');
+    const kept = keepFlippedScenario(config, sell.id, housing.id, keep.id, 'sell (Housing: Keep the house)')!;
+
+    expect(kept.scenarios.map((s) => s.name)).toEqual([
+      'as we are',
+      'sell',
+      'sell (Housing: Keep the house)',
+      'sell and freelance',
+    ]);
+    const added = kept.scenarios[2]!;
+    expect(added.id).not.toBe(sell.id);
+    expect(added.select).toEqual({ ...sell.select, [housing.id]: keep.id });
+    expect(added.events.map((e) => e.name)).toEqual(['Storage']);
+    expect(added.events[0]!.id).not.toBe(sell.events[0]!.id);
+    // Nothing else moved, and the plan passed in is untouched.
+    expect(kept.scenarios[1]).toBe(sell);
+    expect(kept.choices).toBe(config.choices);
+    expect(config.scenarios).toHaveLength(3);
+  });
+
+  it('gives the kept scenario a name no other scenario has', () => {
+    const config = example();
+    const sell = config.scenarios[1]!;
+    const housing = choice(config, 'Housing');
+    const keep = option(config, 'Housing', 'Keep the house');
+    const once = keepFlippedScenario(config, sell.id, housing.id, keep.id, 'as we are')!;
+    expect(once.scenarios[2]!.name).toBe('as we are 2');
+    const twice = keepFlippedScenario(once, sell.id, housing.id, keep.id, 'as we are')!;
+    expect(twice.scenarios[2]!.name).toBe('as we are 3');
+  });
+
+  it('refuses a path whose scenario, choice or option has left the plan', () => {
+    const config = example();
+    const sell = config.scenarios[1]!;
+    const housing = choice(config, 'Housing');
+    const keep = option(config, 'Housing', 'Keep the house');
+    expect(keepFlippedScenario(config, 'gone', housing.id, keep.id, 'x')).toBeNull();
+    expect(keepFlippedScenario(config, sell.id, 'gone', keep.id, 'x')).toBeNull();
+    expect(keepFlippedScenario(config, sell.id, housing.id, 'gone', 'x')).toBeNull();
   });
 });

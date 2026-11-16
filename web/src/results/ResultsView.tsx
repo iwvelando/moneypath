@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Adjustment, AdjustmentStatus } from '../config/adjustments';
-import type { ForecastResults, ScenarioMetrics } from '../engine/types';
+import { flipSubject } from '../config/choices';
+import type { ConfigModel } from '../config/types';
+import type { FlipComparison, FlipRequest, ForecastResults, ScenarioMetrics } from '../engine/types';
 import { formatDuration, formatMoney, formatMonths } from '../util/format';
 import { Chart } from './Chart';
 import { Comparison } from './Comparison';
 import { Difference } from './Difference';
+import { Flip } from './Flip';
 import { MonthlyTable, type MonthlyRow } from './MonthlyTable';
 import { EmergencyFundGauge } from './Gauge';
 import { OverlaySparkline, Sparkline } from './Sparkline';
@@ -17,6 +20,16 @@ interface ResultsViewProps {
   /** Whether the plan already carries each reported adjustment. */
   statusOf: (adjustment: Adjustment) => AdjustmentStatus;
   onApply: (adjustments: Adjustment[]) => void;
+  /** What it takes to flip one choice of a scenario; without it nothing is offered. */
+  flip?: FlipAccess;
+}
+
+export interface FlipAccess {
+  /** The plan these results came from. */
+  plan: ConfigModel;
+  run: (request: FlipRequest) => Promise<FlipComparison>;
+  /** Adds the path, or returns an explanation displayed beside Keep. */
+  onKeep: (scenarioId: string, choiceId: string, optionId: string, name: string) => string | null;
 }
 
 interface SummaryPanelProps {
@@ -161,6 +174,7 @@ export function ResultsView({
   onDownloadCsv,
   statusOf,
   onApply,
+  flip,
 }: ResultsViewProps) {
   // A scenario's position, or the comparison of all of them.
   const [selected, setSelected] = useState<number | 'compare'>(0);
@@ -212,6 +226,12 @@ export function ResultsView({
   };
 
   const scenarioName = results.scenarios[index] ?? '';
+
+  // Offered only when some choice has another option for this scenario.
+  const flipOf = useMemo(() => {
+    const subject = flip ? flipSubject(flip.plan, index) : null;
+    return subject && subject.choices.length > 0 ? subject : null;
+  }, [flip?.plan, index]);
 
   // One Total series per scenario, for the sparkline in each tab.
   const scenarioTotals = useMemo(
@@ -314,6 +334,10 @@ export function ResultsView({
             onApply={onApply}
           />
         </div>
+
+        {flip && flipOf ? (
+          <Flip results={results} scenario={index} subject={flipOf} run={flip.run} onKeep={flip.onKeep} />
+        ) : null}
 
         <div class="results__section-heading">
           <h3>Month by month</h3>

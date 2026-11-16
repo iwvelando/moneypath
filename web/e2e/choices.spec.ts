@@ -83,3 +83,82 @@ test('a new path is one flipped option, and an option is edited once for every s
     expect(column(after, `liquid (${name})`), name).not.toEqual(column(before, `liquid (${name})`));
   }
 });
+
+test('one flipped choice reads as the CLI reports it, and is kept as a scenario only when asked', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await uploadChoices(page);
+  await runForecast(page);
+  const before = await downloadCsv(page);
+
+  await page.getByRole('tab', { name: /^sell(?! and)/ }).click();
+  const flip = page.locator('.flip');
+  await flip.getByRole('combobox', { name: 'Choice' }).selectOption({ label: 'Job' });
+  await flip.getByRole('combobox', { name: 'Instead of Stay' }).selectOption({ label: 'Go freelance' });
+  await expect(flip.locator('.chart__svg')).toBeVisible();
+
+  // The same flip through the command line, built from this checkout.
+  const cli = execFileSync(
+    'go',
+    ['run', './cmd/moneypath', 'forecast', '--config', 'examples/choices.yaml',
+      '--compare', 'sell', '--flip', 'Job', '--to', 'Go freelance'],
+    { cwd: '..', encoding: 'utf8' },
+  ).split('\n');
+  const months = (line: string): string[] =>
+    [...line.matchAll(/(\d{4}-\d{2}) \((.+?) moves ahead\)/g)].map((m) => `${m[1]}: ${m[2]} moves ahead`);
+  const shown = async (label: string): Promise<string[]> =>
+    (await flip.locator('.difference__breakeven > div', { hasText: `${label} break-even` }).locator('li').allTextContents())
+      .map((item) => item.trim());
+  const cash = months(cli.find((line) => line.startsWith('Cash break-even'))!);
+  const total = months(cli.find((line) => line.startsWith('Total break-even'))!);
+  expect(cash.length).toBeGreaterThan(0);
+  expect(await shown('Liquid')).toEqual(cash);
+  expect(await shown('Total')).toEqual(total);
+
+  // Reading the flip left the plan and its results alone.
+  await expect(page.getByRole('tab', { name: 'Results' })).not.toHaveClass(/is-outdated/);
+  expect(await downloadCsv(page)).toBe(before);
+
+  await flip.getByRole('button', { name: 'Keep as a scenario' }).click();
+  await expect(flip.getByRole('button', { name: 'Kept as a scenario' })).toBeFocused();
+  await expect(page.getByRole('tab', { name: 'Results' })).toHaveClass(/is-outdated/);
+  const config = await downloadConfig(page);
+  const scenarios = config['scenarios'] as { name: string; select?: unknown }[];
+  expect(scenarios.map((s) => s.name)).toEqual(['as we are', 'sell', 'sell (Job: Go freelance)', 'sell and freelance']);
+  expect(scenarios[2]!.select).toEqual({ Housing: 'Sell and rent', Job: 'Go freelance' });
+  expect(found).toEqual([]);
+});
+
+test('an earlier flip stays readable but needs a fresh forecast before it can be kept', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await uploadChoices(page);
+  await runForecast(page);
+
+  await page.getByRole('tab', { name: 'Planning Workspace' }).click();
+  await page.getByRole('textbox', { name: 'Starting cash', exact: true }).fill('12345');
+  await page.getByRole('tab', { name: 'Results', exact: true }).click();
+  const flip = page.locator('.flip');
+  const chooseFreelance = async () => {
+    await flip.getByRole('combobox', { name: 'Choice' }).selectOption({ label: 'Job' });
+    await flip.getByRole('combobox', { name: 'Instead of Stay' }).selectOption({ label: 'Go freelance' });
+    await expect(flip.locator('.chart__svg')).toBeVisible();
+  };
+  await chooseFreelance();
+  await flip.getByRole('button', { name: 'Keep as a scenario' }).click();
+  await expect(flip.locator('.flip__keep [role="alert"]')).toBeInViewport();
+  await expect(flip.locator('.flip__keep [role="alert"]')).toContainText(
+    'Your plan has changed. Run the forecast again before keeping this path.',
+  );
+  const before = await downloadConfig(page);
+  expect(before['scenarios']).toHaveLength(3);
+  expect(before['simulation']).toMatchObject({ startingCash: 12345 });
+
+  await page.getByRole('tab', { name: 'Planning Workspace' }).click();
+  await runForecast(page);
+  await chooseFreelance();
+  await flip.getByRole('button', { name: 'Keep as a scenario' }).click();
+  await expect(flip.getByRole('button', { name: 'Kept as a scenario' })).toBeFocused();
+  expect((await downloadConfig(page))['scenarios']).toHaveLength(4);
+  expect(found).toEqual([]);
+});

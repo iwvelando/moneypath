@@ -366,3 +366,73 @@ func TestForecastRefusesABrokenChoice(t *testing.T) {
 		}
 	}
 }
+
+// Spec chapter 05: --compare with --flip and --to prints the scenario's
+// flipped path minus the scenario, and is the comparison two hand-written
+// scenarios give.
+func TestForecastFlipOneChoice(t *testing.T) {
+	in := writeNamedPlan(t, planWithChoices)
+
+	code, stdout, _ := runCaptured(t, "forecast", "--config", in, "--compare", "stay", "--flip", "Home", "--to", "Move")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	want := `--- stay (Home: Move) minus stay ---
+Cash break-even: none
+Total break-even: none
+Date    | Cash difference | Total difference
+____    | _______________ | ________________
+2025-01 | $0.00 | $0.00
+2025-02 | $300.00 | $300.00
+2025-03 | $600.00 | $600.00
+2025-04 | $900.00 | $900.00
+2025-05 | $1,200.00 | $1,200.00
+2025-06 | $1,500.00 | $1,500.00
+`
+	if stdout != want {
+		t.Errorf("pretty flip =\n%s\nwant\n%s", stdout, want)
+	}
+
+	_, byHand, _ := runCaptured(t, "forecast", "--config", in, "--compare", "move", "--against", "stay")
+	if strings.ReplaceAll(stdout, "stay (Home: Move)", "move") != byHand {
+		t.Errorf("the flip differs from the two written scenarios:\n%s\nagainst\n%s", stdout, byHand)
+	}
+
+	code, stdout, _ = runCaptured(t, "forecast", "--config", in, "--output-format", "csv", "--compare", "move", "--flip", "Home", "--to", "Stay")
+	if code != 0 {
+		t.Fatalf("exit code = %d, want 0", code)
+	}
+	if !strings.HasPrefix(stdout, `"date","liquid (move (Home: Stay) minus move)","total (move (Home: Stay) minus move)"`+"\n"+`"2025-01","0.00","0.00"`+"\n"+`"2025-02","-300.00","-300.00"`+"\n") {
+		t.Errorf("csv flip =\n%s", stdout)
+	}
+}
+
+// Spec chapter 05: a flip that cannot be made is a usage error that says what
+// to do, and prints no results.
+func TestForecastFlipUsageErrors(t *testing.T) {
+	in := writeNamedPlan(t, planWithChoices)
+	for _, c := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"--compare", "stay", "--flip", "Home"}, "--flip and --to go together: name the option to switch to with --to"},
+		{[]string{"--compare", "stay", "--to", "Move"}, "--flip and --to go together: name the choice to flip with --flip"},
+		{[]string{"--flip", "Home", "--to", "Move"}, "--flip needs --compare to name the scenario whose choice is flipped"},
+		{[]string{"--compare", "stay", "--against", "move", "--flip", "Home", "--to", "Move"}, "--against and --flip cannot be used together: --flip compares the --compare scenario with itself under another option"},
+		{[]string{"--compare", "leave", "--flip", "Home", "--to", "Move"}, `"leave" is not an active scenario in this plan; the active scenarios are: stay, move`},
+		{[]string{"--compare", "stay", "--flip", "House", "--to", "Move"}, `this plan has no choice named "House"; its choices are: Home`},
+		{[]string{"--compare", "stay", "--flip", "Home", "--to", "Sell"}, `the choice "Home" has no option named "Sell"; its options are: Stay, Move`},
+		{[]string{"--compare", "stay", "--flip", "Home", "--to", "Stay"}, `scenario "stay" already takes "Stay" for the choice "Home"; name another of its options`},
+	} {
+		code, stdout, stderr := runCaptured(t, append([]string{"forecast", "--config", in}, c.args...)...)
+		if code != 2 {
+			t.Errorf("%v: exit code = %d, want 2", c.args, code)
+		}
+		if stdout != "" {
+			t.Errorf("%v: printed results:\n%s", c.args, stdout)
+		}
+		if !strings.Contains(stderr, c.want) {
+			t.Errorf("%v: stderr = %q, want it to contain %q", c.args, stderr, c.want)
+		}
+	}
+}

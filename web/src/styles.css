@@ -2803,6 +2803,50 @@ input[type='checkbox'], input[type='radio'] {
   overflow-wrap: anywhere;
 }
 
+/* One scenario with a single choice made differently, on its own tab. */
+.flip {
+  margin-bottom: 28px;
+}
+
+.flip__hint,
+.flip__error {
+  margin: 0;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.flip__error {
+  color: var(--danger);
+}
+
+.flip__keep {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 16px;
+}
+
+.flip__keep p {
+  flex: 1 1 220px;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.flip__keep .btn[aria-disabled='true'] {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.flip__keep .flip__error {
+  color: var(--danger);
+  scroll-margin-block: 12px;
+}
+
 /* --------------------------------------------------------------- choices */
 
 .option__usage {

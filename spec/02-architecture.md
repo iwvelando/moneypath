@@ -47,6 +47,9 @@ The WASM module exposes to JavaScript (names normative):
   returns the **results JSON** below, or `{"error": "..."}` with a human-readable message.
   Options also accept `"now"` (a `YYYY-MM` string) so the UI pins the current month;
   when absent the bridge uses the real current month.
+  Options also accept `"flip"`, `{"scenario": "…", "choice": "…", "option": "…"}`, which
+  asks for the comparison described under `flip` below. A flip that cannot be made
+  returns `{"error": "..."}` and no results.
 - `moneypathMigrate(legacyYAML string) → string` — returns
   `{"configYaml": "...", "notices": ["..."]}` or `{"error": "..."}` (see chapter 07).
 - `moneypathVersion() → string` — the build version string.
@@ -82,6 +85,11 @@ The WASM module exposes to JavaScript (names normative):
                "breakEven": [{"date": "2026-03", "leader": 1}]},
      "total": {"difference": [0.0, …], "breakEven": []}}
   ],
+  "flip": {"scenario": 0, "choice": "Housing", "option": "Sell and rent",
+           "name": "current path (Housing: Sell and rent)",
+           "cash":  {"difference": [0.0, …],
+                     "breakEven": [{"date": "2026-03", "flipped": true}]},
+           "total": {"difference": [0.0, …], "breakEven": []}},
   "warnings": ["…validation warnings…"],
   "configYaml": "…the config as run (reflects optimizer adjustments when enabled)…"
 }
@@ -106,6 +114,22 @@ scenarios. For `cash` and for `total`, `difference` is index-aligned with `rows`
 `breakEven` lists the break-even months in ascending order, each with its `YYYY-MM`
 `date` and the index of the scenario that moves ahead as `leader`; it is an empty array
 when the lead never changes hands.
+
+`flip` is present only when the `flip` option asked for it; every other field is then
+exactly what the same run reports without the option. It compares one active scenario
+with the **flipped path**: that scenario with the option it selects for one choice
+replaced by another option of the same choice, and nothing else changed. The flipped
+path is resolved (chapter 03, Choices) and simulated like a scenario written that way
+by hand, under the same options as the run, so with the optimizer it is optimized as
+that scenario would be. It is not a scenario of the plan: it appears nowhere else in the
+results, and `csv` and `configYaml` do not carry it. `scenario` indexes `scenarios`,
+`choice` and `option` repeat the request, and `name` is the flipped path's display name,
+`<scenario> (<choice>: <option>)`. `cash` and `total` are the comparison of chapter 04
+§9 read as flipped path minus scenario: `difference` is index-aligned with `rows`, and
+each `breakEven` entry has `flipped` true when the flipped path moves ahead in that
+month and false when the scenario does. The flip is refused when the scenario is not an
+active scenario of the plan, the plan has no such choice, the choice has no such option,
+the scenario already selects that option, or the flipped path fails validation.
 
 In `optimizations`, `original` and `value` are the raw numbers the optimizer searched over
 — currency for `amount`, a count for `frequency`, a month index (`year·12 + month − 1`)

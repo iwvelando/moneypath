@@ -216,3 +216,66 @@ test('an iPhone picks an option, changes a baseline entry, and runs the plan', a
   const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
   expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
 });
+
+test('an iPhone flips one choice of a scenario and keeps the path', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await uploadChoices(page);
+  await runForecast(page);
+
+  const flip = page.locator('.flip');
+  await flip.scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'pickers').toBeLessThanOrEqual(0);
+  await flip.getByRole('combobox', { name: 'Choice' }).selectOption({ label: 'Job' });
+  await flip.getByRole('combobox', { name: 'Instead of Stay' }).selectOption({ label: 'Go freelance' });
+  await expect(flip.locator('.chart__svg')).toBeVisible();
+  await expect(flip.getByText('as we are (Job: Go freelance) moves ahead').first()).toBeVisible();
+  expect(await overflow(page), 'the flip').toBeLessThanOrEqual(0);
+
+  // Safari does not focus a tapped button; the control must still answer once
+  // and then stand down without leaving the page.
+  const keep = flip.getByRole('button', { name: 'Keep as a scenario' });
+  await keep.tap();
+  const kept = flip.getByRole('button', { name: 'Kept as a scenario' });
+  await expect(kept).toHaveAttribute('aria-disabled', 'true');
+  // Playwright waits for an enabled control; a second tap is the point here.
+  await kept.tap({ force: true });
+  await expect(page.locator('.notices li')).toHaveCount(2); // the upload, and one kept path
+  expect(await overflow(page), 'kept').toBeLessThanOrEqual(0);
+
+  await page.getByRole('tab', { name: 'Planning Workspace' }).tap();
+  await expect(page.getByRole('heading', { name: 'as we are (Job: Go freelance)', exact: true })).toBeVisible();
+  expect(await overflow(page), 'workspace').toBeLessThanOrEqual(0);
+  // WebKit logs this once for every native dropdown on the page, whatever the
+  // app does (#71). Anything else it reports still fails the test.
+  const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
+  expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
+});
+
+test('an iPhone shows a refused Keep beside the button', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await uploadChoices(page);
+  await runForecast(page);
+  await page.getByRole('tab', { name: 'Planning Workspace' }).tap();
+  await page.getByRole('textbox', { name: 'Starting cash', exact: true }).fill('12345');
+  await page.getByRole('tab', { name: 'Results', exact: true }).tap();
+  const flip = page.locator('.flip');
+  await flip.getByRole('combobox', { name: 'Choice' }).selectOption({ label: 'Job' });
+  await flip.getByRole('combobox', { name: 'Instead of Stay' }).selectOption({ label: 'Go freelance' });
+  const keep = flip.getByRole('button', { name: 'Keep as a scenario' });
+  await expect(keep).toBeVisible();
+  // A reader may stop scrolling as soon as the button appears. The message
+  // must come into view even when the button is at the bottom of the screen.
+  await keep.evaluate((button) => {
+    window.scrollBy(0, button.getBoundingClientRect().bottom - window.innerHeight + 4);
+  });
+  await keep.tap();
+  const message = flip.locator('.flip__keep [role="alert"]');
+  await expect(message).toContainText('Your plan has changed. Run the forecast again before keeping this path.');
+  await expect(message).toBeInViewport({ ratio: 1 });
+  await expect(keep).not.toHaveAttribute('aria-disabled', 'true');
+  expect(await overflow(page), 'refusal').toBeLessThanOrEqual(0);
+  const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
+  expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
+});
