@@ -3,6 +3,7 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
 import { starterConfig } from './config/starter';
+import { emptyChoice, emptyOption, type ConfigModel } from './config/types';
 import { EDITOR_STATE_VERSION, KEYS } from './state/persistence';
 import { storageKeys } from './test/setup';
 
@@ -350,5 +351,63 @@ describe('the app', () => {
     );
     // Nothing left to warn about: the download and the plan now agree.
     expect(container.querySelector('.toolbar__hint')).toBeNull();
+  });
+
+  it('flips one choice from the results and keeps the path as a scenario when asked', async () => {
+    const config = starterConfig();
+    const stay = emptyOption('Stay');
+    const move = emptyOption('Move');
+    const home = { ...emptyChoice('Home'), options: [stay, move] };
+    config.choices = [home];
+    for (const scenario of config.scenarios) scenario.select = { [home.id]: stay.id };
+    const first = config.scenarios[0]!.name;
+    const count = config.scenarios.length;
+    window.localStorage.setItem(KEYS.editorState, JSON.stringify({ version: EDITOR_STATE_VERSION, config }));
+
+    await act(async () => {
+      render(<App />, container);
+    });
+    await settle();
+    await act(async () => {
+      button('Run Forecast').click();
+    });
+    await settle(500);
+
+    const panel = () => container.querySelector<HTMLElement>('.flip')!;
+    expect(panel().textContent).toContain('Instead of Stay');
+    const option = panel().querySelectorAll('select')[1]!;
+    await act(async () => {
+      option.value = [...option.options].find((o) => o.textContent?.trim() === 'Move')!.value;
+      option.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    await settle(500);
+    expect(panel().textContent).toContain(`${first} (Home: Move) moves ahead`);
+
+    // Reading the flip changed nothing.
+    const savedPlan = () =>
+      (JSON.parse(window.localStorage.getItem(KEYS.editorState)!) as { config: ConfigModel }).config;
+    const saved = () => savedPlan().scenarios;
+    await settle(500);
+    expect(saved()).toHaveLength(count);
+    expect(container.querySelector('#tab-results')!.classList.contains('is-outdated')).toBe(false);
+
+    await act(async () => {
+      button('Keep as a scenario').click();
+    });
+    await settle(600);
+    expect(saved().map((s) => s.name)).toEqual([
+      first,
+      `${first} (Home: Move)`,
+      ...config.scenarios.slice(1).map((s) => s.name),
+    ]);
+    // Restoring a draft gives its rows new ids, so read the pick by name.
+    const savedHome = savedPlan().choices[0]!;
+    const picked = (scenario: number) =>
+      savedHome.options.find((o) => o.id === saved()[scenario]!.select[savedHome.id])?.name;
+    expect([picked(0), picked(1)]).toEqual(['Stay', 'Move']);
+    expect(container.querySelector('.notices')?.textContent).toContain(`Added “${first} (Home: Move)” to your plan`);
+    // The results are of the plan before the path was kept.
+    expect(container.querySelector('#tab-results')!.classList.contains('is-outdated')).toBe(true);
+    expect(panel().textContent).toContain('Added to your plan.');
   });
 });

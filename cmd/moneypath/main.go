@@ -4,6 +4,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
@@ -60,6 +61,7 @@ commands:
              --config FILE [--output-format pretty|csv] [--optimize]
              [--write-config FILE] [--emergency-months N] [--now YYYY-MM]
              [--log-level L] [--compare SCENARIO --against SCENARIO]
+             [--compare SCENARIO --flip CHOICE --to OPTION]
   migrate    convert a legacy (v1) config to v2
              moneypath migrate old-config.yaml [-o new-config.yaml]
   serve      serve the embedded static web app locally [--addr :8080]
@@ -89,6 +91,8 @@ func cmdForecast(args []string) int {
 	logLevel := fs.String("log-level", "warn", "debug|info|warn|error")
 	compare := fs.String("compare", "", "print this scenario minus the --against scenario instead of the forecast")
 	against := fs.String("against", "", "the scenario to subtract from the --compare scenario")
+	flip := fs.String("flip", "", "with --compare and --to: compare that scenario with itself under another option of this choice")
+	to := fs.String("to", "", "the option to switch the --flip choice to")
 	if err := fs.Parse(args); err != nil {
 		return 2
 	}
@@ -107,16 +111,36 @@ func cmdForecast(args []string) int {
 		return 2
 	}
 
-	compareSet, againstSet := false, false
+	compareSet, againstSet, flipSet, toSet := false, false, false, false
 	fs.Visit(func(f *flag.Flag) {
 		switch f.Name {
 		case "compare":
 			compareSet = true
 		case "against":
 			againstSet = true
+		case "flip":
+			flipSet = true
+		case "to":
+			toSet = true
 		}
 	})
-	if compareSet && !againstSet {
+	if flipSet && !toSet {
+		fmt.Fprintln(os.Stderr, "--flip and --to go together: name the option to switch to with --to")
+		return 2
+	}
+	if toSet && !flipSet {
+		fmt.Fprintln(os.Stderr, "--flip and --to go together: name the choice to flip with --flip")
+		return 2
+	}
+	if flipSet && againstSet {
+		fmt.Fprintln(os.Stderr, "--against and --flip cannot be used together: --flip compares the --compare scenario with itself under another option")
+		return 2
+	}
+	if flipSet && !compareSet {
+		fmt.Fprintln(os.Stderr, "--flip needs --compare to name the scenario whose choice is flipped")
+		return 2
+	}
+	if compareSet && !againstSet && !flipSet {
 		fmt.Fprintln(os.Stderr, "--compare and --against go together: name the scenario to subtract with --against")
 		return 2
 	}
@@ -153,14 +177,24 @@ func cmdForecast(args []string) int {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
-	started := time.Now()
-	f, err := app.RunForecast(app.ForecastInput{
+	in := app.ForecastInput{
 		ConfigYAML:      data,
 		Now:             now,
 		Optimize:        *optimize,
 		EmergencyMonths: emOverride,
-	})
+	}
+	if flipSet {
+		in.Flip = &app.Flip{Scenario: *compare, Choice: *flip, Option: *to}
+	}
+	started := time.Now()
+	f, err := app.RunForecast(in)
 	if err != nil {
+		// A flip that names something the plan lacks is a usage error.
+		var refused *app.FlipError
+		if errors.As(err, &refused) {
+			fmt.Fprintf(os.Stderr, "%v\n", err)
+			return 2
+		}
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		return 1
 	}
@@ -170,7 +204,9 @@ func cmdForecast(args []string) int {
 	log.logf(1, "info: ", "forecast completed in %s", time.Since(started).Round(time.Millisecond))
 
 	pretty, csv := f.Pretty, f.CSV
-	if compareSet {
+	if flipSet {
+		pretty, csv = app.FlipOutput(f)
+	} else if compareSet {
 		if pretty, csv, err = app.CompareScenarios(f, *compare, *against); err != nil {
 			fmt.Fprintf(os.Stderr, "%v\n", err)
 			return 2

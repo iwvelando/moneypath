@@ -28,6 +28,11 @@ func errorJSON(err error) string {
 type forecastOptions struct {
 	Optimize bool   `json:"optimize"`
 	Now      string `json:"now"`
+	Flip     *struct {
+		Scenario string `json:"scenario"`
+		Choice   string `json:"choice"`
+		Option   string `json:"option"`
+	} `json:"flip"`
 }
 
 func forecastFn(_ js.Value, args []js.Value) any {
@@ -47,11 +52,15 @@ func forecastFn(_ js.Value, args []js.Value) any {
 			return errorJSON(fmt.Errorf("invalid options.now: %w", err))
 		}
 	}
-	f, err := app.RunForecast(app.ForecastInput{
+	in := app.ForecastInput{
 		ConfigYAML: []byte(args[0].String()),
 		Now:        now,
 		Optimize:   opts.Optimize,
-	})
+	}
+	if opts.Flip != nil {
+		in.Flip = &app.Flip{Scenario: opts.Flip.Scenario, Choice: opts.Flip.Choice, Option: opts.Flip.Option}
+	}
+	f, err := app.RunForecast(in)
 	if err != nil {
 		return errorJSON(err)
 	}

@@ -2,6 +2,8 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Adjustment, AdjustmentStatus } from '../config/adjustments';
+import { fromConfigDocument } from '../config/serialize';
+import type { ConfigModel } from '../config/types';
 import type { ForecastResults, OptimizationSummary } from '../engine/types';
 import { ResultsView } from './ResultsView';
 
@@ -82,7 +84,7 @@ describe('the optimizer adjustments card', () => {
   });
 });
 
-function showScenarios(names: string[]): void {
+function showScenarios(names: string[], plan?: ConfigModel): void {
   const results: ForecastResults = {
     version: 'test',
     scenarios: names,
@@ -104,6 +106,7 @@ function showScenarios(names: string[]): void {
         onDownloadCsv={() => {}}
         statusOf={(_: Adjustment) => 'missing'}
         onApply={() => {}}
+        flip={plan ? { plan, run: () => new Promise(() => {}), onKeep: () => true } : undefined}
       />,
       host,
     );
@@ -251,5 +254,49 @@ describe('the comparison entry', () => {
     expect(tabNames()).toEqual(['a']);
     expect(host.querySelector('.comparison')).toBeNull();
     expect(host.querySelector('.results-table')).not.toBeNull();
+  });
+});
+
+describe('flipping one choice from a scenario', () => {
+  const plan = (scenarios: Record<string, unknown>[], options = ['Stay', 'Move']) =>
+    fromConfigDocument({
+      version: 2,
+      simulation: { endDate: '2030-01' },
+      choices: [{ name: 'Home', options: options.map((name) => ({ name })) }],
+      scenarios,
+    });
+  const flipHeading = () =>
+    [...host.querySelectorAll('h3')].find((h) => h.textContent?.trim() === 'Flip one choice') ?? null;
+
+  it('is offered on the scenario’s own tab, even for a plan with one scenario', () => {
+    showScenarios(['only'], plan([{ name: 'only', select: { Home: 'Stay' } }]));
+    expect(tabNames()).toEqual(['only']);
+    expect(flipHeading()).not.toBeNull();
+    expect(host.querySelector('.flip')?.textContent).toContain('Instead of Stay');
+  });
+
+  it('follows the scenario whose tab is open, and stays out of the comparison', () => {
+    showScenarios(
+      ['a', 'b'],
+      plan([
+        { name: 'a', select: { Home: 'Stay' } },
+        { name: 'parked', active: false, select: { Home: 'Stay' } },
+        { name: 'b', select: { Home: 'Move' } },
+      ]),
+    );
+    expect(host.querySelector('.flip')?.textContent).toContain('Instead of Stay');
+    act(() => tabs()[1]!.click());
+    expect(host.querySelector('.flip')?.textContent).toContain('Instead of Move');
+    act(() => tabs()[2]!.click());
+    expect(flipHeading()).toBeNull();
+  });
+
+  it('is absent when no choice has another option, and when the plan has no choices', () => {
+    showScenarios(['only'], plan([{ name: 'only', select: { Home: 'Stay' } }], ['Stay']));
+    expect(flipHeading()).toBeNull();
+    showScenarios(['only'], fromConfigDocument({ version: 2, simulation: { endDate: '2030-01' }, scenarios: [{ name: 'only' }] }));
+    expect(flipHeading()).toBeNull();
+    showScenarios(['only']);
+    expect(flipHeading()).toBeNull();
   });
 });

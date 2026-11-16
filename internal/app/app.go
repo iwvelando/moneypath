@@ -21,6 +21,8 @@ type ForecastInput struct {
 	Now             config.Month // current month; used when startDate is absent
 	Optimize        bool
 	EmergencyMonths *float64 // CLI/UI override; nil = use config
+	// Flip also compares one scenario with its flipped path; nil = no flip.
+	Flip *Flip
 }
 
 type Forecast struct {
@@ -32,6 +34,8 @@ type Forecast struct {
 	// ConfigYAML is the config as run, re-serialized (reflects optimizer
 	// adjustments when they were enabled).
 	ConfigYAML string
+	// Flip is set when the input asked for one. Nothing else here reflects it.
+	Flip *FlipResult
 }
 
 // RunForecast parses, validates, and simulates a v2 config.
@@ -59,14 +63,20 @@ func RunForecast(in ForecastInput) (*Forecast, error) {
 		return nil, err
 	}
 	warnings := append(append([]string{}, parseWarns...), valWarns...)
-	return &Forecast{
+	f := &Forecast{
 		Config:     cfg,
 		Result:     res,
 		Warnings:   warnings,
 		CSV:        render.CSV(res),
 		Pretty:     render.Pretty(res),
 		ConfigYAML: string(echoed),
-	}, nil
+	}
+	if in.Flip != nil {
+		if f.Flip, err = runFlip(in, f); err != nil {
+			return nil, err
+		}
+	}
+	return f, nil
 }
 
 // CompareScenarios renders one named scenario minus another in both output
@@ -107,6 +117,7 @@ type resultsJSON struct {
 	CSV         string           `json:"csv"`
 	Metrics     []metricJSON     `json:"metrics"`
 	Comparisons []comparisonJSON `json:"comparisons"`
+	Flip        *flipJSON        `json:"flip,omitempty"`
 	Warnings    []string         `json:"warnings"`
 	ConfigYaml  string           `json:"configYaml"`
 }
@@ -123,6 +134,25 @@ type comparisonJSON struct {
 type seriesComparisonJSON struct {
 	Difference []float64       `json:"difference"`
 	BreakEven  []breakEvenJSON `json:"breakEven"`
+}
+
+type flipJSON struct {
+	Scenario int            `json:"scenario"`
+	Choice   string         `json:"choice"`
+	Option   string         `json:"option"`
+	Name     string         `json:"name"`
+	Cash     flipSeriesJSON `json:"cash"`
+	Total    flipSeriesJSON `json:"total"`
+}
+
+type flipSeriesJSON struct {
+	Difference []float64           `json:"difference"`
+	BreakEven  []flipBreakEvenJSON `json:"breakEven"`
+}
+
+type flipBreakEvenJSON struct {
+	Date    string `json:"date"`
+	Flipped bool   `json:"flipped"`
 }
 
 type breakEvenJSON struct {
@@ -280,6 +310,28 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 				Total:    series(cmp.Total),
 			})
 		}
+	}
+	if fl := f.Flip; fl != nil {
+		series := func(sc engine.SeriesComparison) flipSeriesJSON {
+			s := flipSeriesJSON{Difference: sc.Difference, BreakEven: []flipBreakEvenJSON{}}
+			for _, be := range sc.BreakEven {
+				s.BreakEven = append(s.BreakEven, flipBreakEvenJSON{Date: be.Month.String(), Flipped: be.FirstAhead})
+			}
+			return s
+		}
+		entry := &flipJSON{
+			Choice: fl.Choice,
+			Option: fl.Option,
+			Name:   fl.Name,
+			Cash:   series(fl.Comparison.Cash),
+			Total:  series(fl.Comparison.Total),
+		}
+		for i, sc := range res.Scenarios {
+			if sc == fl.Original {
+				entry.Scenario = i
+			}
+		}
+		out.Flip = entry
 	}
 	return json.Marshal(out)
 }

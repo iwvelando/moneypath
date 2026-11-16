@@ -118,6 +118,15 @@ The app covers, at a coarse grain:
   never changes hands; a chart draws both differences over time with the same month
   readout as a scenario's own chart, tinting the months a difference is below zero.
   The comparison shows only figures the engine reported.
+  When the plan has choices, a scenario's own view also offers to flip one of them:
+  pick a choice and another of its options, and the engine compares the scenario with
+  that one decision made differently and everything else as it is (chapter 02, Results
+  JSON, `flip`). It shows the break-even months and the difference over time, as the
+  comparison of two scenarios does. This works for a plan with one scenario, is left
+  out when no choice has another option to switch to, and describes the plan as it was
+  run even after the editor has moved on. Reading it changes nothing. The flipped path
+  enters the plan only when the reader keeps it, as a copy of the scenario placed after
+  it with that one selection changed and a name no other scenario has.
   Editing the config
   marks all of these as describing an earlier version of the plan; they stay readable,
   being the baseline the next run will be compared against.

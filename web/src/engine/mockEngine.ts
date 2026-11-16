@@ -15,6 +15,8 @@ import { formatMoney } from '../util/format';
 import {
   EngineError,
   type Engine,
+  type FlipComparison,
+  type FlipRequest,
   type ForecastOptions,
   type ForecastResults,
   type MigrateResult,
@@ -115,6 +117,27 @@ function buildRows(scenarios: MockScenario[], startMonth: string): ResultRow[] {
     rows.push({ date, values });
   }
   return rows;
+}
+
+/** A synthetic flip: behind at first, ahead from the tenth month. */
+function buildFlip(request: FlipRequest, names: string[], rows: ResultRow[]): FlipComparison {
+  const scenario = names.indexOf(request.scenario);
+  if (scenario < 0) {
+    throw new EngineError(
+      `"${request.scenario}" is not an active scenario in this plan; the active scenarios are: ${names.join(', ')}`,
+    );
+  }
+  const seed = seedOf(request.option);
+  const difference = rows.map((_, i) => (i === 0 ? 0 : (i - 9.5) * (120 + (seed % 9) * 15)));
+  const breakEven = rows.length > 10 ? [{ date: rows[10]?.date ?? '', flipped: true }] : [];
+  return {
+    scenario,
+    choice: request.choice,
+    option: request.option,
+    name: `${request.scenario} (${request.choice}: ${request.option})`,
+    cash: { difference, breakEven },
+    total: { difference: difference.map((value) => value * 1.4), breakEven },
+  };
 }
 
 function buildMetrics(scenarios: MockScenario[], rows: ResultRow[], optimize: boolean): ScenarioMetrics[] {
@@ -229,6 +252,7 @@ class MockEngine implements Engine {
       rows,
       csv: renderCsv(names, rows),
       metrics: buildMetrics(scenarios, rows, options.optimize === true),
+      flip: options.flip ? buildFlip(options.flip, names, rows) : null,
       warnings,
       configYaml: stringifyYaml(doc, { lineWidth: 0 }),
     };
