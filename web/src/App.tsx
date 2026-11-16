@@ -65,21 +65,24 @@ export function App() {
     restored.source === 'starter' ? (restored.reason ?? null) : null,
   );
   const [unsaved, setUnsaved] = useState(false);
-  // Text in a number field that is not a number, by the field's path. The
-  // engine never sees it, so the fields report it themselves.
-  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  // Text in a number field that is not a number, by the field that holds it.
+  // The engine never sees it, so the fields report it themselves.
+  const [drafts, setDrafts] = useState<Record<string, { path: string; message: string }>>({});
   // A new plan (uploaded, or the starter) starts the editor afresh.
   const [planId, setPlanId] = useState(0);
   const [confirmReset, setConfirmReset] = useState(false);
   const confirmButtonRef = useRef<HTMLButtonElement | null>(null);
   const workspaceTabRef = useRef<HTMLButtonElement | null>(null);
 
-  const reportDraft = useCallback((path: string, message: string | null) => {
+  const reportDraft = useCallback((field: string, path: string, message: string | null) => {
     setDrafts((current) => {
-      if ((current[path] ?? null) === message) return current;
+      const held = current[field];
+      if (message === null ? held === undefined : held?.path === path && held.message === message) {
+        return current;
+      }
       const next = { ...current };
-      if (message === null) delete next[path];
-      else next[path] = message;
+      if (message === null) delete next[field];
+      else next[field] = { path, message };
       return next;
     });
   }, []);
@@ -128,21 +131,19 @@ export function App() {
     }
   }, [engine, config]);
 
-  const problems = useMemo(
-    () =>
-      problemSet(
-        [
-          // What the engine says about a field whose box holds something else
-          // is about a value no longer on screen; the field's own error stands.
-          ...found.filter((problem) => !(problem.path in drafts)),
-          ...Object.entries(drafts).map(
-            ([path, message]): Problem => ({ level: 'error', path, where: '', message }),
-          ),
-        ],
-        reportDraft,
-      ),
-    [found, drafts, reportDraft],
-  );
+  const problems = useMemo(() => {
+    const held = Object.values(drafts);
+    const paths = new Set(held.map((draft) => draft.path));
+    return problemSet(
+      [
+        // What the engine says about a field whose box holds something else
+        // is about a value no longer on screen; the field's own error stands.
+        ...found.filter((problem) => !paths.has(problem.path)),
+        ...held.map(({ path, message }): Problem => ({ level: 'error', path, where: '', message })),
+      ],
+      reportDraft,
+    );
+  }, [found, drafts, reportDraft]);
   const errorCount = useMemo(
     () => problems.all.filter((problem) => problem.level === 'error').length,
     [problems],
@@ -209,14 +210,9 @@ export function App() {
   const downloadConfig = useCallback(async () => {
     if (!engine) return;
     setToolbarError(null);
-    const currentInput = toConfigYaml(config);
-    // Prefer the engine-canonical YAML from the last run when the editor has
-    // not changed since — after an optimizer run that is the adjusted config.
-    if (results && lastRunInput === currentInput && results.configYaml) {
-      downloadText('moneypath.yaml', results.configYaml, 'application/yaml');
-      return;
-    }
-    // The download is the plan as the engine writes it, which takes a plan it can read.
+    // The download is the plan on screen as the engine writes it. A field in
+    // error holds something the plan does not, so there is nothing to write
+    // yet, whatever an earlier run left behind.
     if (errorCount > 0) {
       setToolbarError(
         errorCount === 1
@@ -224,6 +220,13 @@ export function App() {
           : `${errorCount} things in your plan need fixing before it can be downloaded.`,
       );
       setBlocked(true);
+      return;
+    }
+    const currentInput = toConfigYaml(config);
+    // Prefer the engine-canonical YAML from the last run when the editor has
+    // not changed since — after an optimizer run that is the adjusted config.
+    if (results && lastRunInput === currentInput && results.configYaml) {
+      downloadText('moneypath.yaml', results.configYaml, 'application/yaml');
       return;
     }
     setRunning(true);

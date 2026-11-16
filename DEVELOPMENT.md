@@ -174,14 +174,17 @@ The rules are in AGENTS.md under the same heading. How they are built:
 2. Add a case to `TestProblemsNameTheirField` (or `TestChoiceProblemsNameTheirField`)
    in `config/problem_test.go` with the path, the place in words and the sentence, and
    break the rule in one of the plans of `TestProblemTextIsPlain`.
-3. Report it from `config/` with `c.fail(path, …)` or `c.warn(path, …)`. The sentence
+3. Pin it in `testdata/problems/`: add the broken value to a case's `config.yaml` and
+   write the problem into its `expected.yaml` by hand, or add a case. This is the
+   fixture that lands with the chapter edit.
+4. Report it from `config/` with `c.fail(path, …)` or `c.warn(path, …)`. The sentence
    names the field by its label in the app, states the rule in plain words, and ends
    with a full stop. The place is worked out from the path; do not write it into the
    sentence.
-4. If the field is new to the editor, give its control `field=` and add the broken
+5. If the field is new to the editor, give its control `field=` and add the broken
    value to the plan in `App.test.tsx`, "places every error the editor can produce
    under a control".
-5. Field help states the same limit the engine enforces (`web/src/config/help.ts`).
+6. Field help states the same limit the engine enforces (`web/src/config/help.ts`).
 
 ### Adding a message that is not about a field
 

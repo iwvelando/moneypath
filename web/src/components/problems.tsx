@@ -1,5 +1,5 @@
 import { createContext, type ComponentChildren } from 'preact';
-import { useContext, useEffect } from 'preact/hooks';
+import { useContext, useEffect, useId } from 'preact/hooks';
 import type { Problem } from '../engine/types';
 
 /**
@@ -12,8 +12,12 @@ import type { Problem } from '../engine/types';
 export interface ProblemSet {
   all: readonly Problem[];
   byPath: ReadonlyMap<string, readonly Problem[]>;
-  /** Tells the page that a field holds something the plan cannot carry; null takes it back. */
-  report: (path: string, message: string | null) => void;
+  /**
+   * Tells the page that a field holds something the plan cannot carry; null
+   * takes it back. `field` names the field itself, not its place: a row added
+   * above moves a field to a new path, and its neighbor to the one it left.
+   */
+  report: (field: string, path: string, message: string | null) => void;
 }
 
 const NONE: readonly Problem[] = [];
@@ -79,11 +83,12 @@ export function useErrorsUnder(path: string): boolean {
 /** Reports what only the field knows is wrong, for as long as it is. */
 export function useDraftProblem(path: string | null, message: string | null): void {
   const { report } = useContext(Problems);
+  const field = useId();
   useEffect(() => {
     if (path === null || message === null) return;
-    report(path, message);
-    return () => report(path, null);
-  }, [report, path, message]);
+    report(field, path, message);
+    return () => report(field, path, null);
+  }, [report, field, path, message]);
 }
 
 export interface Note {

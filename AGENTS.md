@@ -12,8 +12,9 @@
     pin the new behavior, and say so in the commit message.
   - **Descriptive** (06 web UI): change the code, then update the chapter in
     the same commit if it still claims otherwise. Tests are the real contract.
-- Work test-first. `testdata/conformance/` is wired into `go test` as the acceptance
-  gate. **Never edit a fixture to make failing code pass.**
+- Work test-first. `testdata/conformance/` (what a sound plan produces) and
+  `testdata/problems/` (what validation reports for one that is not) are wired into
+  `go test` as the acceptance gate. **Never edit a fixture to make failing code pass.**
   Editing one is legitimate only as a deliberate change to specified behavior — that
   is a spec change, and it lands as one (chapter edit + fixture edit + explicit
   callout in the commit message). If a fixture instead looks like it contradicts

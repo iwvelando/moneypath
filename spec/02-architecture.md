@@ -76,7 +76,10 @@ The WASM module exposes to JavaScript (names normative):
 ```
 
 `problems` holds **every** rule of chapter 03 the config breaks, not only the first, and
-every warning; it is empty for a config with neither. Each entry has:
+every warning; it is empty for a config with neither. A config always yields the same
+problems in the same order. One mistake is one problem: a value of the wrong kind for its
+field is reported as that, and the rules about its size are not held against it as well.
+Each entry has:
 
 - `level` — `error` (the config cannot be run) or `warning` (it can).
 - `path` — the field the problem is about, as its place in the config document: keys

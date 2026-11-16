@@ -1,0 +1,22 @@
+description: >
+  A baseline entry as an option changes it is checked as changed, with its
+  problems placed under the change's set; what the entry already raises as
+  written is not repeated. A target the baseline lacks and a scenario with no
+  pick for a choice are each placed where they are written.
+problems:
+  - level: error
+    path: common.loans.0.interestRate
+    where: Baseline, loan “Mortgage”
+    message: The interest rate must be at least 0.
+  - level: error
+    path: choices.0.options.1.remove.events.0
+    where: Choice “Housing”, option “Refinance”, removed event “Gym”
+    message: The baseline has no event named “Gym”.
+  - level: error
+    path: choices.0.options.1.change.loans.0.set.term
+    where: Choice “Housing”, option “Refinance”, changed loan “Mortgage”
+    message: The term must be 1 month or more.
+  - level: error
+    path: scenarios.0.select.0
+    where: Scenario “plan”
+    message: Pick an option for the choice “Housing”.

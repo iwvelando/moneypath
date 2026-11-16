@@ -92,6 +92,11 @@ func collectUnknownKeys(node *yaml.Node, t reflect.Type, path string, problems *
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
+	// A value reached through an alias is the value it stands for, at the
+	// place the alias is written.
+	if node.Kind == yaml.AliasNode && node.Alias != nil {
+		node = node.Alias
+	}
 	switch node.Kind {
 	case yaml.ScalarNode:
 		// yaml reads 1.5 into a whole-number field as 1 without a word.

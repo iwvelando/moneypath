@@ -81,9 +81,10 @@ describe('what the engine says about a field', () => {
   };
 
   function mount(problems: Problem[], reported: [string, string | null][] = []): HTMLInputElement {
+    // The first argument names the field itself; it is the same for every report.
     act(() => {
       render(
-        <Problems.Provider value={problemSet(problems, (path, message) => reported.push([path, message]))}>
+        <Problems.Provider value={problemSet(problems, (_field, path, message) => reported.push([path, message]))}>
           <At path="common">
             <At sub="investments.0">
               <NumberField label="Withdrawal tax rate" help="" field="withdrawalTaxRate" value={-1} onChange={() => {}} />

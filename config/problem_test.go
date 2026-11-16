@@ -326,3 +326,16 @@ func TestFractionInAWholeNumberIsOneProblem(t *testing.T) {
 		}
 	}
 }
+
+// A value reached through a YAML alias is checked like one written in place.
+func TestAliasedValuesAreChecked(t *testing.T) {
+	doc := sim + "scenarios:\n  - name: a\n    events:\n      - {name: Gym, amount: &fraction 1.5, frequency: *fraction}\n" +
+		"      - &pay {name: Pay, amount: 1, colour: blue}\n      - *pay\n"
+	problems := problemsOf(t, doc)
+	if p := findProblem(problems, "scenarios.0.events.0.frequency"); p == nil || !strings.Contains(p.Message, "whole number") {
+		t.Errorf("an aliased fraction in a whole-number field is not reported: %+v", problems)
+	}
+	if findProblem(problems, "scenarios.0.events.2.colour") == nil {
+		t.Errorf("an unknown key in an aliased entry is not reported: %+v", problems)
+	}
+}

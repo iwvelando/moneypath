@@ -645,6 +645,75 @@ describe('the app', () => {
     }
   });
 
+  // Adding a row moves every field after it to a new place in the plan. A
+  // field's own error has to move with the field, not be dropped on the way.
+  it('keeps refusing to run after rows move while two fields hold text that is not a number', async () => {
+    await act(async () => {
+      render(<App />, container);
+    });
+    await settle();
+
+    await type(fieldInput('common.events.1.amount'), '-');
+    await type(fieldInput('common.events.2.amount'), '-');
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[aria-label="Duplicate Take-home pay"]')!.click();
+    });
+    await settle(50);
+    expect(fieldInput('common.events.2.amount').value).toBe('-');
+    expect(fieldInput('common.events.3.amount').value).toBe('-');
+
+    // Whichever of the two is put right, the other still stops the run.
+    for (const [fixed, restored] of [
+      ['common.events.3.amount', '-1200'],
+      ['common.events.2.amount', '-3400'],
+    ] as const) {
+      await type(fieldInput(fixed), restored);
+      await act(async () => {
+        button('Run Forecast').click();
+      });
+      await settle(300);
+      expect(container.querySelector<HTMLButtonElement>('#tab-results')?.disabled, fixed).toBe(true);
+      expect(container.querySelector('.workbar__error strong')?.textContent, fixed).toBe(
+        'One thing in your plan needs fixing before the forecast can run.',
+      );
+      await type(fieldInput(fixed), '-');
+    }
+  });
+
+  it('will not download a plan other than the one on screen, even right after a run', async () => {
+    await act(async () => {
+      render(<App />, container);
+    });
+    await settle();
+    await act(async () => {
+      button('Run Forecast').click();
+    });
+    await settle(500);
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('#tab-workspace')!.click();
+    });
+    await type(fieldInput('simulation.startingCash'), '-');
+
+    const created = URL.createObjectURL;
+    let downloads = 0;
+    URL.createObjectURL = (blob: Blob | MediaSource) => {
+      downloads += 1;
+      return created ? created.call(URL, blob) : 'blob:test';
+    };
+    try {
+      await act(async () => {
+        button('Download Config').click();
+      });
+      await settle(300);
+    } finally {
+      URL.createObjectURL = created;
+    }
+    expect(downloads).toBe(0);
+    expect(container.querySelector('.toolbar__error')?.textContent).toBe(
+      'One thing in your plan needs fixing before it can be downloaded.',
+    );
+  });
+
   it('says why a file was not loaded beside the upload control, once', async () => {
     await act(async () => {
       render(<App />, container);

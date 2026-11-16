@@ -151,6 +151,7 @@ func locate(doc *yaml.Node, path string) string {
 			continue
 		}
 		name := ""
+		node = resolved(node)
 		if node != nil && node.Kind == yaml.ScalarNode {
 			name = node.Value // a removal names its target outright
 		} else if n := child(node, "name"); n != nil && n.Kind == yaml.ScalarNode {
@@ -166,7 +167,16 @@ func locate(doc *yaml.Node, path string) string {
 	return strings.Join(parts, ", ")
 }
 
+// resolved is the node an alias stands for, or the node itself.
+func resolved(node *yaml.Node) *yaml.Node {
+	if node != nil && node.Kind == yaml.AliasNode {
+		return node.Alias
+	}
+	return node
+}
+
 func child(node *yaml.Node, key string) *yaml.Node {
+	node = resolved(node)
 	if node == nil || node.Kind != yaml.MappingNode {
 		return nil
 	}
@@ -179,6 +189,7 @@ func child(node *yaml.Node, key string) *yaml.Node {
 }
 
 func item(node *yaml.Node, index int) *yaml.Node {
+	node = resolved(node)
 	if node == nil || node.Kind != yaml.SequenceNode || index >= len(node.Content) {
 		return nil
 	}

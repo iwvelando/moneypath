@@ -49,9 +49,24 @@ A case passes when every numeric cell matches within `tolerance` (compare parsed
 not strings), and all dates, headers, and note strings match
 exactly. Tolerances absorb float64 formatting edge cases, not semantic slack.
 
+## `testdata/problems/<case>/`
+
+What validation reports is specified too (chapter 02, "Problems JSON"; the rules are
+chapter 03's), and these cases pin it. A case here is a config that is *not* sound:
+
+- `config.yaml` — a v2 config that breaks rules or raises warnings. It pins
+  `simulation.startDate` like any other fixture.
+- `expected.yaml` — a `description`, and `problems`: every problem the config raises,
+  each with its `level`, `path`, `where` and `message`, in the order the engine reports
+  them. The list is complete: a problem it leaves out is a failure, as is one it adds.
+
+A case passes when the engine reports exactly that list, and the WASM build's answer
+is byte-identical to the native one.
+
 ## Changing a fixture
 
-Fixtures are the enforcement mechanism for chapters 03–05, so a failing one is your bug
+Fixtures are the enforcement mechanism for chapters 03–05 and the problems of chapter
+02, so a failing one is your bug
 until proven otherwise. Never edit a fixture to make failing code pass.
 
 Changing one is legitimate in exactly one situation: a **deliberate change to specified
@@ -65,6 +80,7 @@ side.
 | Check | Where | What it asserts |
 |---|---|---|
 | Conformance | `TestConformance` (`conformance/`) | Each normative case reproduces `expected.csv` under its manifest rules. |
+| Problems | `TestProblems` (`conformance/`) | Each `testdata/problems` case raises exactly the problems its `expected.yaml` lists, natively and, when `node` is present, byte-identically from the wasm module. |
 | Native ↔ WASM parity | `TestNativeWASMParity` (`conformance/`) | For every conformance config, native and WASM CSV are byte-identical. Runs the wasm module under Node; self-skips when `node` is absent. |
 | Static bundle | `TestStaticBundle` (`conformance/`) | The web build produces a standalone `dist/`: relative URLs throughout and a content-hashed engine (chapter 02). Self-skips when `web/dist` is not built. |
 | Distribution | `web/scripts/check-dist.mjs` (`make dist`) | `dist/` holds the real engine, the icons and link-preview card, the 404 page, and the license notices. |
