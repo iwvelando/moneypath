@@ -176,6 +176,30 @@ describe('editor state persistence', () => {
     expect(common.events[0]!.name).toBe('Rent ');
   });
 
+  it('restores a draft saved before guardrails existed as a plan with none', () => {
+    const outcome = decodeEditorState(JSON.stringify(sparseDraft()));
+    expect(outcome.source).toBe('restored');
+    expect(outcome.config.guardrails).toEqual([]);
+    expect(toConfigDocument(outcome.config)).not.toHaveProperty('guardrails');
+  });
+
+  it('restores guardrails, backfilling what a saved one predates', () => {
+    const draft = sparseDraft() as { version: number; config: Record<string, unknown> };
+    draft.config['guardrails'] = [{ id: 'g0', name: 'Cushion', kind: 'cashFloor', amount: 500 }];
+    const outcome = decodeEditorState(JSON.stringify(draft));
+    expect(outcome.source).toBe('restored');
+    expect(outcome.config.guardrails).toMatchObject([
+      { name: 'Cushion', kind: 'cashFloor', amount: 500, startDate: '', endDate: '', investments: null, loans: null },
+    ]);
+    expect(outcome.config.guardrails[0]!.id).not.toBe('g0');
+  });
+
+  it('falls back when the saved guardrails are not a list', () => {
+    const draft = sparseDraft() as { version: number; config: Record<string, unknown> };
+    draft.config['guardrails'] = { name: 'Cushion' };
+    expect(decodeEditorState(JSON.stringify(draft)).source).toBe('starter');
+  });
+
   describe('choices', () => {
     // vitest runs from web/.
     const withChoices = () =>

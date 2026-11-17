@@ -1,0 +1,35 @@
+description: >-
+  The optimizer-amount case with guardrails added. The CSV and the optimizer's
+  choice, held to its own emergency-fund floor, are exactly those of the plan
+  without guardrails, and the guardrails are read from the final forecast: the
+  chosen expense leaves 5772.30 in the last month, which a floor of that amount
+  from 2025-05 exactly meets (with the expense as written it would break),
+  while the opening 5000.00 breaks a 5500 floor.
+normative: true
+optimize: true
+tolerance: 0.01
+expectedMetrics:
+  - scenario: base plan
+    emergencyFund:
+      targetMonths: 3.00
+      averageMonthlyExpenses: 1924.0458
+      targetAmount: 5772.1375
+      initialLiquid: 5000.00
+      fundedMonths: 2.5987
+      shortfall: 772.1375
+      surplus: 0.00
+    optimizations:
+      - targetName: New expense
+        field: amount
+        original: -500.00
+        value: -212.65
+        originalDisplay: "-$500.00"
+        valueDisplay: "-$212.65"
+        floor: 5772.1375
+        minimumCash: 5772.30
+        headroom: 0.1625
+        iterations: 16
+        converged: true
+    guardrails:
+      - {name: Hold what the optimizer leaves, kind: cashFloor, result: holds, tightestDate: "2026-12", margin: 0.00}
+      - {name: Never below 5500, kind: cashFloor, result: breaks, firstBreachDate: "2025-01", tightestDate: "2025-01", margin: -500.00}

@@ -27,5 +27,6 @@ by a `select` is a column triple like any other; choices and options do not appe
 - If there are no results, the CSV is just the literal header
   `Date,Scenario,Liquid,Total,Notes`.
 
-The CSV carries the forecast only. Comparisons between scenarios and a flipped path
-(chapter 02, Results JSON) are not part of it.
+The CSV carries the forecast only. Comparisons between scenarios, a flipped path and
+guardrail results (chapter 02, Results JSON) are not part of it, so a plan with
+guardrails renders the same CSV as the plan without them.

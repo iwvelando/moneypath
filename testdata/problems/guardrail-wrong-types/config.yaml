@@ -1,0 +1,7 @@
+version: 2
+simulation: {startDate: 2025-01, endDate: 2030-12, startingCash: 1000}
+guardrails:
+  - {name: Cushion, kind: cashFloor, amount: lots}
+  - {name: Overdraft, kind: cashFloor, amount: true}
+scenarios:
+  - name: plan

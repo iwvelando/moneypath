@@ -7,6 +7,7 @@ import { starterConfig } from './config/starter';
 import {
   emptyChoice,
   emptyEvent,
+  emptyGuardrail,
   emptyInvestment,
   emptyLoan,
   emptyOption,
@@ -777,6 +778,16 @@ describe('the app', () => {
     fund.withdrawals = [{ ...emptyEvent() }];
     config.common.investments.push({ ...emptyInvestment(), name: fund.name });
     config.common.events.push({ ...emptyEvent(), frequency: 1.5, startDate: '2030-01', endDate: '2029-01' });
+    config.guardrails = [
+      { ...emptyGuardrail(), amount: 100 },
+      { ...emptyGuardrail(), name: 'Twice', amount: 100 },
+      { ...emptyGuardrail(), name: 'Twice', kind: '' },
+      { ...emptyGuardrail(), name: 'Debt', kind: 'debtFree' },
+      { ...emptyGuardrail(), name: 'Typo', kind: 'cashfloor', amount: 1 },
+      { ...emptyGuardrail(), name: 'Floorless' },
+      { ...emptyGuardrail(), name: 'Dates', amount: 1, startDate: 'soon', endDate: '2030-13' },
+      { ...emptyGuardrail(), name: 'Backwards', amount: 1, startDate: '2040-01', endDate: '2039-01' },
+    ];
 
     const stay = emptyOption('Same');
     const move = emptyOption('Same');

@@ -279,3 +279,39 @@ test('an iPhone shows a refused Keep beside the button', async ({ page }) => {
   const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
   expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
 });
+
+test('an iPhone adds a guardrail, taps its kind, and reads the result', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  const section = page.locator('#section-guardrails');
+  await section.getByRole('button', { name: 'Add guardrail' }).tap();
+  const name = section.getByRole('textbox', { name: 'Name', exact: true });
+  await expect(name).toBeFocused();
+  await name.fill('Never overdrawn');
+
+  // The kind is a native dropdown: a tap opens it, and leaving it does not
+  // lose what was picked.
+  const kind = section.getByRole('combobox', { name: 'Kind' });
+  await kind.tap();
+  await kind.selectOption({ label: 'Cash floor' });
+  await expect(kind).toHaveValue('cashFloor');
+  // A floor can be negative, so the field asks for the full keyboard.
+  const floor = section.getByRole('textbox', { name: 'Floor', exact: true });
+  await expect(floor).toHaveAttribute('inputmode', 'text');
+  await floor.tap();
+  await expect(floor).toBeFocused();
+  await floor.fill('-500');
+  await name.tap();
+  await expect(floor).toHaveValue('-500');
+  expect(await overflow(page), 'an open guardrail').toBeLessThanOrEqual(0);
+
+  await runForecast(page);
+  const card = page.locator('.summary__card', { has: page.getByRole('heading', { name: 'Guardrails' }) });
+  await expect(card).toContainText('Never overdrawn');
+  await expect(card.locator('.guardrails__outcome')).toHaveText(/^(Holds|Breaks in \d{4}-\d{2})$/);
+  expect(await overflow(page), 'results').toBeLessThanOrEqual(0);
+  // WebKit logs this once for every native dropdown on the page, whatever the
+  // app does (#71). Anything else it reports still fails the test.
+  const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
+  expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
+});

@@ -119,6 +119,8 @@ type flipJSON struct {
 	Name     string         `json:"name"`
 	Cash     flipSeriesJSON `json:"cash"`
 	Total    flipSeriesJSON `json:"total"`
+	// Guardrails are the flipped path's own; absent when the plan has none.
+	Guardrails []guardrailJSON `json:"guardrails,omitempty"`
 }
 
 type flipSeriesJSON struct {
@@ -148,9 +150,41 @@ type valueJSON struct {
 }
 
 type metricJSON struct {
-	KeyFigures    keyFiguresJSON `json:"keyFigures"`
-	EmergencyFund *efJSON        `json:"emergencyFund,omitempty"`
-	Optimizations []optJSON      `json:"optimizations,omitempty"`
+	KeyFigures    keyFiguresJSON  `json:"keyFigures"`
+	Guardrails    []guardrailJSON `json:"guardrails,omitempty"`
+	EmergencyFund *efJSON         `json:"emergencyFund,omitempty"`
+	Optimizations []optJSON       `json:"optimizations,omitempty"`
+}
+
+// guardrailJSON is one guardrail read from one path (spec chapter 02, Results
+// JSON): a first breach only on a breach, and the tightest month and margin
+// unless the guardrail does not apply.
+type guardrailJSON struct {
+	Name            string   `json:"name"`
+	Kind            string   `json:"kind"`
+	Result          string   `json:"result"`
+	FirstBreachDate string   `json:"firstBreachDate,omitempty"`
+	TightestDate    string   `json:"tightestDate,omitempty"`
+	Margin          *float64 `json:"margin,omitempty"`
+}
+
+func guardrailsJSON(results []engine.GuardrailResult) []guardrailJSON {
+	if len(results) == 0 {
+		return nil
+	}
+	out := make([]guardrailJSON, len(results))
+	for i, g := range results {
+		out[i] = guardrailJSON{Name: g.Name, Kind: g.Kind, Result: string(g.Result)}
+		if g.Result == engine.GuardrailBreaks {
+			out[i].FirstBreachDate = g.FirstBreach.String()
+		}
+		if g.Result != engine.GuardrailDoesNotApply {
+			margin := g.Margin
+			out[i].TightestDate = g.Tightest.String()
+			out[i].Margin = &margin
+		}
+	}
+	return out
 }
 
 type keyFiguresJSON struct {
@@ -227,7 +261,7 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 			LowestCashDate: sc.KeyFigures.LowestCashDate.String(),
 			EndingCash:     sc.KeyFigures.EndingCash,
 			EndingTotal:    sc.KeyFigures.EndingTotal,
-		}}
+		}, Guardrails: guardrailsJSON(sc.Guardrails)}
 		if sc.EmergencyFund != nil {
 			ef := sc.EmergencyFund
 			m.EmergencyFund = &efJSON{
@@ -301,6 +335,8 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 			Name:   fl.Name,
 			Cash:   series(fl.Comparison.Cash),
 			Total:  series(fl.Comparison.Total),
+
+			Guardrails: guardrailsJSON(fl.Flipped.Guardrails),
 		}
 		for i, sc := range res.Scenarios {
 			if sc == fl.Original {

@@ -118,6 +118,7 @@ describe('sections and navigation', () => {
     const links = Array.from(container.querySelectorAll('.sectionnav__link')).map((l) => l.textContent);
     expect(links).toEqual([
       'Simulation',
+      'Guardrails',
       'Baseline',
       'Choices',
       'Housing',

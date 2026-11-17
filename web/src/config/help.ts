@@ -24,6 +24,20 @@ export const HELP = {
   emergencyFundMonths:
     'Months of average expenses to target for the emergency-fund recommendation. Default 6; 0 disables the recommendation.',
 
+  /* guardrails */
+  guardrailName:
+    'Required, and must be unique among guardrails. It labels this guardrail’s result in every scenario.',
+  guardrailKind:
+    'What the guardrail checks. A cash floor checks that your cash never falls below an amount. A guardrail never stops a forecast: each scenario reports whether it holds, the first month it breaks, and the month it comes closest to breaking.',
+  guardrailAmount:
+    'Required for a cash floor. Your cash must be at least this much, to the cent, at the end of every month the guardrail covers, including the start month, whose cash is your starting cash. The same amount applies in every month. It may be negative, to mean “never more than this much overdrawn”.',
+  guardrailStartDate:
+    'Optional. The first month checked. Defaults to the simulation start month. If the cushion is something you are still building up, start from the month you expect to have it: the result then tells you whether you got there and kept it.',
+  guardrailEndDate:
+    'Optional. The last month checked, inclusive. Defaults to the simulation end month. Months outside the simulation are not checked, and a guardrail with no month inside it does not apply.',
+  guardrailUnusedNames:
+    'These names were in the plan you loaded, but this kind of guardrail does not use them, so they have no effect. Take them away to tidy the plan.',
+
   /* scenario */
   scenarioName:
     'Required, and must be unique among scenarios. It labels the scenario in results, notes and CSV columns.',

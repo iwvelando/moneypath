@@ -1,4 +1,4 @@
-import type { EventKind, EventModel, InvestmentModel, LoanModel, SimulationModel } from '../../config/types';
+import type { EventKind, EventModel, GuardrailModel, InvestmentModel, LoanModel, SimulationModel } from '../../config/types';
 import { monthIsError } from '../../config/month';
 import { formatMoney } from '../../util/format';
 
@@ -62,5 +62,22 @@ export function investmentSummary(investment: InvestmentModel): EditorSummary {
     attention: !investment.name.trim() || [...investment.contributions, ...investment.withdrawals].some(eventHasFieldErrors),
     primary: `${formatMoney(investment.startingValue ?? 0)} starting value · ${investment.annualReturnRate ?? 0}% annual return`,
     detail: details.join(' · '),
+  };
+}
+
+/** What the guardrail checks and over which months, as entered. */
+export function guardrailSummary(guardrail: GuardrailModel): EditorSummary {
+  const primary =
+    guardrail.kind !== 'cashFloor'
+      ? `${guardrail.kind.trim() || 'Kind not set'}`
+      : guardrail.amount === null
+        ? 'Cash floor not set'
+        : `Cash never below ${formatMoney(guardrail.amount)}`;
+  const { startDate: start, endDate: end } = guardrail;
+  const detail = start && end ? `${start} through ${end}` : start ? `From ${start}` : end ? `Through ${end}` : 'Every month of the plan';
+  return {
+    attention: !guardrail.name.trim() || monthIsError(guardrail.startDate) || monthIsError(guardrail.endDate),
+    primary,
+    detail,
   };
 }

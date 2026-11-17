@@ -11,6 +11,7 @@ import { ENTRY_KINDS, SET_FIELDS } from '../config/choices';
 import {
   emptyChoice,
   emptyEvent,
+  emptyGuardrail,
   emptyInvestment,
   emptyLoan,
   emptyOptimize,
@@ -22,6 +23,7 @@ import {
   type ConfigModel,
   type EntryKind,
   type EventModel,
+  type GuardrailModel,
   type InvestmentModel,
   type LoanModel,
   type OptionModel,
@@ -84,6 +86,7 @@ function looksLikeConfig(value: unknown): value is ConfigModel {
   if (typeof candidate.simulation !== 'object' || candidate.simulation === null) return false;
   if (!listsAreArrays(candidate.common, SECTION_LISTS)) return false;
   if (candidate.choices !== undefined && !Array.isArray(candidate.choices)) return false;
+  if (candidate.guardrails !== undefined && !Array.isArray(candidate.guardrails)) return false;
   if (!Array.isArray(candidate.scenarios)) return false;
   return candidate.scenarios.every((scenario) => listsAreArrays(scenario, SECTION_LISTS));
 }
@@ -167,6 +170,11 @@ function withScenarioDefaults(saved: Saved<ScenarioModel>): ScenarioModel {
 function withModelDefaults(saved: ConfigModel): ConfigModel {
   return {
     simulation: { ...emptySimulation(), ...saved.simulation },
+    // A draft saved before guardrails existed is a plan with none.
+    guardrails: ((saved as Saved<ConfigModel>).guardrails ?? []).map((guardrail: Saved<GuardrailModel>) => ({
+      ...emptyGuardrail(),
+      ...guardrail,
+    })),
     common: withSectionDefaults(saved.common),
     // A draft saved before choices existed is a plan with none.
     choices: ((saved as Saved<ConfigModel>).choices ?? []).map(withChoiceDefaults),

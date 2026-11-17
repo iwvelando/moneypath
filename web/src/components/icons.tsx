@@ -65,6 +65,16 @@ export function IconBranch() {
   );
 }
 
+/** A shield with a level line — guardrails every path is held to. */
+export function IconShield() {
+  return (
+    <Icon>
+      <path d="M8 1.6 L13.6 3.6 V7.6 C13.6 11 11.2 13.4 8 14.6 C4.8 13.4 2.4 11 2.4 7.6 V3.6 Z" />
+      <line x1="5.2" y1="8.4" x2="10.8" y2="8.4" />
+    </Icon>
+  );
+}
+
 /** Calendar with a marked day — dated cash events. */
 /** A fork in the path: one way in, two ways on. */
 export function IconChoice() {

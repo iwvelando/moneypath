@@ -7,7 +7,7 @@ test('no view scrolls sideways on a narrow phone', async ({ page }) => {
   await openApp(page);
   expect(await overflow(page), 'workspace').toBeLessThanOrEqual(0);
 
-  for (const id of ['section-simulation', 'section-common', 'section-choices', 'section-scenarios']) {
+  for (const id of ['section-simulation', 'section-guardrails', 'section-common', 'section-choices', 'section-scenarios']) {
     await page.locator(`#${id}`).scrollIntoViewIfNeeded();
     expect(await overflow(page), id).toBeLessThanOrEqual(0);
   }
@@ -226,6 +226,8 @@ test('workbar disclosures support keyboard navigation and direct common-settings
   await jump.press('Enter');
   await page.keyboard.press('Tab');
   await expect(page.getByRole('button', { name: 'Simulation', exact: true })).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(page.getByRole('button', { name: 'Guardrails', exact: true })).toBeFocused();
   await page.keyboard.press('Tab');
   const common = page.getByRole('button', { name: 'Baseline', exact: true });
   await expect(common).toBeFocused();
@@ -968,4 +970,25 @@ test('choices, an open change and the selections never scroll sideways', async (
   const box = (await dropdown.boundingBox())!;
   expect(box.x).toBeGreaterThanOrEqual(group.x - 0.5);
   expect(box.x + box.width).toBeLessThanOrEqual(group.x + group.width + 0.5);
+});
+
+test('guardrails, their results and the flip panel never scroll sideways', async ({ page }) => {
+  await openApp(page);
+  await uploadChoices(page);
+  const section = page.locator('#section-guardrails');
+  await section.getByRole('button', { name: 'Edit Cushion' }).click();
+  await section.getByRole('combobox', { name: 'Kind' }).scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'an open guardrail').toBeLessThanOrEqual(0);
+
+  await runForecast(page);
+  await page.getByRole('tab', { name: /^Compare/ }).click();
+  await page.locator('.guardrails-table').scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'guardrails in Compare').toBeLessThanOrEqual(0);
+
+  await page.getByRole('tab', { name: /^as we are/ }).click();
+  const flip = page.locator('.flip');
+  await flip.getByRole('combobox', { name: 'Choice' }).selectOption({ label: 'Job' });
+  await flip.getByRole('combobox', { name: 'Instead of Stay' }).selectOption({ label: 'Go freelance' });
+  await flip.locator('.guardrails-table').scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'guardrails in the flip panel').toBeLessThanOrEqual(0);
 });

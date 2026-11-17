@@ -10,7 +10,7 @@ import {
   toConfigDocument,
   toConfigYaml,
 } from './serialize';
-import { emptyEvent, emptyInvestment, emptyLoan, type ConfigModel } from './types';
+import { emptyEvent, emptyGuardrail, emptyInvestment, emptyLoan, type ConfigModel } from './types';
 import { starterConfig } from './starter';
 
 function model(): ConfigModel {
@@ -204,5 +204,52 @@ describe('finance-forecast detection', () => {
 
   it('does not flag a plain v2 config', () => {
     expect(isFinanceForecastDocument({ version: 2, common: { events: [] } })).toBe(false);
+  });
+});
+
+describe('guardrails', () => {
+  const written = {
+    version: 2,
+    simulation: { startDate: '2026-01', endDate: '2031-01', startingCash: 20000 },
+    recommendations: { emergencyFundMonths: 6 },
+    guardrails: [
+      { name: 'Cushion', kind: 'cashFloor', amount: 15000 },
+      { name: 'Later', kind: 'cashFloor', amount: -250, startDate: '2027-01', endDate: '2030-12' },
+      { name: 'Mortgage gone', kind: 'debtFree', loans: ['Mortgage'], startDate: '2030-01' },
+    ],
+    common: { events: [{ name: 'Pay', amount: 100 }] },
+    scenarios: [{ name: 'a', active: true }],
+  };
+
+  it('reads them and writes them back as written, after recommendations and before common', () => {
+    const read = fromConfigDocument(written);
+    expect(read.guardrails.map((g) => g.name)).toEqual(['Cushion', 'Later', 'Mortgage gone']);
+    expect(read.guardrails[1]).toMatchObject({ kind: 'cashFloor', amount: -250, startDate: '2027-01', endDate: '2030-12' });
+    const doc = toConfigDocument(read);
+    expect(Object.keys(doc)).toEqual(['version', 'simulation', 'recommendations', 'guardrails', 'common', 'scenarios']);
+    expect(doc['guardrails']).toEqual(written.guardrails);
+    expect(Object.keys((doc['guardrails'] as object[])[2]!)).toEqual(['name', 'kind', 'loans', 'startDate']);
+  });
+
+  it('keeps a kind it cannot check and the names a kind does not use, for the engine to report', () => {
+    const read = fromConfigDocument({
+      ...written,
+      guardrails: [{ name: 'Odd', kind: 'cashfloor', amount: 1, investments: ['Fund'], loans: [] }],
+    });
+    expect(toConfigDocument(read)['guardrails']).toEqual([
+      { name: 'Odd', kind: 'cashfloor', amount: 1, investments: ['Fund'], loans: [] },
+    ]);
+  });
+
+  it('leaves them out of a plan that has none', () => {
+    const read = fromConfigDocument({ ...written, guardrails: undefined });
+    expect(read.guardrails).toEqual([]);
+    expect(toConfigDocument(read)).not.toHaveProperty('guardrails');
+  });
+
+  it('writes a new guardrail as a cash floor with what has been entered', () => {
+    const config = model();
+    config.guardrails = [{ ...emptyGuardrail(), name: ' Cushion ', amount: 0 }];
+    expect(toConfigDocument(config)['guardrails']).toEqual([{ name: 'Cushion', kind: 'cashFloor', amount: 0 }]);
   });
 });

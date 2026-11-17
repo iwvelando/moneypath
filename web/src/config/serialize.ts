@@ -15,6 +15,7 @@ import {
   type EntryKind,
   type EventKind,
   type EventModel,
+  type GuardrailModel,
   type InvestmentModel,
   type LoanModel,
   type OptimizeField,
@@ -24,10 +25,12 @@ import {
   type TargetRef,
   emptyChoice,
   emptyEvent,
+  emptyGuardrail,
   emptyInvestment,
   emptyLoan,
   emptyOption,
   emptyScenario,
+  cloneGuardrail,
   newId,
 } from './types';
 
@@ -121,6 +124,19 @@ export function serializeInvestment(investment: InvestmentModel): JsonObject {
   return out;
 }
 
+/** A guardrail's keys in canonical order (spec/03, Guardrails). */
+export function serializeGuardrail(guardrail: GuardrailModel): JsonObject {
+  const out: JsonObject = {};
+  put(out, 'name', guardrail.name.trim());
+  put(out, 'kind', guardrail.kind.trim());
+  put(out, 'amount', guardrail.amount);
+  if (guardrail.investments !== null) out['investments'] = [...guardrail.investments];
+  if (guardrail.loans !== null) out['loans'] = [...guardrail.loans];
+  put(out, 'startDate', guardrail.startDate.trim());
+  put(out, 'endDate', guardrail.endDate.trim());
+  return out;
+}
+
 /** The fields an option changes, with an emptied field written as null: taken away. */
 function serializeSet(kind: EntryKind, set: object): JsonObject {
   const values = set as Record<string, unknown>;
@@ -199,6 +215,8 @@ export function toConfigDocument(model: ConfigModel): JsonObject {
   if (model.simulation.emergencyFundMonths !== null) {
     doc['recommendations'] = { emergencyFundMonths: model.simulation.emergencyFundMonths };
   }
+
+  if (model.guardrails.length > 0) doc['guardrails'] = model.guardrails.map(serializeGuardrail);
 
   const common: JsonObject = {};
   if (model.common.events.length > 0) {
@@ -350,6 +368,25 @@ export function parseInvestment(value: unknown): InvestmentModel {
   return investment;
 }
 
+/** A list of names as written; null when absent. */
+function readNames(value: unknown): string[] | null {
+  if (value === undefined || value === null) return null;
+  return readArray(value).map(readString);
+}
+
+export function parseGuardrail(value: unknown): GuardrailModel {
+  const guardrail = emptyGuardrail();
+  if (!isObject(value)) return guardrail;
+  guardrail.name = readString(value['name']);
+  guardrail.kind = readString(value['kind']);
+  guardrail.amount = readNumber(value['amount']);
+  guardrail.investments = readNames(value['investments']);
+  guardrail.loans = readNames(value['loans']);
+  guardrail.startDate = readString(value['startDate']);
+  guardrail.endDate = readString(value['endDate']);
+  return guardrail;
+}
+
 function parseCommon(value: unknown): CommonModel {
   if (!isObject(value)) return { events: [], loans: [], investments: [] };
   return {
@@ -455,6 +492,7 @@ export function fromConfigDocument(value: unknown): ConfigModel {
       cashInterestRate: readNumber(simulation['cashInterestRate']),
       emergencyFundMonths: readNumber(recommendations['emergencyFundMonths']),
     },
+    guardrails: readArray(doc['guardrails']).map(parseGuardrail),
     common: parseCommon(doc['common']),
     choices,
     scenarios: scenarios.length > 0 ? scenarios : [emptyScenario('scenario 1', choices)],
@@ -544,6 +582,7 @@ export function refreshIds(model: ConfigModel): ConfigModel {
 
   return {
     simulation: { ...model.simulation },
+    guardrails: model.guardrails.map(cloneGuardrail),
     common,
     choices,
     scenarios: model.scenarios.map((s) => {

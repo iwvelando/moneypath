@@ -19,11 +19,12 @@ import {
 } from '../config/types';
 import { findOptimizers, type OptimizerRef } from '../config/optimizers';
 import { CheckField, MonthField, NumberField, SelectField, TextField } from './fields';
-import { IconBranch, IconChoice, IconLayers, IconSliders } from './icons';
+import { IconBranch, IconChoice, IconLayers, IconShield, IconSliders } from './icons';
 import { OptimizerControl } from './OptimizerControl';
 import { At, PathProblems, Problems } from './problems';
 import { problemText, type Problem } from '../engine/types';
 import { EventList } from './editor/EventList';
+import { GuardrailList } from './editor/GuardrailList';
 import { InvestmentList } from './editor/InvestmentList';
 import { LoanList } from './editor/LoanList';
 import { OptionList } from './editor/OptionList';
@@ -178,6 +179,7 @@ export function Workspace({
   const sections: SectionRef[] = useMemo(
     () => [
       { id: 'section-simulation', label: 'Simulation' },
+      { id: 'section-guardrails', label: 'Guardrails' },
       { id: 'section-common', label: 'Baseline' },
       {
         id: 'section-choices',
@@ -523,6 +525,19 @@ export function Workspace({
           />
           </At>
         </div>
+      </Section>
+
+      <Section
+        id="section-guardrails"
+        title="Guardrails"
+        description="Conditions every scenario is checked against, month by month, such as keeping a cash cushion. A guardrail never stops a forecast: the results say whether each one holds on each path, when it first breaks, and when it comes closest."
+        highlighted={highlightId === 'section-guardrails'}
+        icon={<IconShield />}
+      >
+        <GuardrailList
+          guardrails={config.guardrails}
+          onChange={(guardrails) => onChange({ ...config, guardrails })}
+        />
       </Section>
 
       <Section

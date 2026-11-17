@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defaultOptimize } from '../config/optimize';
 import {
   emptyEvent,
+  emptyGuardrail,
   emptyScenario,
   type ConfigModel,
   type EventModel,
@@ -22,6 +23,7 @@ function event(name: string): EventModel {
 function makeConfig(commonEvents: EventModel[], scenarios: ScenarioModel[]): ConfigModel {
   return {
     simulation: { startDate: '', endDate: '2030-12', startingCash: 0, cashInterestRate: null, emergencyFundMonths: null },
+    guardrails: [],
     common: { events: commonEvents, loans: [], investments: [] },
     choices: [],
     scenarios,
@@ -237,6 +239,117 @@ describe('the cash interest rate field', () => {
   });
 });
 
+describe('the Guardrails section', () => {
+  function field(label: string, scope: ParentNode = container): HTMLInputElement | HTMLSelectElement {
+    const found = Array.from(scope.querySelectorAll('label')).find((element) => element.textContent?.trim() === label);
+    if (!found) throw new Error(`no "${label}" field`);
+    return container.querySelector<HTMLInputElement | HTMLSelectElement>(`#${CSS.escape(found.htmlFor)}`)!;
+  }
+
+  async function type(input: HTMLInputElement, text: string): Promise<void> {
+    await act(async () => {
+      input.value = text;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+
+  it('says there are none yet, and is in the section navigation after Simulation', async () => {
+    await mount(makeConfig([], [emptyScenario('plan a')]));
+    const section = container.querySelector('#section-guardrails')!;
+    expect(section.previousElementSibling?.id).toBe('section-simulation');
+    expect(section.textContent).toContain('No guardrails yet.');
+  });
+
+  it('adds a cash floor, opens it on its name, and writes what is typed', async () => {
+    await mount(makeConfig([], [emptyScenario('plan a')]));
+    await click('Add guardrail');
+    expect(latest.guardrails).toHaveLength(1);
+    expect(latest.guardrails[0]).toMatchObject({ name: '', kind: 'cashFloor', amount: null, startDate: '', endDate: '' });
+
+    const section = container.querySelector<HTMLElement>('#section-guardrails')!;
+    const name = field('Name', section) as HTMLInputElement;
+    expect(document.activeElement).toBe(name);
+    const kind = field('Kind', section) as HTMLSelectElement;
+    expect(kind.value).toBe('cashFloor');
+    expect(Array.from(kind.options, (option) => option.textContent)).toEqual(['Cash floor']);
+
+    await type(name, 'Cushion');
+    await type(field('Floor', section) as HTMLInputElement, '-250');
+    await type(field('Start month', section) as HTMLInputElement, '202701');
+    expect(latest.guardrails[0]).toMatchObject({ name: 'Cushion', amount: -250, startDate: '2027-01' });
+    expect(section.querySelector('.editor-card__title')?.textContent).toBe('Cushion');
+    expect(section.querySelector('.editor-card__summary')?.textContent).toBe('Cash never below -$250.00');
+    expect(section.querySelector('.editor-card__detail')?.textContent).toBe('From 2027-01');
+    expect(container.querySelector('button[aria-label="Help: Start month"]')).not.toBeNull();
+  });
+
+  it('removes and duplicates a guardrail', async () => {
+    const config = makeConfig([], [emptyScenario('plan a')]);
+    config.guardrails = [{ ...emptyGuardrail(), name: 'Cushion', amount: 100 }];
+    await mount(config);
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Duplicate Cushion"]')!.click();
+    });
+    expect(latest.guardrails.map((g) => g.name)).toEqual(['Cushion', 'Cushion']);
+    expect(latest.guardrails[0]!.id).not.toBe(latest.guardrails[1]!.id);
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('button[aria-label="Remove Cushion"]')!.click();
+    });
+    expect(latest.guardrails).toHaveLength(1);
+  });
+
+  it('shows what the engine says under the field it concerns', async () => {
+    const config = makeConfig([], [emptyScenario('plan a')]);
+    config.guardrails = [{ ...emptyGuardrail(), name: 'Cushion' }];
+    const problems: Problem[] = [
+      { level: 'error', path: 'guardrails.0.amount', where: 'Guardrail “Cushion”', message: 'The floor amount is required.' },
+    ];
+    await act(async () => {
+      render(
+        <Problems.Provider value={problemSet(problems)}>
+          <Harness initial={config} />
+        </Problems.Provider>,
+        container,
+      );
+    });
+    const floor = container.querySelector('[data-path="guardrails.0.amount"]')!;
+    expect(floor.textContent).toContain('The floor amount is required.');
+    expect(container.querySelector('#section-guardrails .editor-card__notice')?.textContent).toBe('Check details');
+  });
+
+  it('keeps a kind it cannot check, as written, for its error to explain', async () => {
+    const config = makeConfig([], [emptyScenario('plan a')]);
+    config.guardrails = [{ ...emptyGuardrail(), name: 'Mortgage gone', kind: 'debtFree' }];
+    await mount(config);
+    const kind = field('Kind', container.querySelector('#section-guardrails')!) as HTMLSelectElement;
+    expect(kind.value).toBe('debtFree');
+    expect(kind.closest('[data-path]')?.getAttribute('data-path')).toBe('guardrails.0.kind');
+  });
+
+  it('shows the names a cash floor does not use, with their warning and a way to take them away', async () => {
+    const config = makeConfig([], [emptyScenario('plan a')]);
+    config.guardrails = [{ ...emptyGuardrail(), name: 'Cushion', amount: 1, loans: ['Mortgage', 'Car'] }];
+    const problems: Problem[] = [
+      { level: 'warning', path: 'guardrails.0.loans', where: 'Guardrail “Cushion”', message: 'A cash floor does not use loans, so this has no effect.' },
+    ];
+    await act(async () => {
+      render(
+        <Problems.Provider value={problemSet(problems)}>
+          <Harness initial={config} />
+        </Problems.Provider>,
+        container,
+      );
+    });
+    const unused = container.querySelector('[data-path="guardrails.0.loans"]')!;
+    expect(unused.textContent).toContain('Mortgage, Car');
+    expect(unused.textContent).toContain('Warning: A cash floor does not use loans, so this has no effect.');
+    await act(async () => {
+      Array.from(unused.querySelectorAll('button')).find((b) => b.textContent === 'Take away')!.click();
+    });
+    expect(latest.guardrails[0]!.loans).toBeNull();
+  });
+});
+
 describe('the pinned workspace bar', () => {
   it('offers Run Forecast alongside the section navigation', async () => {
     await mount(makeConfig([], [emptyScenario('plan a')]));
@@ -356,7 +469,7 @@ describe('the section navigation', () => {
     expect(container.querySelector('.sectionnav__panel')).toBeNull();
     await click('Jump to section');
     const links = Array.from(container.querySelectorAll('.sectionnav__link')).map((el) => el.textContent);
-    expect(links).toEqual(['Simulation', 'Baseline', 'Choices', 'Scenarios', 'plan a', 'plan b']);
+    expect(links).toEqual(['Simulation', 'Guardrails', 'Baseline', 'Choices', 'Scenarios', 'plan a', 'plan b']);
     expect(container.querySelector('.sectionnav__children')?.closest('li')?.textContent)
       .toBe('Scenariosplan aplan b');
   });

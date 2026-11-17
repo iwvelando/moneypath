@@ -42,8 +42,24 @@ export interface KeyFigureMetrics {
   endingTotal: number;
 }
 
+/**
+ * One guardrail read from one path, decided by the engine. `firstBreachDate`
+ * is present only when it breaks; `tightestDate` and `margin` (the cash less
+ * the floor in the tightest month) unless it does not apply.
+ */
+export interface GuardrailResult {
+  name: string;
+  kind: string;
+  result: 'holds' | 'breaks' | 'doesNotApply';
+  firstBreachDate?: string;
+  tightestDate?: string;
+  margin?: number;
+}
+
 export interface ScenarioMetrics {
   keyFigures?: KeyFigureMetrics | null;
+  /** In the plan's order; absent when the plan has no guardrails. */
+  guardrails?: GuardrailResult[] | null;
   emergencyFund?: EmergencyFundMetrics | null;
   optimizations?: OptimizationSummary[] | null;
 }
@@ -98,6 +114,8 @@ export interface FlipComparison {
   name: string;
   cash: FlipSeries;
   total: FlipSeries;
+  /** The flipped path's own guardrail results; absent when the plan has none. */
+  guardrails?: GuardrailResult[] | null;
 }
 
 export interface ScenarioValue {

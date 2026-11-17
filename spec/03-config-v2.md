@@ -52,6 +52,9 @@ simulation:
 recommendations:      # optional block
   emergencyFundMonths: 6   # optional; default 6; 0 disables the recommendation
 
+guardrails: []        # optional; conditions every path is checked against — see
+                      # Guardrails
+
 common:               # optional; shared by every scenario (the baseline)
   events: []
   loans: []
@@ -298,8 +301,8 @@ neither is a hard error. An option that no scenario selects is not warned about.
 ### Canonical form
 
 The plan as echoed (`--write-config`, `configYaml`) keeps the written form, with
-`choices` and `select`, never the resolved lists. Top-level keys are written `common`,
-`choices`, `scenarios`; a scenario's keys are `name`, `active`, `select`, then its entry
+`choices` and `select`, never the resolved lists. Top-level keys are written
+`guardrails`, `common`, `choices`, `scenarios` (see Guardrails for where they go); a scenario's keys are `name`, `active`, `select`, then its entry
 lists; an option's are `name`, its entry lists, `change`, `remove`; and `select` is
 written in the order the choices are listed.
 
@@ -310,6 +313,71 @@ about `choices` and `select`, and forecasts each scenario from `common` and the
 scenario's own entries alone. The format stays at version 2 all the same: a new version
 would refuse such a file in an old build at the price of a migration for every file
 that needs no change.
+
+## Guardrails
+
+A guardrail is a condition the plan's owner wants every path to meet, such as "keep at
+least $15,000 in cash". It is checked month by month over a window, on every active
+scenario and on a flipped path (chapter 02, Results JSON), and each path reports
+whether it holds, the first month it breaks and its tightest month (chapter 04 §10). A
+guardrail adds nothing to the simulation and never stops a run: a broken guardrail is
+a result, not a problem.
+
+```yaml
+guardrails:                # optional; checked on every path
+  - name: Keep a cushion   # required, unique among guardrails
+    kind: cashFloor        # required: cashFloor | debtFree | lasts
+    amount: 15000.00       # cashFloor: required; any number, negative allowed
+    startDate: 2027-01     # optional; first month checked (default: plan start)
+    endDate: 2035-12       # optional; last month checked (default: plan end)
+```
+
+- The list is plan-wide. Options and scenarios cannot add, change or remove a
+  guardrail, so every path is judged against the same conditions.
+- `startDate` and `endDate` give every kind the same window, inclusive at both ends, in
+  the same `YYYY-MM` form as an event's dates. Months outside the simulation are not
+  checked.
+- `kind` says what is checked:
+  - **`cashFloor`** — cash is at least `amount` in every month of the window. `amount`
+    is the same nominal amount in every month. It may be negative, which states
+    "never more than this overdrawn", as `startingCash` may be.
+  - **`debtFree`** and **`lasts`** are reserved for the kinds that check loans and
+    accounts. This version refuses them as kinds it cannot check yet, so no build
+    accepts a guardrail it cannot evaluate.
+- `investments` and `loans` take lists of entry names, for the kinds that use them.
+  A `cashFloor` uses neither.
+- There is no severity: all guardrails are equal.
+
+Validation, hard errors:
+
+- A guardrail with no name, or a name another guardrail has.
+- No `kind`, a kind other than the three, or `debtFree` or `lasts`, which cannot be
+  checked yet.
+- A `cashFloor` without `amount`.
+- A `startDate` or `endDate` that does not parse, or an `endDate` before the
+  `startDate` when both are given.
+- The usual wrong-type rules.
+
+Warnings:
+
+- A window with no month inside the simulation: the guardrail does not apply on any
+  path. The simulation's start can default to the current month, so a window can
+  drift out of range on its own, as an event's can. The warning is placed at
+  `startDate` when the window starts after the simulation ends, and otherwise at
+  `endDate`.
+- A key the kind does not use (`investments` or `loans` on a `cashFloor`): it has no
+  effect.
+- Unknown keys, as everywhere.
+
+Problems are placed at `guardrails.<i>.<field>`, and their place in words is
+`Guardrail “<name>”`, numbered from 1 when the guardrail has no name.
+
+Canonical form: `guardrails` is written after `recommendations` and before `common`.
+A guardrail's keys are written `name`, `kind`, `amount`, `investments`, `loans`,
+`startDate`, `endDate`.
+
+A moneypath build that predates guardrails warns about the unknown key and checks
+nothing. The format stays at version 2.
 
 ## Optimizer block (a scenario's own events only)
 

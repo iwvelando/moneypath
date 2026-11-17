@@ -53,6 +53,18 @@ type scenarioMetric struct {
 	KeyFigures    *keyFigureMetric   `yaml:"keyFigures"`
 	EmergencyFund map[string]float64 `yaml:"emergencyFund"`
 	Optimizations []optMetric        `yaml:"optimizations"`
+	// Guardrails, when given, is the scenario's complete list of guardrail
+	// results (spec chapter 04 §10).
+	Guardrails []guardrailMetric `yaml:"guardrails"`
+}
+
+type guardrailMetric struct {
+	Name            string  `yaml:"name"`
+	Kind            string  `yaml:"kind"`
+	Result          string  `yaml:"result"`
+	FirstBreachDate string  `yaml:"firstBreachDate"`
+	TightestDate    string  `yaml:"tightestDate"`
+	Margin          float64 `yaml:"margin"`
 }
 
 type keyFigureMetric struct {
@@ -306,6 +318,9 @@ func compareMetrics(t *testing.T, want []scenarioMetric, res *engine.Result) {
 				}
 			}
 		}
+		if wm.Guardrails != nil {
+			compareGuardrails(t, wm.Scenario, wm.Guardrails, sc.Guardrails)
+		}
 		if len(wm.Optimizations) != len(sc.Optimizations) {
 			t.Errorf("scenario %q: want %d optimizations, got %d", wm.Scenario, len(wm.Optimizations), len(sc.Optimizations))
 			continue
@@ -342,6 +357,33 @@ func compareMetrics(t *testing.T, want []scenarioMetric, res *engine.Result) {
 			if go_.Converged != wo.Converged {
 				t.Errorf("scenario %q opt %d: converged want %v, got %v", wm.Scenario, i, wo.Converged, go_.Converged)
 			}
+		}
+	}
+}
+
+// compareGuardrails checks a scenario's guardrail results against the
+// manifest: names, kinds, results and months exactly, margins within 0.01.
+func compareGuardrails(t *testing.T, scenario string, want []guardrailMetric, got []engine.GuardrailResult) {
+	t.Helper()
+	if len(want) != len(got) {
+		t.Errorf("scenario %q: want %d guardrail results, got %d", scenario, len(want), len(got))
+		return
+	}
+	for i, w := range want {
+		g := got[i]
+		have := guardrailMetric{Name: g.Name, Kind: g.Kind, Result: string(g.Result)}
+		if g.Result == engine.GuardrailBreaks {
+			have.FirstBreachDate = g.FirstBreach.String()
+		}
+		if g.Result != engine.GuardrailDoesNotApply {
+			have.TightestDate = g.Tightest.String()
+			have.Margin = g.Margin
+		}
+		if math.Abs(have.Margin-w.Margin) <= 0.01 {
+			have.Margin = w.Margin
+		}
+		if have != w {
+			t.Errorf("scenario %q guardrail %d:\n want %+v\n  got %+v", scenario, i, w, have)
 		}
 	}
 }

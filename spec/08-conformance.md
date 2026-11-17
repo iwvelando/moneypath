@@ -25,6 +25,21 @@ expectedComparisons: […] # optional: differences and break-even months for nam
                          # ordered pairs (chapter 04 §9); see below.
 ```
 
+An `expectedMetrics` entry may also pin the scenario's guardrail results (chapter 04
+§10) under `guardrails`: the complete list, in the plan's order, each with its `name`,
+`kind` and `result` exactly, `firstBreachDate` and `tightestDate` exactly (absent where
+the result has none), and `margin` within 0.01. An entry without `guardrails` does not
+check them.
+
+```yaml
+expectedMetrics:
+  - scenario: dips
+    guardrails:
+      - {name: Cushion, kind: cashFloor, result: breaks,
+         firstBreachDate: "2025-02", tightestDate: "2025-03", margin: -300.00}
+      - {name: After the plan, kind: cashFloor, result: doesNotApply}
+```
+
 An `expectedComparisons` entry pins one ordered pair, `scenario` minus `against`, for
 `cash` and for `total`:
 

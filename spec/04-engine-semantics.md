@@ -18,7 +18,7 @@ holding an APY or a long-run average annual return can convert it (chapter 03,
 Conventions). "Month arithmetic" means calendar-month stepping (`2025-11` + 3 =
 `2026-02`). All internal math is float64; **comparisons that decide behavior** (loan
 reaching zero, threshold triggers, the optimizer's cash-floor test, whether an
-emergency fund has a shortfall) round both sides to 2 decimals first
+emergency fund has a shortfall, whether a guardrail holds) round both sides to 2 decimals first
 (`round2(x) = math.Round(x*100)/100`), so float noise in a sum of cent amounts never
 decides an outcome.
 
@@ -460,3 +460,51 @@ month in which it is still behind in total. The break-even months of (B, A) are 
 
 The comparison describes the forecast that is reported: with the optimizer (§7), the
 final forecast on the adjusted config.
+
+## 10. Guardrails
+
+Every guardrail of the plan (chapter 03, Guardrails) is checked on every path the
+engine reports: each active scenario's forecast and the flipped path (chapter 02,
+Results JSON). Like the key figures (§8), a guardrail is read from the recorded series
+(§1) and adds nothing to the simulation, so the same rule evaluates any path the
+engine simulates. With the optimizer (§7), it describes the final forecast on the
+adjusted config. The optimizer's own floor is unchanged by guardrails, as is the
+emergency-fund recommendation (§5), which is not reported as a guardrail.
+
+**The window.** A guardrail's window is its `startDate`–`endDate`, inclusive at both
+ends, defaulting to `start` and `end`, and clipped to the recorded months `start`–`end`
+(§1). The initial row at `start` counts, as it does for lowest cash (§8). A window with
+no recorded month in it is **empty**.
+
+**The test in one month.** A guardrail holds in month `m` when its condition is met at
+the recorded values of `m`, compared in whole cents (preamble):
+
+- **cashFloor** holds in `m` when `round2(liquid[m]) ≥ round2(floor(m))`, where
+  `floor(m)` is `amount` in every month. The floor is written per month so that a
+  floor which grows can define it later without changing this rule.
+
+**The outcome.** The rule is strict: a guardrail holds only if its condition is met in
+**every** month of its window. No guardrail uses the optimizer's "from the first month
+the floor is reached" reading; a guardrail that should only apply once a balance has
+been built says so with `startDate`.
+
+- **holds** — every month of the window passes;
+- **breaks** — some month fails. The **first breach** is the earliest failing month;
+- **does not apply** — the window is empty. It is never reported as holding.
+
+**Tightest month and margin** (cashFloor). The tightest month is the earliest month of
+the window with the least `liquid` in whole cents, by the tie rule of lowest cash (§8):
+the first `m` in the window with `round2(liquid[m]) = min round2(liquid)` over the
+window. The **margin** is `liquid[m] − floor(m)` there, unrounded like every reported
+number. It is negative when the guardrail breaks, and it is the lowest margin in the
+window, not the margin at the first breach. Neither is reported when the guardrail does
+not apply.
+
+What follows from the rule, each deliberate:
+
+- A floor met exactly, to the cent, holds; one cent less breaks.
+- A path whose cash starts below its floor breaks in its opening month, at `start`. The
+  same guardrail with a later `startDate` is judged from that month.
+- The first breach can come before the tightest month, when cash falls below the floor
+  and later falls further.
+- Inactive scenarios are not simulated, so they report nothing.

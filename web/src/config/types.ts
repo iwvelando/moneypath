@@ -145,8 +145,30 @@ export interface CommonModel {
   investments: InvestmentModel[];
 }
 
+/** The kinds of guardrail the engine can check. */
+export type GuardrailKind = 'cashFloor';
+
+/**
+ * A condition every path is checked against. `kind` is kept as written, so a
+ * kind the engine cannot check stays on screen with its error. `investments`
+ * and `loans` are null when absent; a cash floor uses neither, and a plan that
+ * names them keeps them until the reader takes them away.
+ */
+export interface GuardrailModel {
+  id: string;
+  name: string;
+  kind: GuardrailKind | (string & {});
+  amount: number | null;
+  investments: string[] | null;
+  loans: string[] | null;
+  startDate: string;
+  endDate: string;
+}
+
 export interface ConfigModel {
   simulation: SimulationModel;
+  /** Checked on every path; empty when the plan has none. */
+  guardrails: GuardrailModel[];
   common: CommonModel;
   choices: ChoiceModel[];
   scenarios: ScenarioModel[];
@@ -175,6 +197,29 @@ export function emptyOptimize(): OptimizeModel {
 /** A blank simulation block: every setting unset, which the engine reads as its default. */
 export function emptySimulation(): SimulationModel {
   return { startDate: '', endDate: '', startingCash: null, cashInterestRate: null, emergencyFundMonths: null };
+}
+
+/** A new guardrail is a cash floor with nothing entered yet. */
+export function emptyGuardrail(): GuardrailModel {
+  return {
+    id: newId('gr'),
+    name: '',
+    kind: 'cashFloor',
+    amount: null,
+    investments: null,
+    loans: null,
+    startDate: '',
+    endDate: '',
+  };
+}
+
+export function cloneGuardrail(guardrail: GuardrailModel): GuardrailModel {
+  return {
+    ...guardrail,
+    id: newId('gr'),
+    investments: guardrail.investments ? [...guardrail.investments] : null,
+    loans: guardrail.loans ? [...guardrail.loans] : null,
+  };
 }
 
 export function emptyEvent(): EventModel {
