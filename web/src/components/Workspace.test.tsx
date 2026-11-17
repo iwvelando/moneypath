@@ -420,6 +420,23 @@ describe('the Guardrails section', () => {
     expect(field('Start month', section)).toBeDefined();
   });
 
+  it('lets an explicitly empty loan list become every loan even when the plan has no loans', async () => {
+    const config = makeConfig([], [emptyScenario('plan')]);
+    config.guardrails = [{ ...emptyGuardrail(), name: 'Debt gone', kind: 'debtFree', startDate: '2030-01', loans: [] }];
+    await mount(config);
+    const loans = checklist('loans');
+    expect(boxes(loans)).toEqual([]);
+    // Preserve the uploaded input until the reader explicitly removes the list.
+    expect(latest.guardrails[0]!.loans).toEqual([]);
+    const everyLoan = Array.from(loans.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Use every loan');
+    expect(everyLoan).toBeDefined();
+    await act(async () => everyLoan!.click());
+    expect(latest.guardrails[0]!.loans).toBeNull();
+    expect(loans.textContent).not.toContain('Use every loan');
+    expect(latest.guardrails[0]!.name).toBe('Debt gone');
+    expect(latest.guardrails[0]!.startDate).toBe('2030-01');
+  });
+
   it('keeps a listed name the plan does not have, ticked, with its error, until it is unticked', async () => {
     const config = planWithEntries();
     config.guardrails = [{ ...emptyGuardrail(), name: 'Debt gone', kind: 'debtFree', startDate: '2030-01', loans: ['Mortgage', 'Yacht'] }];

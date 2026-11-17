@@ -76,6 +76,33 @@ test('a guardrail added in the editor is refused until it has a floor, then repo
   await expect(card).toContainText('Never overdrawn Does not apply');
 });
 
+test('an uploaded empty loan list can be removed without replacing the guardrail', async ({ page }) => {
+  await openApp(page);
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'empty-loans.yaml',
+    mimeType: 'application/yaml',
+    buffer: Buffer.from(`version: 2
+simulation: {startDate: 2025-01, endDate: 2025-06, startingCash: 1000}
+guardrails:
+  - {name: Nothing owed, kind: debtFree, startDate: 2025-04, loans: []}
+scenarios: [{name: plan}]
+`),
+  });
+  const section = page.locator('#section-guardrails');
+  await section.getByRole('button', { name: 'Edit Nothing owed' }).click();
+  const loans = section.locator('[data-path="guardrails.0.loans"]');
+  await expect(loans).toContainText('List at least one loan, or leave the list out');
+  await page.getByRole('button', { name: 'Run Forecast' }).first().click();
+  await expect(page.locator('.workbar__error')).toContainText('needs fixing');
+  await loans.getByRole('button', { name: 'Use every loan' }).click();
+  await expect(loans).not.toContainText('List at least one loan');
+  await runForecast(page);
+  await expect(page.locator('.guardrails__list')).toContainText('Nothing owed Holds Debt-free from 2025-01, 3 months to spare');
+  expect((await downloadConfig(page))['guardrails']).toEqual([
+    { name: 'Nothing owed', kind: 'debtFree', startDate: '2025-04' },
+  ]);
+});
+
 test('the flip panel shows the flipped path’s guardrails beside the scenario’s', async ({ page }) => {
   await openApp(page);
   await uploadChoices(page);

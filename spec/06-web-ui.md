@@ -80,6 +80,8 @@ The app covers, at a coarse grain:
   name written anywhere in the plan, once: in the baseline, an option's added entries
   or a scenario's own entries. A listed name the plan does not have stays ticked
   beside the others, with the engine's error under it, until it is unticked.
+  An explicitly empty loan list from an uploaded plan keeps its error and offers
+  "Use every loan" to remove the list, even when the plan has no loans to tick.
   Collapsed, a guardrail says what it checks and over which months. A kind the editor
   cannot offer, from an uploaded plan, is shown as written with the engine's error,
   and names or an amount its kind does not use are shown with their warning and a way

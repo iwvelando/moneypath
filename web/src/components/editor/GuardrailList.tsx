@@ -94,6 +94,8 @@ interface NameChecklistProps {
   available: string[];
   /** Said when the plan has no entry of that kind yet. */
   none: string;
+  /** Optional action to remove an explicitly empty list. */
+  clearEmptyLabel?: string;
   onChange: (listed: string[] | null) => void;
 }
 
@@ -102,7 +104,7 @@ interface NameChecklistProps {
  * lists it. A listed name the plan does not have keeps its ticked box, with
  * the engine's problem at its place in the list, until it is unticked.
  */
-function NameChecklist({ field, label, help, hint, listed, available, none, onChange }: NameChecklistProps) {
+function NameChecklist({ field, label, help, hint, listed, available, none, clearEmptyLabel, onChange }: NameChecklistProps) {
   const path = usePath(field);
   const base = useId();
   const labelId = `${base}-label`;
@@ -148,6 +150,13 @@ function NameChecklist({ field, label, help, hint, listed, available, none, onCh
       )}
       <p class="field__message">{hint}</p>
       <Notes id={messageId} notes={notes} />
+      {clearEmptyLabel && listed?.length === 0 ? (
+        <p>
+          <button type="button" class="btn btn--quiet btn--small" onClick={() => onChange(null)}>
+            {clearEmptyLabel}
+          </button>
+        </p>
+      ) : null}
     </fieldset>
   );
 }
@@ -233,6 +242,7 @@ function GuardrailCard({ guardrail, names, index, onChange, onRemove, onDuplicat
             listed={guardrail.loans}
             available={names.loans}
             none="The plan has no loans yet, so every loan a scenario takes out later is checked."
+            clearEmptyLabel="Use every loan"
             onChange={(loans) => patch({ loans })}
           />
         ) : null}
