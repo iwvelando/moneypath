@@ -30,9 +30,9 @@ test('an uploaded plan reports its cash floor on every scenario and keeps it', a
 
   await page.getByRole('tab', { name: /^Compare/ }).click();
   expect(await rows(page)).toEqual([
-    ['as we are', 'Holds Tightest 2026-01, $5,000.00 to spare'],
-    ['sell', 'Holds Tightest 2026-01, $5,000.00 to spare'],
-    ['sell and freelance', 'Breaks in 2027-02 Tightest 2027-02, $4,545.36 short'],
+    ['as we are', 'Holds Tightest 2026-01, $5,044.20 to spare'],
+    ['sell', 'Holds Tightest 2026-01, $5,044.20 to spare'],
+    ['sell and freelance', 'Breaks in 2027-02 Tightest 2027-02, $4,441.15 short'],
   ]);
 
   await page.getByRole('tab', { name: /^sell and freelance/ }).click();
@@ -77,8 +77,8 @@ test('the flip panel shows the flipped pathâ€™s guardrails beside the scenarioâ€
   await flip.getByRole('combobox', { name: 'Instead of Stay' }).selectOption({ label: 'Go freelance' });
   await expect(flip.locator('.guardrails')).toBeVisible();
   expect(await rows(page, flip.locator('.guardrails'))).toEqual([
-    ['as we are', 'Holds Tightest 2026-01, $5,000.00 to spare'],
+    ['as we are', 'Holds Tightest 2026-01, $5,044.20 to spare'],
     // Going freelance without selling: the months before freelance income starts cost the cushion.
-    ['as we are (Job: Go freelance)', 'Breaks in 2027-02 Tightest 2027-02, $3,245.36 short'],
+    ['as we are (Job: Go freelance)', 'Breaks in 2027-02 Tightest 2027-02, $3,141.15 short'],
   ]);
 });

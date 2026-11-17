@@ -72,11 +72,11 @@ func TestResultsJSONCarriesRawOptimizerValues(t *testing.T) {
 	if !ok {
 		t.Fatalf("optimization has no numeric \"value\": %v", opt["value"])
 	}
-	if value != -212.65 {
-		t.Errorf("value = %v, want -212.65", value)
+	if value != -225.64 {
+		t.Errorf("value = %v, want -225.64", value)
 	}
 	// The display strings stay, and describe the same numbers.
-	if opt["originalDisplay"] != "-$500.00" || opt["valueDisplay"] != "-$212.65" {
+	if opt["originalDisplay"] != "-$500.00" || opt["valueDisplay"] != "-$225.64" {
 		t.Errorf("displays = %v / %v", opt["originalDisplay"], opt["valueDisplay"])
 	}
 }
@@ -125,13 +125,13 @@ recommendations: {emergencyFundMonths: 0}
 scenarios: [{name: plan}]
 `, false)
 	rows, ok := out["rows"].([]any)
-	if !ok || len(rows) != 2 { // the starting row and one simulated month
+	if !ok || len(rows) != 2 { // both months are simulated
 		t.Fatalf("rows = %v", out["rows"])
 	}
-	row := rows[1].(map[string]any)
+	row := rows[0].(map[string]any)
 	liquid := row["values"].([]any)[0].(map[string]any)["liquid"].(float64)
 	if liquid != 1212 {
-		t.Errorf("liquid after one month = %v, want 1212", liquid)
+		t.Errorf("liquid after the start month = %v, want 1212", liquid)
 	}
 	yaml, _ := out["configYaml"].(string)
 	if !strings.Contains(yaml, "cashInterestRate: 12") {
@@ -163,7 +163,7 @@ scenarios:
 	}
 	want := []map[string]any{
 		{"lowestCash": 3000.0, "lowestCashDate": "2025-02", "endingCash": 5500.0, "endingTotal": 6500.0},
-		{"lowestCash": 5000.0, "lowestCashDate": "2025-01", "endingCash": 6500.0, "endingTotal": 7500.0},
+		{"lowestCash": 5500.0, "lowestCashDate": "2025-01", "endingCash": 7000.0, "endingTotal": 8000.0},
 	}
 	for i, m := range metrics {
 		got, ok := m.(map[string]any)["keyFigures"].(map[string]any)

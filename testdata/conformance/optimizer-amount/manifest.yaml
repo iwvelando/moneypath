@@ -6,21 +6,21 @@ expectedMetrics:
   - scenario: base plan
     emergencyFund:
       targetMonths: 3.00
-      averageMonthlyExpenses: 1924.0458
-      targetAmount: 5772.1375
+      averageMonthlyExpenses: 1912.82
+      targetAmount: 5738.46
       initialLiquid: 5000.00
-      fundedMonths: 2.5987
-      shortfall: 772.1375
+      fundedMonths: 2.6139
+      shortfall: 738.46
       surplus: 0.00
     optimizations:
       - targetName: New expense
         field: amount
         original: -500.00
-        value: -212.65
+        value: -225.64
         originalDisplay: "-$500.00"
-        valueDisplay: "-$212.65"
-        floor: 5772.1375
-        minimumCash: 5772.30
-        headroom: 0.1625
-        iterations: 16
+        valueDisplay: "-$225.64"
+        floor: 5738.46
+        minimumCash: 5738.48
+        headroom: 0.02
+        iterations: 15
         converged: true

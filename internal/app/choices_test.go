@@ -143,9 +143,9 @@ func TestEditingAnOptionChangesEveryScenarioSelectingIt(t *testing.T) {
 	diff := func(i int) float64 {
 		return after.Scenarios[i].Liquid[last] - before.Scenarios[i].Liquid[last]
 	}
-	// Five iterated months at 100 more rent each.
-	if diff(0) != -500 || diff(1) != -500 {
-		t.Errorf("both renting scenarios should end 500 lower; got %v and %v", diff(0), diff(1))
+	// Six simulated months at 100 more rent each.
+	if diff(0) != -600 || diff(1) != -600 {
+		t.Errorf("both renting scenarios should end 600 lower; got %v and %v", diff(0), diff(1))
 	}
 	if diff(2) != 0 {
 		t.Errorf("the buying scenario should not move; got %v", diff(2))

@@ -122,7 +122,7 @@ The app covers, at a coarse grain:
   readout: it lists every scenario's value for the month under the pointer, a tap, or
   the keyboard cursor, and for the final month otherwise. A plan with one scenario has
   no Compare entry. An isolated recorded month is drawn as a point so a plan
-  containing only its initial month remains visible. Under the chart, a table of key
+  containing only one month remains visible. Under the chart, a table of key
   figures has one row per scenario, in the plan's order: the lowest cash and the month
   it is reached, cash and total at the end of the plan, and the emergency-fund
   shortfall or surplus. The emergency-fund column is left out when the recommendation

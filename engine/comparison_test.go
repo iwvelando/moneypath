@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"math"
 	"reflect"
 	"testing"
 
@@ -139,9 +140,9 @@ func TestCompareOfTheSwappedPairMirrorsTheFirst(t *testing.T) {
 	}
 }
 
-// Spec chapter 04 §1 and §9: a plan with only its initial row has one
-// difference and no break-even month.
-func TestCompareOfAPlanWithOnlyItsInitialRow(t *testing.T) {
+// Spec chapter 04 §1 and §9: a plan of one month has one difference and no
+// break-even month.
+func TestCompareOfAPlanOfOneMonth(t *testing.T) {
 	cfg, _, err := config.Parse([]byte(`
 version: 2
 simulation: {startDate: 2025-03, endDate: 2025-03, startingCash: 1200}
@@ -162,11 +163,10 @@ scenarios:
 		t.Fatal(err)
 	}
 	got := res.Compare(res.Scenarios[0], res.Scenarios[1])
-	want := Comparison{
-		Cash:  SeriesComparison{Difference: []float64{0}, BreakEven: []BreakEven{}},
-		Total: SeriesComparison{Difference: []float64{800}, BreakEven: []BreakEven{}},
-	}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("Compare = %+v, want %+v", got, want)
+	// The fund has grown half a percent in its one month.
+	if !reflect.DeepEqual(got.Cash, SeriesComparison{Difference: []float64{0}, BreakEven: []BreakEven{}}) ||
+		len(got.Total.Difference) != 1 || math.Abs(got.Total.Difference[0]-804) > 1e-9 ||
+		len(got.Total.BreakEven) != 0 {
+		t.Errorf("Compare = %+v, want a cash difference of 0 and a total difference of 804", got)
 	}
 }

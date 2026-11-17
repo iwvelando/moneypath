@@ -254,14 +254,14 @@ func TestEarlyPayoffDateChargesAccruedInterest(t *testing.T) {
 func TestThresholdPayoffChargesAccruedInterest(t *testing.T) {
 	loan := validLoan(t, &config.Loan{
 		Name: "Loan", Principal: 1200, InterestRate: 12, Term: 120, StartDate: "2024-01",
-	}, "2025-01", "2025-04")
+	}, "2025-02", "2025-04")
 	remaining := buildLoanSchedule(loan, month(t, "2025-04")).remainAfter[month(t, "2025-01")]
 	payoff := remaining * 1.01
 
 	plan := func(cash float64) *config.Config {
 		return loadConfig(t, fmt.Sprintf(`
 version: 2
-simulation: {startDate: 2025-01, endDate: 2025-04, startingCash: %.6f}
+simulation: {startDate: 2025-02, endDate: 2025-04, startingCash: %.6f}
 recommendations: {emergencyFundMonths: 0}
 scenarios:
   - name: a
@@ -275,7 +275,7 @@ scenarios:
 	if err != nil {
 		t.Fatal(err)
 	}
-	if notes := short.Scenarios[0].Notes[1]; len(notes) != 0 {
+	if notes := short.Scenarios[0].Notes[0]; len(notes) != 0 {
 		t.Errorf("payoff fired without covering the month's interest: %q", notes)
 	}
 
@@ -284,10 +284,10 @@ scenarios:
 		t.Fatal(err)
 	}
 	wantNote := fmt.Sprintf("paying off asset Loan for %.2f", payoff)
-	if notes := exact.Scenarios[0].Notes[1]; len(notes) != 1 || notes[0] != wantNote {
+	if notes := exact.Scenarios[0].Notes[0]; len(notes) != 1 || notes[0] != wantNote {
 		t.Fatalf("notes = %q, want [%q]", notes, wantNote)
 	}
-	if got := exact.Scenarios[0].Liquid[1]; math.Abs(got-100) > 1e-6 {
+	if got := exact.Scenarios[0].Liquid[0]; math.Abs(got-100) > 1e-6 {
 		t.Errorf("cash after payoff = %.4f, want the 100.00 margin", got)
 	}
 }

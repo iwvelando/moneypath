@@ -1,0 +1,56 @@
+description: "The start month is simulated: startingCash is the balance at the end of the month before it. An event, a loan's down payment and first payment, an investment contribution and a month of growth dated in the start month all show in its row, and the emergency fund measures startingCash against the average of the months from the start."
+normative: true
+optimize: false
+tolerance: 0.01
+expectedMetrics:
+  - scenario: car at start
+    keyFigures:
+      lowestCash: 41500.00
+      lowestCashDate: "2026-04"
+      endingCash: 41500.00
+      endingTotal: 41500.00
+    emergencyFund:
+      targetMonths: 1.00
+      averageMonthlyExpenses: 2250.00
+      targetAmount: 2250.00
+      initialLiquid: 50000.00
+      fundedMonths: 22.2222
+      shortfall: 0.00
+      surplus: 47750.00
+  - scenario: car next month
+    keyFigures:
+      lowestCash: 42000.00
+      lowestCashDate: "2026-04"
+      endingCash: 42000.00
+      endingTotal: 42000.00
+    emergencyFund:
+      targetMonths: 1.00
+      averageMonthlyExpenses: 2000.00
+      targetAmount: 2000.00
+      initialLiquid: 50000.00
+      fundedMonths: 25.00
+      shortfall: 0.00
+      surplus: 48000.00
+  - scenario: fund
+    keyFigures:
+      lowestCash: 49900.00
+      lowestCashDate: "2026-01"
+      endingCash: 49900.00
+      endingTotal: 51043.6341
+    emergencyFund:
+      targetMonths: 1.00
+      averageMonthlyExpenses: 25.00
+      targetAmount: 25.00
+      initialLiquid: 50000.00
+      fundedMonths: 2000.00
+      shortfall: 0.00
+      surplus: 49975.00
+expectedComparisons:
+  - scenario: car at start
+    against: car next month
+    cash:
+      breakEven: []
+      endingDifference: -500.00
+    total:
+      breakEven: []
+      endingDifference: -500.00

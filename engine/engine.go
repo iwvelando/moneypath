@@ -144,12 +144,14 @@ func forecast(cfg *config.Config, opts Options) *Result {
 
 func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64) *ScenarioResult {
 	start, end := cfg.Simulation.ResolvedStart, cfg.Simulation.ResolvedEnd
-	n := int(end - start) // iterated months
+	// Every month from start through end is simulated and recorded (spec
+	// chapter 04 §1); validation refuses an end before the start.
+	n := int(end-start) + 1
 	sr := &ScenarioResult{
 		Name:   sc.Name,
-		Liquid: make([]float64, n+1),
-		Total:  make([]float64, n+1),
-		Notes:  make([][]string, n+1),
+		Liquid: make([]float64, n),
+		Total:  make([]float64, n),
+		Notes:  make([][]string, n),
 	}
 
 	// The scenario's two resolved lists (spec chapter 04 §1): its own entries
@@ -177,19 +179,16 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		invs = append(invs, newInvSim(inv, "common"))
 	}
 
-	cash := cfg.Simulation.ResolvedStartingCash
+	// startingCash and each startingValue are balances at the end of the
+	// month before start, so the start month's own activity is simulated.
+	startingCash := cfg.Simulation.ResolvedStartingCash
+	cash := startingCash
 	cashRate := cfg.Simulation.CashInterestRate / 100 / 12
-	invTotal := 0.0
-	for _, iv := range invs {
-		invTotal += iv.value
-	}
-	sr.Liquid[0] = cash
-	sr.Total[0] = cash + invTotal
 
 	expenseSum := 0.0
 	expenseMonths := 0
 
-	for idx := 1; idx <= n; idx++ {
+	for idx := 0; idx < n; idx++ {
 		m := start + config.Month(idx)
 
 		// 1. Cash interest (§1.1) on the prior month's balance, then events.
@@ -247,7 +246,7 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		cash += cashInterest + eventDelta + loanDelta - cashContributions + withdrawalCash
 
 		// 6. Record.
-		invTotal = 0.0
+		invTotal := 0.0
 		for _, iv := range invs {
 			invTotal += iv.value
 		}
@@ -255,8 +254,8 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		sr.Total[idx] = cash + invTotal
 		sr.Notes[idx] = append(payoffNotes, invNotes...)
 
-		// 7. Emergency-fund stats over the first 12 iterated months.
-		if idx <= 12 {
+		// 7. Emergency-fund stats over the first 12 simulated months.
+		if idx < 12 {
 			expenseSum += negEvents + positivePayments + cashContributions
 			expenseMonths++
 		}
@@ -265,7 +264,7 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 	sr.KeyFigures = keyFigures(start, sr.Liquid, sr.Total)
 
 	if emMonths > 0 {
-		ef := &EmergencyFund{TargetMonths: emMonths, InitialLiquid: sr.Liquid[0]}
+		ef := &EmergencyFund{TargetMonths: emMonths, InitialLiquid: startingCash}
 		if expenseMonths > 0 {
 			ef.AverageMonthlyExpenses = expenseSum / float64(expenseMonths)
 		}

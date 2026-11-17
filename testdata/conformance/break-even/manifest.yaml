@@ -12,7 +12,7 @@ expectedComparisons:
       endingDifference: -500.00
     total:
       breakEven: []
-      endingDifference: -2900.00
+      endingDifference: -3200.00
   - scenario: stay employed
     against: take the course
     cash:
@@ -22,4 +22,4 @@ expectedComparisons:
       endingDifference: 500.00
     total:
       breakEven: []
-      endingDifference: 2900.00
+      endingDifference: 3200.00
