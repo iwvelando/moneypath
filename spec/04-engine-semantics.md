@@ -494,6 +494,19 @@ the recorded values of `m`, compared in whole cents (preamble):
 - **cashFloor** holds in `m` when `round2(liquid[m]) ≥ round2(floor(m))`, where
   `floor(m)` is `amount` in every month. The floor is written per month so that a
   floor which grows can define it later without changing this rule.
+- **debtFree** holds in `m` when `round2(owed[m]) = 0`. `owed[m]` is the combined
+  principal outstanding at the end of `m` (§3.2) on the path's loans with the listed
+  names, or on every loan of the path when none are listed. A loan owes nothing before
+  its `startDate`, and nothing from the month it ends (§3.2 end check, §3.5: maturity,
+  an early payoff by date or by threshold, a sale). Escrow that continues after a
+  payoff (§3.6) is a cost, not a debt. A listed name the path has no loan by owes
+  nothing, and loans with the same name are summed. In a loan's own first month,
+  `owed` is what remains after that month's payment, as in any other month.
+- **lasts** holds in `m` when `round2(value[m]) ≥ round2(amount)`, or
+  `round2(value[m]) > 0` when no `amount` is given. `value[m]` is the combined value
+  at the end of `m` (§4, after any withdrawal that funds a loan payoff, §3.5) of the
+  path's accounts with the listed names. These per-loan and per-account balances are
+  recorded for evaluation only; the CSV does not carry them (chapter 05).
 
 **The outcome.** The rule is strict: a guardrail holds only if its condition is met in
 **every** month of its window. No guardrail uses the optimizer's "from the first month
@@ -502,15 +515,30 @@ been built says so with `startDate`.
 
 - **holds** — every month of the window passes;
 - **breaks** — some month fails. The **first breach** is the earliest failing month;
-- **does not apply** — the window is empty. It is never reported as holding.
+- **does not apply** — the window is empty, or a `lasts` names no account the path
+  has. It is never reported as holding.
 
-**Tightest month and margin** (cashFloor). The tightest month is the earliest month of
-the window with the least `liquid` in whole cents, by the tie rule of lowest cash (§8):
-the first `m` in the window with `round2(liquid[m]) = min round2(liquid)` over the
-window. The **margin** is `liquid[m] − floor(m)` there, unrounded like every reported
-number. It is negative when the guardrail breaks, and it is the lowest margin in the
-window, not the margin at the first breach. Neither is reported when the guardrail does
-not apply.
+**Tightest month and margin** (cashFloor and lasts). The balance is `liquid` for a
+cashFloor and `value` for a lasts, and the floor is `amount`, or 0 for a lasts with no
+`amount`. The tightest month is the earliest month of the window with the least
+balance in whole cents, by the tie rule of lowest cash (§8): the first `m` in the
+window with `round2(balance[m]) = min round2(balance)` over the window. The **margin**
+is `balance[m] − floor(m)` there, unrounded like every reported number. It is negative
+when the guardrail breaks (zero or less for a lasts with no `amount`), and it is the
+lowest margin in the window, not the margin at the first breach. Neither is reported
+when the guardrail does not apply.
+
+**Cleared month and months to spare** (debtFree). The tightest month of a debtFree is
+the month the debt is **cleared**: the first month of the last stretch of months,
+running to the window's last month, in which nothing is owed. The stretch may begin
+before the window but no earlier than `start`. There is none when something is owed in
+the window's last month. The margin, **`marginMonths`**, is the window's first month
+minus the cleared month: positive when the debt is cleared early, zero when it is
+cleared in the window's first month and negative when it is cleared late. A debtFree
+holds exactly when it has a cleared month and `marginMonths` is zero or more. When it
+breaks, **`owed`** is `owed[m]` at the first breach, unrounded. Neither the cleared
+month nor `marginMonths` is reported when there is no cleared month or the guardrail
+does not apply.
 
 What follows from the rule, each deliberate:
 
@@ -521,4 +549,10 @@ What follows from the rule, each deliberate:
   from that month.
 - The first breach can come before the tightest month, when cash falls below the floor
   and later falls further.
+- A debtFree whose deadline is before `start` is judged from `start`, the window's
+  first month, like any clipped window.
+- A debtFree with no loans to check (a path without the listed loans, or with no loans
+  at all) holds, cleared at `start`.
+- A lasts on accounts that start empty breaks at the window's first month; a later
+  `startDate` judges it from when they have been funded.
 - Inactive scenarios are not simulated, so they report nothing.

@@ -1,0 +1,66 @@
+description: >
+  The rules for debt-free and lasts guardrails, each placed at its field. A
+  debt-free needs its deadline and, when it lists loans, at least one; a lasts
+  needs at least one account and an amount above zero when it has one. Each
+  listed name must be an entry of that kind somewhere in the plan, whether in
+  the baseline, an option's added entries or a scenario's own, active or not;
+  an unknown name, a name of the other kind and a repeat are placed at the name,
+  a repeat at its second listing. A list or an amount the kind does not use is
+  a warning, and its names are not checked.
+problems:
+  - level: error
+    path: guardrails.0.startDate
+    where: Guardrail “No deadline”
+    message: A debt-free guardrail needs a start month, the month from which nothing may be owed.
+  - level: error
+    path: guardrails.1.loans
+    where: Guardrail “Empty loans”
+    message: List at least one loan, or leave the list out to check every loan.
+  - level: error
+    path: guardrails.3.loans.1
+    where: Guardrail “Unknown and repeated loans”, loan “Yacht”
+    message: No loan in the plan is named “Yacht”.
+  - level: error
+    path: guardrails.3.loans.2
+    where: Guardrail “Unknown and repeated loans”, loan “Mortgage”
+    message: “Mortgage” is already listed.
+  - level: error
+    path: guardrails.3.loans.3
+    where: Guardrail “Unknown and repeated loans”, loan “Brokerage”
+    message: No loan in the plan is named “Brokerage”.
+  - level: error
+    path: guardrails.4.investments
+    where: Guardrail “No accounts”
+    message: List at least one investment whose balance must last.
+  - level: error
+    path: guardrails.5.investments
+    where: Guardrail “Empty accounts”
+    message: List at least one investment whose balance must last.
+  - level: error
+    path: guardrails.6.amount
+    where: Guardrail “Zero amount”
+    message: The amount must be more than 0. Leave it out to mean the investments must never be emptied.
+  - level: error
+    path: guardrails.7.amount
+    where: Guardrail “Negative amount”
+    message: The amount must be more than 0. Leave it out to mean the investments must never be emptied.
+  - level: error
+    path: guardrails.9.investments.1
+    where: Guardrail “Unknown and repeated accounts”, investment “Mortgage”
+    message: No investment in the plan is named “Mortgage”.
+  - level: error
+    path: guardrails.9.investments.3
+    where: Guardrail “Unknown and repeated accounts”, investment “IRA”
+    message: “IRA” is already listed.
+  - level: warning
+    path: guardrails.10.loans
+    where: Guardrail “Loans on a lasts”
+    message: A guardrail on investments that last does not use loans, so this has no effect.
+  - level: warning
+    path: guardrails.11.amount
+    where: Guardrail “Extras on a debt-free”
+    message: A debt-free guardrail does not use an amount, so this has no effect.
+  - level: warning
+    path: guardrails.11.investments
+    where: Guardrail “Extras on a debt-free”
+    message: A debt-free guardrail does not use investments, so this has no effect.

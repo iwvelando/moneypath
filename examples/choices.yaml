@@ -12,13 +12,23 @@ simulation:
   startingCash: 20000.00
 
 # Guardrails are conditions every path is checked against, month by month.
-# Each scenario reports whether this one holds, the first month it breaks,
-# and the month cash comes closest to the floor.
+# Each scenario reports whether each one holds, the first month it breaks,
+# and the month it comes closest to breaking.
 # Field-by-field reference: spec/03-config-v2.md, "Guardrails".
 guardrails:
+  # Cash never below a cushion.
   - name: Cushion
     kind: cashFloor
     amount: 15000.00
+  # Nothing owed on the mortgage from 2030 on.
+  - name: Mortgage gone by 2030
+    kind: debtFree
+    startDate: 2030-01
+    loans: [Mortgage]
+  # The brokerage account is never emptied.
+  - name: Brokerage lasts
+    kind: lasts
+    investments: [Brokerage]
 
 # The baseline: what holds on every path unless an option says otherwise.
 common:

@@ -1,6 +1,11 @@
 package engine
 
-import "github.com/iwvelando/moneypath/config"
+import (
+	"maps"
+	"slices"
+
+	"github.com/iwvelando/moneypath/config"
+)
 
 // GuardrailOutcome is what a path's months say about one guardrail (spec
 // chapter 04 §10).
@@ -13,16 +18,25 @@ const (
 )
 
 // GuardrailResult is one guardrail read from one path. FirstBreach is set
-// only when the guardrail breaks; Tightest and Margin unless it does not
-// apply.
+// only when the guardrail breaks, and so is Owed for a debtFree. Tightest and
+// its margin are set when HasTightest is: unless the guardrail does not apply,
+// and for a debtFree only when its debt is cleared.
 type GuardrailResult struct {
 	Name        string
 	Kind        string
 	Result      GuardrailOutcome
 	FirstBreach config.Month
-	Tightest    config.Month
-	// Margin is the balance less the floor in the tightest month, unrounded.
+	HasTightest bool
+	// Tightest is a debtFree's cleared month, and the month of least balance
+	// for the other kinds.
+	Tightest config.Month
+	// Margin is a cashFloor's or a lasts' balance less its floor in the
+	// tightest month, unrounded.
 	Margin float64
+	// MarginMonths is a debtFree's window's first month less its cleared month.
+	MarginMonths int
+	// Owed is what a debtFree's loans owe at its first breach, unrounded.
+	Owed float64
 }
 
 // EvaluateGuardrails reads every guardrail from a simulated path whose
@@ -51,24 +65,101 @@ func EvaluateGuardrail(g *config.Guardrail, start config.Month, path *ScenarioRe
 	}
 	switch g.Kind {
 	case config.GuardrailCashFloor:
-		floor := func(config.Month) float64 { return *g.Amount }
-		tightest := first
-		breached := false
-		for m := first; m <= last; m++ {
-			cash := path.Liquid[m-start]
-			if !breached && round2(cash) < round2(floor(m)) {
-				out.FirstBreach, breached = m, true
-			}
-			if round2(cash) < round2(path.Liquid[tightest-start]) {
-				tightest = m
+		floorTest(&out, first, last, *g.Amount, func(m config.Month) float64 { return path.Liquid[m-start] }, false)
+	case config.GuardrailLasts:
+		var accounts [][]float64
+		for _, name := range g.Investments {
+			if v, ok := path.Holdings[name]; ok {
+				accounts = append(accounts, v)
 			}
 		}
-		out.Result = GuardrailHolds
-		if breached {
-			out.Result = GuardrailBreaks
+		if len(accounts) == 0 {
+			return out
 		}
-		out.Tightest = tightest
-		out.Margin = path.Liquid[tightest-start] - floor(tightest)
+		value := func(m config.Month) float64 {
+			total := 0.0
+			for _, v := range accounts {
+				total += v[m-start]
+			}
+			return total
+		}
+		if g.Amount == nil {
+			floorTest(&out, first, last, 0, value, true)
+		} else {
+			floorTest(&out, first, last, *g.Amount, value, false)
+		}
+	case config.GuardrailDebtFree:
+		debtFreeTest(&out, g, start, first, last, path)
 	}
 	return out
+}
+
+// floorTest reads a balance that must stay at or above a floor in every month
+// from first through last, in whole cents, or strictly above it when strict
+// is set; the tightest month is the earliest of the least balance (spec
+// chapter 04 §10).
+func floorTest(out *GuardrailResult, first, last config.Month, floor float64, balance func(config.Month) float64, strict bool) {
+	tightest := first
+	breached := false
+	for m := first; m <= last; m++ {
+		b := balance(m)
+		fails := round2(b) < round2(floor)
+		if strict {
+			fails = round2(b) <= round2(floor)
+		}
+		if !breached && fails {
+			out.FirstBreach, breached = m, true
+		}
+		if round2(b) < round2(balance(tightest)) {
+			tightest = m
+		}
+	}
+	out.Result = GuardrailHolds
+	if breached {
+		out.Result = GuardrailBreaks
+	}
+	out.HasTightest, out.Tightest = true, tightest
+	out.Margin = balance(tightest) - floor
+}
+
+// debtFreeTest reads what a debtFree's loans owe from first through last, and
+// the month the debt is cleared: the first of the last stretch, running to
+// last and starting no earlier than start, in which nothing is owed (spec
+// chapter 04 §10).
+func debtFreeTest(out *GuardrailResult, g *config.Guardrail, start, first, last config.Month, path *ScenarioResult) {
+	names := g.Loans
+	if len(names) == 0 {
+		// Every loan of the path, summed in a fixed order so the reported
+		// amount is the same on every run and in every build.
+		names = slices.Sorted(maps.Keys(path.Owed))
+	}
+	var loans [][]float64
+	for _, name := range names {
+		if v, ok := path.Owed[name]; ok {
+			loans = append(loans, v)
+		}
+	}
+	owed := func(m config.Month) float64 {
+		total := 0.0
+		for _, v := range loans {
+			total += v[m-start]
+		}
+		return total
+	}
+	out.Result = GuardrailHolds
+	for m := first; m <= last; m++ {
+		if round2(owed(m)) != 0 {
+			out.Result, out.FirstBreach, out.Owed = GuardrailBreaks, m, owed(m)
+			break
+		}
+	}
+	if round2(owed(last)) != 0 {
+		return
+	}
+	cleared := last
+	for cleared > start && round2(owed(cleared-1)) == 0 {
+		cleared--
+	}
+	out.HasTightest, out.Tightest = true, cleared
+	out.MarginMonths = int(first - cleared)
 }

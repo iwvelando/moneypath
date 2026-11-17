@@ -28,15 +28,25 @@ export const HELP = {
   guardrailName:
     'Required, and must be unique among guardrails. It labels this guardrail’s result in every scenario.',
   guardrailKind:
-    'What the guardrail checks. A cash floor checks that your cash never falls below an amount. A guardrail never stops a forecast: each scenario reports whether it holds, the first month it breaks, and the month it comes closest to breaking.',
+    'What the guardrail checks. A cash floor checks that your cash never falls below an amount. Debt-free checks that nothing is owed on your loans from a month on. Investments last checks that the investments you pick are never emptied, or never fall below an amount. A guardrail never stops a forecast: each scenario reports whether it holds, the first month it breaks, and the month it comes closest to breaking.',
   guardrailAmount:
     'Required for a cash floor. Your cash must be at least this much, to the cent, at the end of every month the guardrail covers, including the start month, after that month’s own income and spending. The same amount applies in every month. It may be negative, to mean “never more than this much overdrawn”.',
   guardrailStartDate:
-    'Optional. The first month checked. Defaults to the simulation start month. If the cushion is something you are still building up, start from the month you expect to have it: the result then tells you whether you got there and kept it.',
+    'Optional. The first month checked. Defaults to the simulation start month. If the balance is something you are still building up, start from the month you expect to have it: the result then tells you whether you got there and kept it.',
+  guardrailDeadline:
+    'Required for a debt-free guardrail. From this month on, through the end month, the loans must owe nothing at the end of every month, so a loan taken out after this month breaks it too. The result gives the month the debt was cleared and how many months early or late that was.',
+  guardrailLoans:
+    'The loans that must be paid off. Leave every box unticked to check every loan a scenario has. A loan a scenario does not have owes nothing there. A loan owes nothing before it starts, and nothing once it is paid off or sold; escrow you keep paying afterwards is not debt.',
+  guardrailInvestments:
+    'Required for an investments-last guardrail. Tick at least one investment. Their values are added together at the end of every month the guardrail covers. A scenario with none of them is reported as “does not apply”.',
+  guardrailLastsAmount:
+    'Optional. The ticked investments together must hold at least this much, to the cent, at the end of every month the guardrail covers. Leave it empty to mean they must never be emptied. It must be more than 0.',
   guardrailEndDate:
     'Optional. The last month checked, inclusive. Defaults to the simulation end month. Months outside the simulation are not checked, and a guardrail with no month inside it does not apply.',
   guardrailUnusedNames:
     'These names were in the plan you loaded, but this kind of guardrail does not use them, so they have no effect. Take them away to tidy the plan.',
+  guardrailUnusedAmount:
+    'This amount was in the plan you loaded, but a debt-free guardrail does not use it, so it has no effect. Take it away to tidy the plan.',
 
   /* scenario */
   scenarioName:

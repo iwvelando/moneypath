@@ -41,8 +41,7 @@ type Recommendations struct {
 	EmergencyFundMonths *float64 `yaml:"emergencyFundMonths,omitempty"`
 }
 
-// The kinds of guardrail (spec chapter 03, Guardrails). Only a cash floor
-// can be checked so far; the others are refused by validation.
+// The kinds of guardrail (spec chapter 03, Guardrails).
 const (
 	GuardrailCashFloor = "cashFloor"
 	GuardrailDebtFree  = "debtFree"

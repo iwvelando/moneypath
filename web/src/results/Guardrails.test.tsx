@@ -3,8 +3,10 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { FlipSubject } from '../config/choices';
 import type { FlipComparison, ForecastResults, GuardrailResult } from '../engine/types';
+import { emptyGuardrail, type GuardrailModel } from '../config/types';
 import { Comparison } from './Comparison';
 import { Flip } from './Flip';
+import { outcomeOf } from './Guardrails';
 import { ResultsView } from './ResultsView';
 
 let host: HTMLDivElement;
@@ -162,5 +164,94 @@ describe('guardrails in the flip panel', () => {
   it('shows none for a plan without guardrails', async () => {
     await pickAndShow(results([undefined]), flip());
     expect(host.querySelector('.guardrails')).toBeNull();
+  });
+});
+
+describe('debt-free and lasts results', () => {
+  const debt = (fields: Partial<GuardrailResult>): GuardrailResult => ({
+    name: 'Mortgage gone',
+    kind: 'debtFree',
+    result: 'holds',
+    ...fields,
+  });
+  const read = (result: GuardrailResult, definition?: GuardrailModel) => {
+    const outcome = outcomeOf(result, definition);
+    return [outcome.text, outcome.detail];
+  };
+
+  it('says when a debt is cleared and how many months it has to spare', () => {
+    expect(read(debt({ tightestDate: '2027-06', marginMonths: 31 }))).toEqual([
+      'Holds',
+      'Debt-free from 2027-06, 31 months to spare',
+    ]);
+    expect(read(debt({ tightestDate: '2029-12', marginMonths: 1 }))).toEqual([
+      'Holds',
+      'Debt-free from 2029-12, 1 month to spare',
+    ]);
+    expect(read(debt({ tightestDate: '2030-01', marginMonths: 0 }))).toEqual([
+      'Holds',
+      'Debt-free from 2030-01, right on time',
+    ]);
+  });
+
+  it('says what is owed at a breach, and when a late debt is cleared', () => {
+    expect(
+      read(debt({ result: 'breaks', firstBreachDate: '2030-01', owed: 12400, tightestDate: '2031-03', marginMonths: -14 })),
+    ).toEqual(['Breaks in 2030-01', 'Owes $12,400.00 then; debt-free from 2031-03, 14 months late']);
+    expect(
+      read(debt({ result: 'breaks', firstBreachDate: '2030-01', owed: 500, tightestDate: '2030-02', marginMonths: -1 })),
+    ).toEqual(['Breaks in 2030-01', 'Owes $500.00 then; debt-free from 2030-02, 1 month late']);
+    expect(read(debt({ result: 'breaks', firstBreachDate: '2030-01', owed: 194640.48 }))).toEqual([
+      'Breaks in 2030-01',
+      'Owes $194,640.48 then; still owed at the end of the window',
+    ]);
+  });
+
+  it('reads a lasts with an amount like a floor, and one without as what is left', () => {
+    const withAmount: GuardrailModel = { ...emptyGuardrail(), kind: 'lasts', investments: ['Fund'], amount: 50000 };
+    const without: GuardrailModel = { ...withAmount, amount: null };
+    const lasts = (fields: Partial<GuardrailResult>): GuardrailResult => ({ name: 'Fund lasts', kind: 'lasts', result: 'holds', ...fields });
+    expect(read(lasts({ tightestDate: '2040-01', margin: 3200 }), withAmount)).toEqual([
+      'Holds',
+      'Tightest 2040-01, $3,200.00 to spare',
+    ]);
+    expect(read(lasts({ result: 'breaks', firstBreachDate: '2038-05', tightestDate: '2039-02', margin: -8000 }), withAmount)).toEqual([
+      'Breaks in 2038-05',
+      'Tightest 2039-02, $8,000.00 short',
+    ]);
+    expect(read(lasts({ tightestDate: '2040-01', margin: 0 }), withAmount)).toEqual([
+      'Holds',
+      'Tightest 2040-01, exactly at the amount',
+    ]);
+    expect(read(lasts({ tightestDate: '2040-01', margin: 3200 }), without)).toEqual([
+      'Holds',
+      'Tightest 2040-01, $3,200.00 left',
+    ]);
+    expect(read(lasts({ result: 'breaks', firstBreachDate: '2033-07', tightestDate: '2033-07', margin: 0.001 }), without)).toEqual([
+      'Breaks in 2033-07',
+      'Tightest 2033-07, nothing left',
+    ]);
+    expect(read(lasts({ result: 'doesNotApply' }), without)).toEqual(['Does not apply', null]);
+  });
+
+  it('words each result by the guardrail the plan ran with', () => {
+    const plan: GuardrailModel[] = [{ ...emptyGuardrail(), name: 'Fund lasts', kind: 'lasts', investments: ['Fund'] }];
+    const left: GuardrailResult = { name: 'Fund lasts', kind: 'lasts', result: 'holds', tightestDate: '2026-02', margin: 700 };
+    act(() => {
+      render(
+        <ResultsView
+          results={results([[left]])}
+          guardrails={plan}
+          durationMs={1}
+          optimizerRan={false}
+          onDownloadCsv={() => {}}
+          statusOf={() => 'missing'}
+          onApply={() => {}}
+        />,
+        host,
+      );
+    });
+    const card = [...host.querySelectorAll('.summary__card')].find((element) => element.querySelector('h4')?.textContent === 'Guardrails')!;
+    expect(card.querySelector('li')?.textContent?.replace(/\s+/g, ' ').trim()).toBe('Fund lasts Holds Tightest 2026-02, $700.00 left');
   });
 });

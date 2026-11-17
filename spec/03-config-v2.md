@@ -331,6 +331,17 @@ guardrails:                # optional; checked on every path
     amount: 15000.00       # cashFloor: required; any number, negative allowed
     startDate: 2027-01     # optional; first month checked (default: plan start)
     endDate: 2035-12       # optional; last month checked (default: plan end)
+
+  - name: Mortgage gone before I retire
+    kind: debtFree
+    startDate: 2045-01            # debtFree: required; the deadline
+    loans: [Mortgage]             # optional; default: every loan on the path
+
+  - name: Retirement savings last
+    kind: lasts
+    investments: [401k, Roth IRA] # lasts: required; taken together
+    amount: 50000.00              # optional; default: never emptied
+    startDate: 2055-01            # e.g. from the month withdrawals begin
 ```
 
 - The list is plan-wide. Options and scenarios cannot add, change or remove a
@@ -342,19 +353,33 @@ guardrails:                # optional; checked on every path
   - **`cashFloor`** — cash is at least `amount` in every month of the window. `amount`
     is the same nominal amount in every month. It may be negative, which states
     "never more than this overdrawn", as `startingCash` may be.
-  - **`debtFree`** and **`lasts`** are reserved for the kinds that check loans and
-    accounts. This version refuses them as kinds it cannot check yet, so no build
-    accepts a guardrail it cannot evaluate.
-- `investments` and `loans` take lists of entry names, for the kinds that use them.
-  A `cashFloor` uses neither.
+  - **`debtFree`** — nothing is owed, from `startDate` through the end of the window,
+    on the loans listed in `loans`, or on every loan of the path when `loans` is left
+    out. `startDate` is required: it is the deadline. A loan taken out after the
+    deadline breaks it, and a listed loan a path does not have owes nothing there.
+  - **`lasts`** — the accounts listed in `investments`, taken together, are never
+    emptied in any month of the window or, with `amount`, never hold less than
+    `amount`. A path that has none of the listed accounts is not judged by it.
+- `investments` and `loans` take lists of entry names, for the kinds that use them:
+  `investments` for a `lasts`, `loans` for a `debtFree`. Each name must be the name
+  of an entry of that kind somewhere in the plan: in `common`, in an option's added
+  entries, or in a scenario's own entries, active or not. A name may be listed only
+  once. Loans with the same name on one path are counted together.
 - There is no severity: all guardrails are equal.
 
 Validation, hard errors:
 
 - A guardrail with no name, or a name another guardrail has.
-- No `kind`, a kind other than the three, or `debtFree` or `lasts`, which cannot be
-  checked yet.
+- No `kind`, or a kind other than the three.
 - A `cashFloor` without `amount`.
+- A `debtFree` without `startDate`, or with an empty `loans` list (leave the list out
+  to check every loan).
+- A `lasts` without `investments`, or with an empty list; a `lasts` with an `amount` of
+  zero or less. Zero would always hold, and "never emptied" is what an absent amount
+  means.
+- In the list a kind uses, a name that no entry of that kind in the plan has, or a
+  name listed twice. The problem is placed at the name (`loans.<j>`,
+  `investments.<j>`), at its second listing for a repeat.
 - A `startDate` or `endDate` that does not parse, or an `endDate` before the
   `startDate` when both are given.
 - The usual wrong-type rules.
@@ -366,8 +391,9 @@ Warnings:
   drift out of range on its own, as an event's can. The warning is placed at
   `startDate` when the window starts after the simulation ends, and otherwise at
   `endDate`.
-- A key the kind does not use (`investments` or `loans` on a `cashFloor`): it has no
-  effect.
+- A key the kind does not use (`investments` or `loans` on a `cashFloor`, `amount` or
+  `investments` on a `debtFree`, `loans` on a `lasts`): it has no effect. The names in
+  a list the kind does not use are not checked against the plan.
 - Unknown keys, as everywhere.
 
 Problems are placed at `guardrails.<i>.<field>`, and their place in words is

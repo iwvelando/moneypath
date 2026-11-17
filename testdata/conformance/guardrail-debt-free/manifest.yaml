@@ -1,0 +1,63 @@
+description: >
+  Debt-free guardrails read from what each path's loans owe at the end of each
+  month, in whole cents, from the deadline through the window's end. A loan
+  starting in the plan's first month owes what remains after that month's
+  payment; it owes nothing from the month it matures, is paid off by date or by
+  threshold, or is sold, and escrow that continues after maturity is not debt.
+  The cleared month is the first of the last stretch owing nothing, which may
+  start before the window but not before the plan; the margin is the window's
+  first month minus it, zero when cleared on the deadline and negative when
+  late, and a breach reports what was owed at the first breach. A deadline
+  before the plan is judged from the plan's first month. A loan taken out after
+  the deadline breaks it and leaves no cleared month, as does debt at the end of
+  a window; a listed loan a path does not have owes nothing, and loans with the
+  same name are counted together. A window after the plan does not apply.
+normative: true
+optimize: false
+tolerance: 0.01
+expectedMetrics:
+  - scenario: on schedule
+    guardrails:
+      - {name: Car gone by June, kind: debtFree, result: holds, tightestDate: "2025-06", marginMonths: 0}
+      - {name: Car gone by May, kind: debtFree, result: breaks, firstBreachDate: "2025-05", owed: 1000.00, tightestDate: "2025-06", marginMonths: -1}
+      - {name: Deadline before the plan, kind: debtFree, result: breaks, firstBreachDate: "2025-01", owed: 5000.00, tightestDate: "2025-06", marginMonths: -5}
+      - {name: Debt-free from April, kind: debtFree, result: breaks, firstBreachDate: "2025-04", owed: 2000.00, tightestDate: "2025-06", marginMonths: -2}
+      - {name: Boat gone by March, kind: debtFree, result: holds, tightestDate: "2025-01", marginMonths: 2}
+      - {name: "Car gone, checked to April", kind: debtFree, result: breaks, firstBreachDate: "2025-03", owed: 3000.00}
+      - {name: After the plan, kind: debtFree, result: doesNotApply}
+  - scenario: sold early
+    guardrails:
+      - {name: Car gone by June, kind: debtFree, result: holds, tightestDate: "2025-03", marginMonths: 3}
+      - {name: Car gone by May, kind: debtFree, result: holds, tightestDate: "2025-03", marginMonths: 2}
+      - {name: Deadline before the plan, kind: debtFree, result: breaks, firstBreachDate: "2025-01", owed: 5000.00, tightestDate: "2025-03", marginMonths: -2}
+      - {name: Debt-free from April, kind: debtFree, result: holds, tightestDate: "2025-03", marginMonths: 1}
+      - {name: Boat gone by March, kind: debtFree, result: holds, tightestDate: "2025-01", marginMonths: 2}
+      - {name: "Car gone, checked to April", kind: debtFree, result: holds, tightestDate: "2025-03", marginMonths: 0}
+      - {name: After the plan, kind: debtFree, result: doesNotApply}
+  - scenario: threshold
+    guardrails:
+      - {name: Car gone by June, kind: debtFree, result: holds, tightestDate: "2025-02", marginMonths: 4}
+      - {name: Car gone by May, kind: debtFree, result: holds, tightestDate: "2025-02", marginMonths: 3}
+      - {name: Deadline before the plan, kind: debtFree, result: breaks, firstBreachDate: "2025-01", owed: 5000.00, tightestDate: "2025-02", marginMonths: -1}
+      - {name: Debt-free from April, kind: debtFree, result: holds, tightestDate: "2025-02", marginMonths: 2}
+      - {name: Boat gone by March, kind: debtFree, result: holds, tightestDate: "2025-01", marginMonths: 2}
+      - {name: "Car gone, checked to April", kind: debtFree, result: holds, tightestDate: "2025-02", marginMonths: 1}
+      - {name: After the plan, kind: debtFree, result: doesNotApply}
+  - scenario: boat later
+    guardrails:
+      - {name: Car gone by June, kind: debtFree, result: holds, tightestDate: "2025-01", marginMonths: 5}
+      - {name: Car gone by May, kind: debtFree, result: holds, tightestDate: "2025-01", marginMonths: 4}
+      - {name: Deadline before the plan, kind: debtFree, result: holds, tightestDate: "2025-01", marginMonths: 0}
+      - {name: Debt-free from April, kind: debtFree, result: breaks, firstBreachDate: "2025-10", owed: 3000.00}
+      - {name: Boat gone by March, kind: debtFree, result: breaks, firstBreachDate: "2025-10", owed: 3000.00}
+      - {name: "Car gone, checked to April", kind: debtFree, result: holds, tightestDate: "2025-01", marginMonths: 2}
+      - {name: After the plan, kind: debtFree, result: doesNotApply}
+  - scenario: two cars
+    guardrails:
+      - {name: Car gone by June, kind: debtFree, result: holds, tightestDate: "2025-06", marginMonths: 0}
+      - {name: Car gone by May, kind: debtFree, result: breaks, firstBreachDate: "2025-05", owed: 1000.00, tightestDate: "2025-06", marginMonths: -1}
+      - {name: Deadline before the plan, kind: debtFree, result: breaks, firstBreachDate: "2025-01", owed: 7000.00, tightestDate: "2025-06", marginMonths: -5}
+      - {name: Debt-free from April, kind: debtFree, result: breaks, firstBreachDate: "2025-04", owed: 2000.00, tightestDate: "2025-06", marginMonths: -2}
+      - {name: Boat gone by March, kind: debtFree, result: holds, tightestDate: "2025-01", marginMonths: 2}
+      - {name: "Car gone, checked to April", kind: debtFree, result: breaks, firstBreachDate: "2025-03", owed: 3000.00}
+      - {name: After the plan, kind: debtFree, result: doesNotApply}

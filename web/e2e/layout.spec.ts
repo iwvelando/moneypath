@@ -980,6 +980,12 @@ test('guardrails, their results and the flip panel never scroll sideways', async
   await section.getByRole('button', { name: 'Edit Cushion' }).click();
   await section.getByRole('combobox', { name: 'Kind' }).scrollIntoViewIfNeeded();
   expect(await overflow(page), 'an open guardrail').toBeLessThanOrEqual(0);
+  for (const name of ['Mortgage gone by 2030', 'Brokerage lasts']) {
+    await section.getByRole('button', { name: `Edit ${name}` }).click();
+    const card = section.getByRole('listitem').filter({ has: page.getByRole('button', { name: `Collapse ${name}` }) });
+    await card.locator('.name-checklist').scrollIntoViewIfNeeded();
+    expect(await overflow(page), `an open guardrail: ${name}`).toBeLessThanOrEqual(0);
+  }
 
   await runForecast(page);
   await page.getByRole('tab', { name: /^Compare/ }).click();

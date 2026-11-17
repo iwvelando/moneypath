@@ -65,6 +65,10 @@ type guardrailMetric struct {
 	FirstBreachDate string  `yaml:"firstBreachDate"`
 	TightestDate    string  `yaml:"tightestDate"`
 	Margin          float64 `yaml:"margin"`
+	// MarginMonths and Owed are a debtFree's: the months to spare at its
+	// cleared month, and what is owed at its first breach.
+	MarginMonths int     `yaml:"marginMonths"`
+	Owed         float64 `yaml:"owed"`
 }
 
 type keyFigureMetric struct {
@@ -362,7 +366,8 @@ func compareMetrics(t *testing.T, want []scenarioMetric, res *engine.Result) {
 }
 
 // compareGuardrails checks a scenario's guardrail results against the
-// manifest: names, kinds, results and months exactly, margins within 0.01.
+// manifest: names, kinds, results, months and months to spare exactly,
+// margins and amounts owed within 0.01.
 func compareGuardrails(t *testing.T, scenario string, want []guardrailMetric, got []engine.GuardrailResult) {
 	t.Helper()
 	if len(want) != len(got) {
@@ -375,12 +380,19 @@ func compareGuardrails(t *testing.T, scenario string, want []guardrailMetric, go
 		if g.Result == engine.GuardrailBreaks {
 			have.FirstBreachDate = g.FirstBreach.String()
 		}
-		if g.Result != engine.GuardrailDoesNotApply {
+		if g.HasTightest {
 			have.TightestDate = g.Tightest.String()
 			have.Margin = g.Margin
+			have.MarginMonths = g.MarginMonths
+		}
+		if g.Kind == config.GuardrailDebtFree && g.Result == engine.GuardrailBreaks {
+			have.Owed = g.Owed
 		}
 		if math.Abs(have.Margin-w.Margin) <= 0.01 {
 			have.Margin = w.Margin
+		}
+		if math.Abs(have.Owed-w.Owed) <= 0.01 {
+			have.Owed = w.Owed
 		}
 		if have != w {
 			t.Errorf("scenario %q guardrail %d:\n want %+v\n  got %+v", scenario, i, w, have)

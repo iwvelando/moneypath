@@ -2,9 +2,10 @@ description: >
   Every rule for a guardrail, each placed at its field and named by the
   guardrail it concerns. A guardrail with no name is numbered. A window with
   no month inside the simulation is a warning at the end of the window that
-  misses it; a window of one month at the simulation's end applies. Kinds that
-  cannot be checked yet are refused, and a key the kind does not use is a
-  warning.
+  misses it; a window of one month at the simulation's end applies. A
+  debt-free with its deadline and no list of loans is sound; the accounts a
+  lasts lists must be in the plan. A key the kind does not use is a warning,
+  and its names are not checked.
 problems:
   - level: warning
     path: guardrails.12.severity
@@ -25,15 +26,11 @@ problems:
   - level: error
     path: guardrails.3.kind
     where: Guardrail “Typo”
-    message: “cashfloor” is not a kind of guardrail. For now, a guardrail can only be a cash floor.
+    message: “cashfloor” is not a kind of guardrail. Use cashFloor, debtFree or lasts.
   - level: error
-    path: guardrails.4.kind
-    where: Guardrail “Mortgage gone”
-    message: This kind of guardrail cannot be checked yet. For now, a guardrail can only be a cash floor.
-  - level: error
-    path: guardrails.5.kind
-    where: Guardrail “Savings last”
-    message: This kind of guardrail cannot be checked yet. For now, a guardrail can only be a cash floor.
+    path: guardrails.5.investments.0
+    where: Guardrail “Savings last”, investment “Brokerage”
+    message: No investment in the plan is named “Brokerage”.
   - level: error
     path: guardrails.6.amount
     where: Guardrail “No amount”

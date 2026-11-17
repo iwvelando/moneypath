@@ -69,13 +69,21 @@ The app covers, at a coarse grain:
   month the number pad, with the field supplying the dash that pad lacks.
 - **Guardrails** (chapter 03, "Guardrails") — a section of the plan's guardrails, after
   the simulation settings, each an entry like any other. A new guardrail is a cash
-  floor with nothing else entered; its fields are its name, its kind (only "Cash floor"
-  can be picked), the floor, which may be negative, and the optional start and end
-  months it covers, whose help says to start a cushion still being built from the
-  month it is expected. Collapsed, it says what it checks and over which months. A
-  kind the editor cannot offer, from an uploaded plan, is shown as written with the
-  engine's error, and names a cash floor does not use are shown with their warning
-  and a way to take them away; neither is dropped in silence.
+  floor with nothing else entered; its fields are its name, its kind ("Cash floor",
+  "Debt-free" or "Investments last") and the optional start and end months it covers,
+  whose help says to start a balance still being built from the month it is expected.
+  A cash floor adds its floor, which may be negative. A debt-free names its start
+  month "Debt-free from" and requires it, and lists the plan's loans as checkboxes,
+  every loan when none is ticked. An investments-last lists the plan's investments as
+  checkboxes, of which at least one must be ticked, and adds an optional "Never below"
+  amount, empty for "never emptied". The checkboxes offer each loan or investment
+  name written anywhere in the plan, once: in the baseline, an option's added entries
+  or a scenario's own entries. A listed name the plan does not have stays ticked
+  beside the others, with the engine's error under it, until it is unticked.
+  Collapsed, a guardrail says what it checks and over which months. A kind the editor
+  cannot offer, from an uploaded plan, is shown as written with the engine's error,
+  and names or an amount its kind does not use are shown with their warning and a way
+  to take them away; nothing is dropped in silence.
 - **Choices** (chapter 03, "Choices") — each choice is a section holding its options.
   An option is an entry like any other: collapsed, it says what it adds, changes and
   removes and which scenarios pick it, so its reach is known before it is edited. Open,
@@ -129,7 +137,11 @@ The app covers, at a coarse grain:
   is disabled, never shown as zero. When the plan has guardrails, a second table under
   the key figures has a row per scenario and a column per guardrail: whether it holds,
   the month it first breaks, its tightest month and the margin there, as an amount to
-  spare or short. "Does not apply" is said as such, never as holding. A scenario's own
+  spare or short, or for an investments-last without an amount as the amount left. A
+  debt-free says instead the month it is debt-free from and the months to spare or
+  late ("right on time" at none), and on a breach what is owed then, or that debt is
+  still owed at the end of the window. "Does not apply" is said as such, never as
+  holding. The wording follows the guardrails of the plan the results came from. A scenario's own
   view lists its guardrails the same way beside its emergency fund, and the flip panel
   shows the scenario's results and the flipped path's in one table. Nothing about a
   guardrail is computed in the app; it formats what the engine reported. A row leads to its scenario's own view: choosing

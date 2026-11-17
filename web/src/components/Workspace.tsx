@@ -24,7 +24,7 @@ import { OptimizerControl } from './OptimizerControl';
 import { At, PathProblems, Problems } from './problems';
 import { problemText, type Problem } from '../engine/types';
 import { EventList } from './editor/EventList';
-import { GuardrailList } from './editor/GuardrailList';
+import { GuardrailList, entryNames } from './editor/GuardrailList';
 import { InvestmentList } from './editor/InvestmentList';
 import { LoanList } from './editor/LoanList';
 import { OptionList } from './editor/OptionList';
@@ -536,6 +536,7 @@ export function Workspace({
       >
         <GuardrailList
           guardrails={config.guardrails}
+          names={entryNames(config)}
           onChange={(guardrails) => onChange({ ...config, guardrails })}
         />
       </Section>

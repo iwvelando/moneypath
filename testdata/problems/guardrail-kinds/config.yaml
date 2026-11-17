@@ -1,0 +1,74 @@
+version: 2
+simulation: {startDate: 2025-01, endDate: 2030-12, startingCash: 1000}
+guardrails:
+  - name: No deadline
+    kind: debtFree
+  - name: Empty loans
+    kind: debtFree
+    startDate: 2028-01
+    loans: []
+  - name: Loans from everywhere
+    kind: debtFree
+    startDate: 2028-01
+    loans: [Mortgage, Car, Boat, Plane]
+  - name: Unknown and repeated loans
+    kind: debtFree
+    startDate: 2028-01
+    loans: [Mortgage, Yacht, Mortgage, Brokerage]
+  - name: No accounts
+    kind: lasts
+  - name: Empty accounts
+    kind: lasts
+    investments: []
+  - name: Zero amount
+    kind: lasts
+    investments: [Brokerage]
+    amount: 0
+  - name: Negative amount
+    kind: lasts
+    investments: [Brokerage]
+    amount: -5
+  - name: Accounts from everywhere
+    kind: lasts
+    investments: [Brokerage, HSA, IRA, Old 401k]
+    amount: 0.01
+  - name: Unknown and repeated accounts
+    kind: lasts
+    investments: [Brokerage, Mortgage, IRA, IRA]
+  - name: Loans on a lasts
+    kind: lasts
+    investments: [IRA]
+    loans: [Nowhere]
+  - name: Extras on a debt-free
+    kind: debtFree
+    startDate: 2028-01
+    amount: 100
+    investments: [Nowhere]
+common:
+  loans:
+    - {name: Mortgage, principal: 100000, interestRate: 4, term: 360, startDate: 2021-01}
+  investments:
+    - {name: Brokerage, startingValue: 1000}
+choices:
+  - name: Ride
+    options:
+      - name: Car
+        loans:
+          - {name: Car, principal: 20000, interestRate: 5, term: 60, startDate: 2026-01}
+        investments:
+          - {name: HSA}
+      - name: Walk
+scenarios:
+  - name: plan
+    select: {Ride: Car}
+    loans:
+      - {name: Boat, principal: 10000, interestRate: 6, term: 48, startDate: 2027-01}
+    investments:
+      - {name: IRA}
+  - name: parked
+    active: false
+    select: {Ride: Walk}
+    loans:
+      - {name: Plane, principal: 50000, interestRate: 6, term: 120, startDate: 2027-01}
+    investments:
+      - {name: Old 401k}

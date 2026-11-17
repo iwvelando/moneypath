@@ -1,0 +1,38 @@
+description: >
+  Lasts guardrails read from the combined end-of-month value of the accounts
+  they list, in whole cents and over every month of their window. Without an
+  amount, an account emptied to 0.00 breaks it in that month; with one, an
+  amount met to the cent holds and one cent more breaks. The tightest month is
+  the earliest with the least value, and its margin is the value less the
+  amount, or the value itself with no amount. A path with some of the listed
+  accounts is judged on those, and one with none of them is not judged. An
+  account that starts empty breaks in the first month unless a later start
+  month judges it once funded; a withdrawal that funds a loan payoff counts.
+  A window after the plan does not apply, and an inactive scenario's accounts
+  still count as names in the plan.
+normative: true
+optimize: false
+tolerance: 0.01
+expectedMetrics:
+  - scenario: draws down
+    guardrails:
+      - {name: Brokerage lasts, kind: lasts, result: breaks, firstBreachDate: "2025-04", tightestDate: "2025-04", margin: 0.00}
+      - {name: Both last, kind: lasts, result: holds, tightestDate: "2025-04", margin: 500.00}
+      - {name: Keep 1500, kind: lasts, result: breaks, firstBreachDate: "2025-04", tightestDate: "2025-04", margin: -1000.00}
+      - {name: Keep 1500 in March, kind: lasts, result: holds, tightestDate: "2025-03", margin: 0.00}
+      - {name: Keep a cent more in March, kind: lasts, result: breaks, firstBreachDate: "2025-03", tightestDate: "2025-03", margin: -0.01}
+      - {name: Savings last, kind: lasts, result: breaks, firstBreachDate: "2025-01", tightestDate: "2025-01", margin: 0.00}
+      - {name: Savings last from April, kind: lasts, result: holds, tightestDate: "2025-04", margin: 2000.00}
+      - {name: Old 401k lasts, kind: lasts, result: doesNotApply}
+      - {name: After the plan, kind: lasts, result: doesNotApply}
+  - scenario: pays a loan
+    guardrails:
+      - {name: Brokerage lasts, kind: lasts, result: holds, tightestDate: "2025-02", margin: 3500.00}
+      - {name: Both last, kind: lasts, result: holds, tightestDate: "2025-02", margin: 3500.00}
+      - {name: Keep 1500, kind: lasts, result: holds, tightestDate: "2025-02", margin: 2000.00}
+      - {name: Keep 1500 in March, kind: lasts, result: holds, tightestDate: "2025-03", margin: 2000.00}
+      - {name: Keep a cent more in March, kind: lasts, result: holds, tightestDate: "2025-03", margin: 1999.99}
+      - {name: Savings last, kind: lasts, result: doesNotApply}
+      - {name: Savings last from April, kind: lasts, result: doesNotApply}
+      - {name: Old 401k lasts, kind: lasts, result: doesNotApply}
+      - {name: After the plan, kind: lasts, result: doesNotApply}

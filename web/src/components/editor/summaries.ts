@@ -67,14 +67,36 @@ export function investmentSummary(investment: InvestmentModel): EditorSummary {
 
 /** What the guardrail checks and over which months, as entered. */
 export function guardrailSummary(guardrail: GuardrailModel): EditorSummary {
-  const primary =
-    guardrail.kind !== 'cashFloor'
-      ? `${guardrail.kind.trim() || 'Kind not set'}`
-      : guardrail.amount === null
-        ? 'Cash floor not set'
-        : `Cash never below ${formatMoney(guardrail.amount)}`;
+  const listed = (names: string[] | null) => (names ?? []).join(', ');
+  let primary: string;
+  switch (guardrail.kind) {
+    case 'cashFloor':
+      primary = guardrail.amount === null ? 'Cash floor not set' : `Cash never below ${formatMoney(guardrail.amount)}`;
+      break;
+    case 'debtFree':
+      primary = `Nothing owed on ${guardrail.loans === null ? 'any loan' : listed(guardrail.loans)}`;
+      break;
+    case 'lasts':
+      primary = !guardrail.investments?.length
+        ? 'Investments not picked'
+        : guardrail.amount === null
+          ? `${listed(guardrail.investments)} never emptied`
+          : `${listed(guardrail.investments)} never below ${formatMoney(guardrail.amount)}`;
+      break;
+    default:
+      primary = guardrail.kind.trim() || 'Kind not set';
+  }
   const { startDate: start, endDate: end } = guardrail;
-  const detail = start && end ? `${start} through ${end}` : start ? `From ${start}` : end ? `Through ${end}` : 'Every month of the plan';
+  const detail =
+    guardrail.kind === 'debtFree' && !start
+      ? 'Debt-free month not set'
+      : start && end
+        ? `${start} through ${end}`
+        : start
+          ? `From ${start}`
+          : end
+            ? `Through ${end}`
+            : 'Every month of the plan';
   return {
     attention: !guardrail.name.trim() || monthIsError(guardrail.startDate) || monthIsError(guardrail.endDate),
     primary,

@@ -30,7 +30,7 @@ func path(liquid ...float64) *ScenarioResult {
 // cash there less the floor.
 func TestCashFloorHoldsOverEveryMonth(t *testing.T) {
 	got := EvaluateGuardrail(cashFloor(t, 400, "", ""), month(t, "2025-01"), path(1000, 600, 400, 900, 400))
-	want := GuardrailResult{Name: "Cushion", Kind: "cashFloor", Result: GuardrailHolds, Tightest: month(t, "2025-03"), Margin: 0}
+	want := GuardrailResult{Name: "Cushion", Kind: "cashFloor", Result: GuardrailHolds, HasTightest: true, Tightest: month(t, "2025-03"), Margin: 0}
 	if got != want {
 		t.Errorf("got %+v, want %+v", got, want)
 	}
@@ -85,7 +85,7 @@ func TestCashFloorFirstBreachBeforeTheTightestMonth(t *testing.T) {
 	got := EvaluateGuardrail(cashFloor(t, 700, "", ""), month(t, "2025-01"), path(1000, 600, 400, 900, 400))
 	want := GuardrailResult{
 		Name: "Cushion", Kind: "cashFloor", Result: GuardrailBreaks,
-		FirstBreach: month(t, "2025-02"), Tightest: month(t, "2025-03"), Margin: -300,
+		FirstBreach: month(t, "2025-02"), HasTightest: true, Tightest: month(t, "2025-03"), Margin: -300,
 	}
 	if got != want {
 		t.Errorf("got %+v, want %+v", got, want)
@@ -101,7 +101,7 @@ func TestCashFloorWindowStartsWhereItSays(t *testing.T) {
 		t.Errorf("from the start: got %+v, want a breach in 2025-01", got)
 	}
 	got := EvaluateGuardrail(cashFloor(t, 1050, "2025-02", ""), start, series)
-	want := GuardrailResult{Name: "Cushion", Kind: "cashFloor", Result: GuardrailHolds, Tightest: month(t, "2025-02"), Margin: 50}
+	want := GuardrailResult{Name: "Cushion", Kind: "cashFloor", Result: GuardrailHolds, HasTightest: true, Tightest: month(t, "2025-02"), Margin: 50}
 	if got != want {
 		t.Errorf("from 2025-02: got %+v, want %+v", got, want)
 	}
@@ -130,7 +130,7 @@ func TestCashFloorMayBeNegative(t *testing.T) {
 	got := EvaluateGuardrail(cashFloor(t, -250, "", ""), month(t, "2025-01"), path(100, -200, -500, -800))
 	want := GuardrailResult{
 		Name: "Cushion", Kind: "cashFloor", Result: GuardrailBreaks,
-		FirstBreach: month(t, "2025-03"), Tightest: month(t, "2025-04"), Margin: -550,
+		FirstBreach: month(t, "2025-03"), HasTightest: true, Tightest: month(t, "2025-04"), Margin: -550,
 	}
 	if got != want {
 		t.Errorf("got %+v, want %+v", got, want)

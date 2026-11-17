@@ -22,22 +22,30 @@ async function rows(page: Page, scope = page.locator('.guardrails').first()): Pr
   );
 }
 
-test('an uploaded plan reports its cash floor on every scenario and keeps it', async ({ page }) => {
+test('an uploaded plan reports its guardrails on every scenario and keeps them', async ({ page }) => {
   const found = problems(page);
   await openApp(page);
   await uploadChoices(page);
   await runForecast(page);
 
   await page.getByRole('tab', { name: /^Compare/ }).click();
+  const brokerage = 'Holds Tightest 2026-01, $40,600.00 left';
+  const sold = 'Holds Debt-free from 2027-06, 31 months to spare';
   expect(await rows(page)).toEqual([
-    ['as we are', 'Holds Tightest 2026-01, $5,044.20 to spare'],
-    ['sell', 'Holds Tightest 2026-01, $5,044.20 to spare'],
-    ['sell and freelance', 'Breaks in 2027-02 Tightest 2027-02, $4,441.15 short'],
+    [
+      'as we are',
+      'Holds Tightest 2026-01, $5,044.20 to spare',
+      'Breaks in 2030-01 Owes $194,640.48 then; still owed at the end of the window',
+      brokerage,
+    ],
+    ['sell', 'Holds Tightest 2026-01, $5,044.20 to spare', sold, brokerage],
+    ['sell and freelance', 'Breaks in 2027-02 Tightest 2027-02, $4,441.15 short', sold, brokerage],
   ]);
 
   await page.getByRole('tab', { name: /^sell and freelance/ }).click();
   const card = page.locator('.summary__card', { has: page.getByRole('heading', { name: 'Guardrails' }) });
   await expect(card).toContainText('Cushion');
+  await expect(card).toContainText('Mortgage gone by 2030 Holds Debt-free from 2027-06, 31 months to spare');
   await expect(card.locator('.is-negative')).toHaveText('Breaks in 2027-02');
 
   const written = await downloadConfig(page);
@@ -77,8 +85,68 @@ test('the flip panel shows the flipped pathâ€™s guardrails beside the scenarioâ€
   await flip.getByRole('combobox', { name: 'Instead of Stay' }).selectOption({ label: 'Go freelance' });
   await expect(flip.locator('.guardrails')).toBeVisible();
   expect(await rows(page, flip.locator('.guardrails'))).toEqual([
-    ['as we are', 'Holds Tightest 2026-01, $5,044.20 to spare'],
+    [
+      'as we are',
+      'Holds Tightest 2026-01, $5,044.20 to spare',
+      'Breaks in 2030-01 Owes $194,640.48 then; still owed at the end of the window',
+      'Holds Tightest 2026-01, $40,600.00 left',
+    ],
     // Going freelance without selling: the months before freelance income starts cost the cushion.
-    ['as we are (Job: Go freelance)', 'Breaks in 2027-02 Tightest 2027-02, $3,141.15 short'],
+    [
+      'as we are (Job: Go freelance)',
+      'Breaks in 2027-02 Tightest 2027-02, $3,141.15 short',
+      'Breaks in 2030-01 Owes $194,640.48 then; still owed at the end of the window',
+      'Holds Tightest 2026-01, $40,600.00 left',
+    ],
   ]);
+});
+
+test('a debt-free and an investments-last built in the editor are checked and reported', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await uploadChoices(page);
+  const section = page.locator('#section-guardrails');
+  const card = section.locator('.editor-card').last();
+
+  await section.getByRole('button', { name: 'Add guardrail' }).click();
+  await card.getByRole('textbox', { name: 'Name', exact: true }).fill('Mortgage gone by 2028');
+  await card.getByRole('combobox', { name: 'Kind' }).selectOption({ label: 'Debt-free' });
+  await page.getByRole('button', { name: 'Run Forecast' }).first().click();
+  await expect(card.locator('[data-path="guardrails.3.startDate"]')).toContainText('Required');
+  await card.getByRole('textbox', { name: 'Debt-free from', exact: true }).pressSequentially('202801');
+  await card.getByRole('checkbox', { name: 'Mortgage' }).check();
+
+  await section.getByRole('button', { name: 'Add guardrail' }).click();
+  const lasts = section.locator('.editor-card').last();
+  await lasts.getByRole('textbox', { name: 'Name', exact: true }).fill('Keep a million');
+  await lasts.getByRole('combobox', { name: 'Kind' }).selectOption({ label: 'Investments last' });
+  await lasts.getByRole('textbox', { name: 'Never below', exact: true }).fill('0');
+  await expect(lasts.locator('[data-path="guardrails.4.investments"]')).toContainText('List at least one investment');
+  await expect(lasts.locator('[data-path="guardrails.4.amount"]')).toContainText('The amount must be more than 0.');
+  await lasts.getByRole('checkbox', { name: 'Brokerage' }).check();
+  await lasts.getByRole('textbox', { name: 'Never below', exact: true }).fill('1000000');
+
+  await runForecast(page);
+  await page.getByRole('tab', { name: /^Compare/ }).click();
+  const results = (await rows(page)).map((row) => [row[0], row[4], row[5]]);
+  expect(results).toEqual([
+    [
+      'as we are',
+      'Breaks in 2028-01 Owes $206,085.41 then; still owed at the end of the window',
+      'Breaks in 2026-01 Tightest 2026-01, $959,400.00 short',
+    ],
+    ['sell', 'Holds Debt-free from 2027-06, 7 months to spare', 'Breaks in 2026-01 Tightest 2026-01, $959,400.00 short'],
+    [
+      'sell and freelance',
+      'Holds Debt-free from 2027-06, 7 months to spare',
+      'Breaks in 2026-01 Tightest 2026-01, $959,400.00 short',
+    ],
+  ]);
+
+  const written = await downloadConfig(page);
+  expect((written['guardrails'] as unknown[]).slice(3)).toEqual([
+    { name: 'Mortgage gone by 2028', kind: 'debtFree', loans: ['Mortgage'], startDate: '2028-01' },
+    { name: 'Keep a million', kind: 'lasts', amount: 1000000, investments: ['Brokerage'] },
+  ]);
+  expect(found).toEqual([]);
 });

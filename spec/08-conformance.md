@@ -28,8 +28,9 @@ expectedComparisons: […] # optional: differences and break-even months for nam
 An `expectedMetrics` entry may also pin the scenario's guardrail results (chapter 04
 §10) under `guardrails`: the complete list, in the plan's order, each with its `name`,
 `kind` and `result` exactly, `firstBreachDate` and `tightestDate` exactly (absent where
-the result has none), and `margin` within 0.01. An entry without `guardrails` does not
-check them.
+the result has none), and `margin` within 0.01. A `debtFree` gives `marginMonths`
+exactly where it has a cleared month and `owed` within 0.01 where it breaks, and no
+`margin`. An entry without `guardrails` does not check them.
 
 ```yaml
 expectedMetrics:

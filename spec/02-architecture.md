@@ -115,7 +115,13 @@ Each entry has:
      "guardrails": [
        {"name": "Cushion", "kind": "cashFloor", "result": "breaks",
         "firstBreachDate": "2027-02", "tightestDate": "2027-02", "margin": -4545.36},
-       {"name": "Later cushion", "kind": "cashFloor", "result": "doesNotApply"}
+       {"name": "Later cushion", "kind": "cashFloor", "result": "doesNotApply"},
+       {"name": "Mortgage gone by 2030", "kind": "debtFree", "result": "holds",
+        "tightestDate": "2027-06", "marginMonths": 31},
+       {"name": "Car gone by 2028", "kind": "debtFree", "result": "breaks",
+        "firstBreachDate": "2028-01", "owed": 8412.77},
+       {"name": "Brokerage lasts", "kind": "lasts", "result": "holds",
+        "tightestDate": "2026-01", "margin": 40000.0}
      ],
      "emergencyFund": {"targetMonths": 6, "averageMonthlyExpenses": 0.0,
                        "targetAmount": 0.0, "initialLiquid": 0.0,
@@ -161,8 +167,12 @@ no value for. Numbers are raw float64 values; formatting is the consumer's job.
 present for every scenario when the plan has at least one guardrail; it is absent when
 the plan has none. Each entry has the guardrail's `name` and `kind` and its `result`:
 `holds`, `breaks` or `doesNotApply`. `firstBreachDate` is present only when the result
-is `breaks`; `tightestDate` and `margin` are present unless it is `doesNotApply`. Dates
-are `YYYY-MM` strings and `margin` is in currency, unrounded.
+is `breaks`. For a `cashFloor` or a `lasts`, `tightestDate` and `margin` are present
+unless the result is `doesNotApply`. For a `debtFree`, `tightestDate` is the month the
+debt is cleared and `marginMonths` the whole months to spare (negative when late); both
+are present when the path has a cleared month, and `owed`, the amount owed at the first
+breach, is present when the result is `breaks`. A `debtFree` never has `margin`. Dates
+are `YYYY-MM` strings, and `margin` and `owed` are in currency, unrounded.
 
 `comparisons` (chapter 04 §9) holds one entry for every ordered pair of distinct
 scenarios, `scenario` minus `against`, both given as indexes into `scenarios`. Entries
