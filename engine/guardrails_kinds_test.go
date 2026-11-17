@@ -132,6 +132,33 @@ func TestDebtFreeSumsLoansInWholeCents(t *testing.T) {
 	}
 }
 
+func TestDebtFreeFirstBreachRoundsOwedToCents(t *testing.T) {
+	start := month(t, "2025-01")
+	for _, tc := range []struct {
+		name   string
+		owed   float64
+		result GuardrailOutcome
+	}{
+		{"below half a cent", 0.0049, GuardrailHolds},
+		{"half a cent", 0.005, GuardrailBreaks},
+		{"above half a cent", 0.0051, GuardrailBreaks},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := EvaluateGuardrail(debtFree(t, "2025-01", "", "Car"), start,
+				owing(map[string][]float64{"Car": {tc.owed}}))
+			want := GuardrailResult{Name: "G", Kind: config.GuardrailDebtFree, Result: tc.result}
+			if tc.result == GuardrailHolds {
+				want.HasTightest, want.Tightest = true, start
+			} else {
+				want.FirstBreach, want.Owed = start, tc.owed
+			}
+			if got != want {
+				t.Errorf("got %+v, want %+v", got, want)
+			}
+		})
+	}
+}
+
 // Spec chapter 04 §10: a deadline before the plan is judged from its first
 // month, and a window with no recorded month does not apply.
 func TestDebtFreeWindowIsClipped(t *testing.T) {
