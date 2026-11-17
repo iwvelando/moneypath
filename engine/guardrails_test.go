@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"math"
 	"testing"
 
 	"github.com/iwvelando/moneypath/config"
@@ -44,6 +45,37 @@ func TestCashFloorComparesWholeCents(t *testing.T) {
 	}
 	if got := EvaluateGuardrail(cashFloor(t, 400, "", ""), start, path(1000, 399.996)); got.Result != GuardrailHolds {
 		t.Errorf("float noise: got %+v, want holds", got)
+	}
+}
+
+func TestCashFloorRoundsBothSidesOfTheBoundary(t *testing.T) {
+	start := month(t, "2025-01")
+	for _, tc := range []struct {
+		name    string
+		cash    float64
+		outcome GuardrailOutcome
+	}{
+		{"one cent below", 399.994, GuardrailBreaks},
+		{"same cent", 400.001, GuardrailHolds},
+		{"one cent above", 400.006, GuardrailHolds},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got := EvaluateGuardrail(cashFloor(t, 400.004, "", ""), start, path(tc.cash))
+			if got.Result != tc.outcome {
+				t.Errorf("cash %.3f against floor 400.004: got %s, want %s", tc.cash, got.Result, tc.outcome)
+			}
+		})
+	}
+}
+
+func TestCashFloorTightestMonthKeepsTheEarliestWholeCentTie(t *testing.T) {
+	start := month(t, "2025-01")
+	got := EvaluateGuardrail(cashFloor(t, 400, "", ""), start, path(400.004, 399.996))
+	if got.Result != GuardrailHolds || got.Tightest != start {
+		t.Errorf("got %+v, want holds with the opening month tightest", got)
+	}
+	if math.Abs(got.Margin-0.004) > 1e-10 {
+		t.Errorf("margin = %.12f, want the unrounded opening margin 0.004", got.Margin)
 	}
 }
 
