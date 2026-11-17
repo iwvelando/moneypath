@@ -3,6 +3,7 @@ import type { FlipSubject } from '../config/choices';
 import { EngineError, type FlipComparison, type FlipRequest, type ForecastResults } from '../engine/types';
 import { Chart } from './Chart';
 import { BreakEven } from './Difference';
+import { GuardrailTable } from './Guardrails';
 
 interface FlipProps {
   results: ForecastResults;
@@ -168,6 +169,16 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
               Above zero, {scenarioName} is better off with {option.name} than with {choice.current.name}; below
               zero, worse off.
             </p>
+            <GuardrailTable
+              title="Guardrails on both paths"
+              intro={`Whether ${scenarioName} keeps each guardrail with ${option.name}, beside how it does now.`}
+              pathLabel="Path"
+              nested
+              paths={[
+                { name: scenarioName, guardrails: results.metrics[scenario]?.guardrails },
+                { name: outcome.flip.name, guardrails: outcome.flip.guardrails },
+              ]}
+            />
             <Chart
               dates={results.rows.map((row) => row.date)}
               liquid={outcome.flip.cash.difference}

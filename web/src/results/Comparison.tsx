@@ -4,6 +4,7 @@ import type { ForecastResults } from '../engine/types';
 import { formatMoney, isNegativeMoney } from '../util/format';
 import { ChartAxes, plotOf, useChartWidth, useMonthCursor } from './chartParts';
 import { extentOf, segments, valueScale, type Series } from './chartScale';
+import { GuardrailTable } from './Guardrails';
 import { KeyFigures } from './KeyFigures';
 import { SCENARIO_COLORS, ScenarioSample, styleOf } from './scenarioStyle';
 
@@ -66,6 +67,12 @@ export function Comparison({ results, onOpenScenario }: ComparisonProps) {
       <ComparisonChart dates={dates} lines={lines} seriesLabel={seriesLabel} />
       </div>
       <KeyFigures results={results} onOpenScenario={onOpenScenario} />
+      <GuardrailTable
+        title="Guardrails"
+        intro="Whether each scenario keeps every guardrail of the plan, the month it first breaks, and the month it comes closest."
+        pathLabel="Scenario"
+        paths={results.scenarios.map((name, i) => ({ name, scenario: i, guardrails: results.metrics[i]?.guardrails }))}
+      />
     </div>
   );
 }

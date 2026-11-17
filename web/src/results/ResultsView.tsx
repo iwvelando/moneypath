@@ -8,6 +8,7 @@ import { Chart } from './Chart';
 import { Comparison } from './Comparison';
 import { Difference } from './Difference';
 import { Flip } from './Flip';
+import { GuardrailList } from './Guardrails';
 import { MonthlyTable, type MonthlyRow } from './MonthlyTable';
 import { EmergencyFundGauge } from './Gauge';
 import { OverlaySparkline, Sparkline } from './Sparkline';
@@ -42,6 +43,7 @@ interface SummaryPanelProps {
 function SummaryPanel({ metrics, scenarioName, statusOf, onApply }: SummaryPanelProps) {
   const fund = metrics?.emergencyFund ?? null;
   const optimizations = metrics?.optimizations ?? [];
+  const guardrails = metrics?.guardrails ?? [];
 
   // A target the optimizer could not improve has nothing to apply.
   const pending = optimizations
@@ -92,6 +94,13 @@ function SummaryPanel({ metrics, scenarioName, statusOf, onApply }: SummaryPanel
           <p class="empty">The emergency-fund recommendation is disabled for this run.</p>
         )}
       </div>
+
+      {guardrails.length > 0 ? (
+        <div class="summary__card">
+          <h4>Guardrails</h4>
+          <GuardrailList guardrails={guardrails} />
+        </div>
+      ) : null}
 
       {optimizations.length > 0 ? (
         <div class="summary__card">

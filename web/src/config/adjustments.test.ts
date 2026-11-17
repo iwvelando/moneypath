@@ -39,6 +39,7 @@ function scenario(name: string, events: EventModel[], active = true): ScenarioMo
 function config(scenarios: ScenarioModel[]): ConfigModel {
   return {
     simulation: { startDate: '2025-01', endDate: '2026-12', startingCash: 5000, cashInterestRate: null, emergencyFundMonths: 3 },
+    guardrails: [],
     common: { events: [], loans: [], investments: [] },
     choices: [],
     scenarios,

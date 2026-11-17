@@ -1792,6 +1792,60 @@ select.input {
   display: none;
 }
 
+/* Guardrail results: a row per path, beside the key figures and in the flip panel. */
+.guardrails-table .figures-table__row {
+  cursor: default;
+}
+
+.guardrails-table .figures-table__row:hover {
+  background: transparent;
+}
+
+.guardrails__outcome {
+  font-weight: 700;
+}
+
+.guardrails__month {
+  white-space: nowrap;
+}
+
+.guardrails__detail {
+  display: block;
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+}
+
+.guardrails--nested .results__section-heading {
+  margin-top: 20px;
+}
+
+.guardrails--nested .results__section-heading h4 {
+  font: 400 1.15rem/1.25 var(--serif);
+}
+
+.guardrails__list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.86rem;
+}
+
+.guardrails__name {
+  display: block;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+/* What a loaded plan named that the guardrail's kind does not use. */
+.field__static {
+  margin: 0;
+  font-size: 0.9rem;
+  overflow-wrap: anywhere;
+}
+
 /* A tab a tap or click sent focus to: the pointer already shows where it is. */
 .tablist__tab.is-focus-quiet:focus,
 .tablist__tab.is-focus-quiet:focus-visible {
@@ -2750,7 +2804,8 @@ input[type='checkbox'], input[type='radio'] {
     font-size: 0.95rem;
   }
 
-  .figures-table tbody td.numeric {
+  .figures-table tbody td.numeric,
+  .guardrails-table tbody td {
     display: block;
     min-width: 0;
     text-align: left;

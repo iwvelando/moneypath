@@ -67,6 +67,15 @@ The app covers, at a coarse grain:
   chapter 03, the help says what that chapter says. A field asks a phone for the
   keyboard its value needs: the full one where a number may be negative, and for a
   month the number pad, with the field supplying the dash that pad lacks.
+- **Guardrails** (chapter 03, "Guardrails") — a section of the plan's guardrails, after
+  the simulation settings, each an entry like any other. A new guardrail is a cash
+  floor with nothing else entered; its fields are its name, its kind (only "Cash floor"
+  can be picked), the floor, which may be negative, and the optional start and end
+  months it covers, whose help says to start a cushion still being built from the
+  month it is expected. Collapsed, it says what it checks and over which months. A
+  kind the editor cannot offer, from an uploaded plan, is shown as written with the
+  engine's error, and names a cash floor does not use are shown with their warning
+  and a way to take them away; neither is dropped in silence.
 - **Choices** (chapter 03, "Choices") — each choice is a section holding its options.
   An option is an entry like any other: collapsed, it says what it adds, changes and
   removes and which scenarios pick it, so its reach is known before it is edited. Open,
@@ -117,7 +126,13 @@ The app covers, at a coarse grain:
   figures has one row per scenario, in the plan's order: the lowest cash and the month
   it is reached, cash and total at the end of the plan, and the emergency-fund
   shortfall or surplus. The emergency-fund column is left out when the recommendation
-  is disabled, never shown as zero. A row leads to its scenario's own view: choosing
+  is disabled, never shown as zero. When the plan has guardrails, a second table under
+  the key figures has a row per scenario and a column per guardrail: whether it holds,
+  the month it first breaks, its tightest month and the margin there, as an amount to
+  spare or short. "Does not apply" is said as such, never as holding. A scenario's own
+  view lists its guardrails the same way beside its emergency fund, and the flip panel
+  shows the scenario's results and the flipped path's in one table. Nothing about a
+  guardrail is computed in the app; it formats what the engine reported. A row leads to its scenario's own view: choosing
   the scenario's name, or anywhere on its row, selects that scenario's tab and moves
   focus to it. Under the key figures, the difference between two scenarios: two
   pickers choose one scenario and the scenario to subtract from it, starting with the
@@ -156,7 +171,7 @@ beside its fields. This introduction stays pinned below the navigation bar while
 its section scrolls, then leaves with the section. On smaller screens introductions
 stack above the fields and scroll normally to preserve working space. A pinned
 navigation and run bar stays reachable while the plan scrolls. A “Jump to section”
-dropdown includes Simulation, Baseline, Choices, and Scenarios, with individual choices
+dropdown includes Simulation, Guardrails, Baseline, Choices, and Scenarios, with individual choices
 nested beneath Choices and individual scenarios beneath Scenarios. The destinations have no active-section highlight. An optimizer
 status button shows only On or Off and opens its enable switch and event jump list, or setup guidance when the list
 is empty. Only one panel opens at a time; Escape closes it and returns focus to its trigger.

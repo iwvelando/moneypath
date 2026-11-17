@@ -19,6 +19,7 @@ function scenario(name: string, events: EventModel[]): ScenarioModel {
 function config(commonEvents: EventModel[], scenarios: ScenarioModel[]): ConfigModel {
   return {
     simulation: { startDate: '', endDate: '2030-12', startingCash: 0, cashInterestRate: null, emergencyFundMonths: null },
+    guardrails: [],
     common: { events: commonEvents, loans: [], investments: [] },
     choices: [],
     scenarios,
