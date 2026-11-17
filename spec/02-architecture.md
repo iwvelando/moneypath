@@ -112,6 +112,11 @@ Each entry has:
   "metrics": [
     {"keyFigures": {"lowestCash": 0.0, "lowestCashDate": "2025-06",
                     "endingCash": 0.0, "endingTotal": 0.0},
+     "guardrails": [
+       {"name": "Cushion", "kind": "cashFloor", "result": "breaks",
+        "firstBreachDate": "2027-02", "tightestDate": "2027-02", "margin": -4545.36},
+       {"name": "Later cushion", "kind": "cashFloor", "result": "doesNotApply"}
+     ],
      "emergencyFund": {"targetMonths": 6, "averageMonthlyExpenses": 0.0,
                        "targetAmount": 0.0, "initialLiquid": 0.0,
                        "fundedMonths": 0.0, "shortfall": 0.0, "surplus": 0.0},
@@ -133,7 +138,9 @@ Each entry has:
            "name": "current path (Housing: Sell and rent)",
            "cash":  {"difference": [0.0, …],
                      "breakEven": [{"date": "2026-03", "flipped": true}]},
-           "total": {"difference": [0.0, …], "breakEven": []}},
+           "total": {"difference": [0.0, …], "breakEven": []},
+           "guardrails": [{"name": "Cushion", "kind": "cashFloor", "result": "holds",
+                           "tightestDate": "2026-01", "margin": 5000.0}, …]},
   "warnings": ["…validation warnings…"],
   "configYaml": "…the config as run (reflects optimizer adjustments when enabled)…"
 }
@@ -149,6 +156,13 @@ no value for. Numbers are raw float64 values; formatting is the consumer's job.
 `keyFigures` (chapter 04 §8) is present for every scenario; `lowestCashDate` is a
 `YYYY-MM` string. `emergencyFund` is absent when the recommendation is disabled, and
 `optimizations` when the optimizer produced no summary for the scenario.
+
+`guardrails` (chapter 04 §10) is index-aligned with the plan's `guardrails` list and is
+present for every scenario when the plan has at least one guardrail; it is absent when
+the plan has none. Each entry has the guardrail's `name` and `kind` and its `result`:
+`holds`, `breaks` or `doesNotApply`. `firstBreachDate` is present only when the result
+is `breaks`; `tightestDate` and `margin` are present unless it is `doesNotApply`. Dates
+are `YYYY-MM` strings and `margin` is in currency, unrounded.
 
 `comparisons` (chapter 04 §9) holds one entry for every ordered pair of distinct
 scenarios, `scenario` minus `against`, both given as indexes into `scenarios`. Entries
@@ -171,7 +185,9 @@ results, and `csv` and `configYaml` do not carry it. `scenario` indexes `scenari
 `<scenario> (<choice>: <option>)`. `cash` and `total` are the comparison of chapter 04
 §9 read as flipped path minus scenario: `difference` is index-aligned with `rows`, and
 each `breakEven` entry has `flipped` true when the flipped path moves ahead in that
-month and false when the scenario does. The flip is refused when the scenario is not an
+month and false when the scenario does. `guardrails`, in the shape of `metrics[].guardrails`,
+is the flipped path's own guardrail results, present under the same rule; the
+scenario's are in its `metrics`. The flip is refused when the scenario is not an
 active scenario of the plan, the plan has no such choice, the choice has no such option,
 the scenario already selects that option, or the flipped path fails validation.
 

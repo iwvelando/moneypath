@@ -1,0 +1,50 @@
+version: 2
+simulation: {startDate: 2025-01, endDate: 2030-12, startingCash: 1000}
+guardrails:
+  - kind: cashFloor
+    amount: 100
+  - name: Cushion
+    kind: cashFloor
+    amount: 100
+  - name: Cushion
+  - name: Typo
+    kind: cashfloor
+    amount: 100
+  - name: Mortgage gone
+    kind: debtFree
+    startDate: 2030-01
+  - name: Savings last
+    kind: lasts
+    investments: [Brokerage]
+  - name: No amount
+    kind: cashFloor
+  - name: Bad months
+    kind: cashFloor
+    amount: 100
+    startDate: soon
+    endDate: 2030-13
+  - name: Backwards
+    kind: cashFloor
+    amount: 100
+    startDate: 2028-01
+    endDate: 2027-01
+  - name: Too late
+    kind: cashFloor
+    amount: 100
+    startDate: 2031-01
+  - name: Too early
+    kind: cashFloor
+    amount: 100
+    endDate: 2024-12
+  - name: Just inside
+    kind: cashFloor
+    amount: 100
+    startDate: 2030-12
+  - name: Unused keys
+    kind: cashFloor
+    amount: 100
+    investments: [Brokerage]
+    loans: [Mortgage]
+    severity: high
+scenarios:
+  - name: plan

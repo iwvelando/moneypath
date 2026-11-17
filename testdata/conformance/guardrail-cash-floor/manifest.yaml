@@ -1,0 +1,42 @@
+description: >
+  Cash-floor guardrails read from each path's recorded cash, in whole cents and
+  over every month of their window, the opening row included. A floor met
+  exactly holds and one cent more breaks; the tightest month is the earliest of
+  a tie and can follow the first breach; a window is clipped to the plan, a
+  later start month is judged from that month, a negative floor is an overdraft
+  limit, and a window after the plan does not apply. The inactive scenario
+  reports nothing, and the CSV carries no guardrails.
+normative: true
+optimize: false
+tolerance: 0.01
+expectedMetrics:
+  - scenario: dips
+    guardrails:
+      - {name: Exactly met, kind: cashFloor, result: holds, tightestDate: "2025-03", margin: 0.00}
+      - {name: One cent more, kind: cashFloor, result: breaks, firstBreachDate: "2025-03", tightestDate: "2025-03", margin: -0.01}
+      - {name: Cushion, kind: cashFloor, result: breaks, firstBreachDate: "2025-02", tightestDate: "2025-03", margin: -300.00}
+      - {name: Clipped, kind: cashFloor, result: breaks, firstBreachDate: "2025-05", tightestDate: "2025-05", margin: -100.00}
+      - {name: Starts below, kind: cashFloor, result: breaks, firstBreachDate: "2025-01", tightestDate: "2025-03", margin: -650.00}
+      - {name: "Starts below, judged later", kind: cashFloor, result: breaks, firstBreachDate: "2025-02", tightestDate: "2025-03", margin: -650.00}
+      - {name: Overdraft limit, kind: cashFloor, result: holds, tightestDate: "2025-03", margin: 650.00}
+      - {name: After the plan, kind: cashFloor, result: doesNotApply}
+  - scenario: steady
+    guardrails:
+      - {name: Exactly met, kind: cashFloor, result: holds, tightestDate: "2025-01", margin: 600.00}
+      - {name: One cent more, kind: cashFloor, result: holds, tightestDate: "2025-01", margin: 599.99}
+      - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2025-01", margin: 300.00}
+      - {name: Clipped, kind: cashFloor, result: holds, tightestDate: "2025-04", margin: 800.00}
+      - {name: Starts below, kind: cashFloor, result: breaks, firstBreachDate: "2025-01", tightestDate: "2025-01", margin: -50.00}
+      - {name: "Starts below, judged later", kind: cashFloor, result: holds, tightestDate: "2025-02", margin: 50.00}
+      - {name: Overdraft limit, kind: cashFloor, result: holds, tightestDate: "2025-01", margin: 1250.00}
+      - {name: After the plan, kind: cashFloor, result: doesNotApply}
+  - scenario: overdrawn
+    guardrails:
+      - {name: Exactly met, kind: cashFloor, result: breaks, firstBreachDate: "2025-04", tightestDate: "2025-07", margin: -1200.00}
+      - {name: One cent more, kind: cashFloor, result: breaks, firstBreachDate: "2025-03", tightestDate: "2025-07", margin: -1200.01}
+      - {name: Cushion, kind: cashFloor, result: breaks, firstBreachDate: "2025-03", tightestDate: "2025-07", margin: -1500.00}
+      - {name: Clipped, kind: cashFloor, result: breaks, firstBreachDate: "2025-04", tightestDate: "2025-07", margin: -1300.00}
+      - {name: Starts below, kind: cashFloor, result: breaks, firstBreachDate: "2025-01", tightestDate: "2025-07", margin: -1850.00}
+      - {name: "Starts below, judged later", kind: cashFloor, result: breaks, firstBreachDate: "2025-02", tightestDate: "2025-07", margin: -1850.00}
+      - {name: Overdraft limit, kind: cashFloor, result: breaks, firstBreachDate: "2025-06", tightestDate: "2025-07", margin: -550.00}
+      - {name: After the plan, kind: cashFloor, result: doesNotApply}

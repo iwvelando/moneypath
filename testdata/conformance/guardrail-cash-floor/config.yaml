@@ -1,0 +1,71 @@
+version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2025-07
+  startingCash: 1000.00
+guardrails:
+  - name: Exactly met
+    kind: cashFloor
+    amount: 400.00
+  - name: One cent more
+    kind: cashFloor
+    amount: 400.01
+  - name: Cushion
+    kind: cashFloor
+    amount: 700.00
+  - name: Clipped
+    kind: cashFloor
+    amount: 500.00
+    startDate: 2025-04
+    endDate: 2026-12
+  - name: Starts below
+    kind: cashFloor
+    amount: 1050.00
+  - name: Starts below, judged later
+    kind: cashFloor
+    amount: 1050.00
+    startDate: 2025-02
+  - name: Overdraft limit
+    kind: cashFloor
+    amount: -250.00
+  - name: After the plan
+    kind: cashFloor
+    amount: 0.00
+    startDate: 2026-01
+scenarios:
+  - name: dips
+    events:
+      - name: Repair
+        amount: -400.00
+        startDate: 2025-02
+        endDate: 2025-02
+      - name: Fees
+        amount: -200.00
+        startDate: 2025-03
+        endDate: 2025-03
+      - name: Refund
+        amount: 500.00
+        startDate: 2025-04
+        endDate: 2025-04
+      - name: Repair again
+        amount: -500.00
+        startDate: 2025-05
+        endDate: 2025-05
+      - name: Bonus
+        amount: 700.00
+        startDate: 2025-06
+        endDate: 2025-06
+  - name: steady
+    events:
+      - name: Savings
+        amount: 100.00
+  - name: overdrawn
+    events:
+      - name: Spending
+        amount: -300.00
+        startDate: 2025-02
+  - name: parked
+    active: false
+    events:
+      - name: Spending
+        amount: -5000.00

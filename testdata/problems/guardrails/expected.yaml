@@ -1,0 +1,68 @@
+description: >
+  Every rule for a guardrail, each placed at its field and named by the
+  guardrail it concerns. A guardrail with no name is numbered. A window with
+  no month inside the simulation is a warning at the end of the window that
+  misses it; a window of one month at the simulation's end applies. Kinds that
+  cannot be checked yet are refused, and a key the kind does not use is a
+  warning.
+problems:
+  - level: warning
+    path: guardrails.12.severity
+    where: Guardrail “Unused keys”
+    message: “severity” is not a setting moneypath knows, so it is ignored.
+  - level: error
+    path: guardrails.0.name
+    where: Guardrail 1
+    message: The guardrail needs a name.
+  - level: error
+    path: guardrails.2.name
+    where: Guardrail “Cushion”
+    message: Another guardrail is already named “Cushion”. Give each guardrail its own name.
+  - level: error
+    path: guardrails.2.kind
+    where: Guardrail “Cushion”
+    message: The guardrail needs a kind.
+  - level: error
+    path: guardrails.3.kind
+    where: Guardrail “Typo”
+    message: “cashfloor” is not a kind of guardrail. For now, a guardrail can only be a cash floor.
+  - level: error
+    path: guardrails.4.kind
+    where: Guardrail “Mortgage gone”
+    message: This kind of guardrail cannot be checked yet. For now, a guardrail can only be a cash floor.
+  - level: error
+    path: guardrails.5.kind
+    where: Guardrail “Savings last”
+    message: This kind of guardrail cannot be checked yet. For now, a guardrail can only be a cash floor.
+  - level: error
+    path: guardrails.6.amount
+    where: Guardrail “No amount”
+    message: The floor amount is required.
+  - level: error
+    path: guardrails.7.startDate
+    where: Guardrail “Bad months”
+    message: The start month, “soon”, is not a month. Write the year and the month, like 2030-01.
+  - level: error
+    path: guardrails.7.endDate
+    where: Guardrail “Bad months”
+    message: The end month, “2030-13”, is not a month. Write the year and the month, like 2030-01.
+  - level: error
+    path: guardrails.8.endDate
+    where: Guardrail “Backwards”
+    message: The end month (2027-01) is before the start month (2028-01).
+  - level: warning
+    path: guardrails.9.startDate
+    where: Guardrail “Too late”
+    message: This starts after the simulation ends (2030-12), so the guardrail has no month to check and does not apply.
+  - level: warning
+    path: guardrails.10.endDate
+    where: Guardrail “Too early”
+    message: This ends before the simulation starts (2025-01), so the guardrail has no month to check and does not apply.
+  - level: warning
+    path: guardrails.12.investments
+    where: Guardrail “Unused keys”
+    message: A cash floor does not use investments, so this has no effect.
+  - level: warning
+    path: guardrails.12.loans
+    where: Guardrail “Unused keys”
+    message: A cash floor does not use loans, so this has no effect.
