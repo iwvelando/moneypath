@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"math"
+	"slices"
 	"strings"
 )
 
@@ -22,7 +23,7 @@ func Validate(cfg *Config, now Month) ([]string, error) {
 // each with the field it concerns (spec chapter 02, Problems JSON). The
 // Resolved* fields are complete only when no problem is an error.
 func Check(cfg *Config, now Month) []Problem {
-	c := &checker{}
+	c := &checker{windowed: map[*Guardrail]bool{}}
 
 	switch {
 	case cfg.Version == nil:
@@ -102,11 +103,68 @@ func Check(cfg *Config, now Month) []Problem {
 		}
 	}
 	c.resolveScenarios(cfg)
+	c.optimizerGuardrails(cfg)
 
 	for i := range c.problems {
 		c.problems[i].Where = locate(cfg.doc, c.problems[i].Path)
 	}
 	return c.problems
+}
+
+// optimizerGuardrails resolves the guardrail each optimizer target names and
+// checks that it applies to the target's scenario (spec chapter 03,
+// Optimizer block). It runs once guardrail windows and scenarios are
+// resolved; a scenario whose selection could not be resolved is not judged
+// on its investments.
+func (c *checker) optimizerGuardrails(cfg *Config) {
+	byName := map[string]*Guardrail{}
+	for _, g := range cfg.Guardrails {
+		if g != nil && g.Name != "" && byName[g.Name] == nil {
+			byName[g.Name] = g
+		}
+	}
+	for si, sc := range cfg.Scenarios {
+		if sc == nil {
+			continue
+		}
+		selectPath := join("scenarios", si, "select")
+		resolved := true
+		for _, p := range c.problems {
+			if p.Level == LevelError && (p.Path == selectPath || strings.HasPrefix(p.Path, selectPath+".")) {
+				resolved = false
+			}
+		}
+		for ei, ev := range sc.Events {
+			if ev == nil || ev.Optimize == nil || ev.Optimize.Guardrail == "" {
+				continue
+			}
+			at := join("scenarios", si, "events", ei, "optimize", "guardrail")
+			g := byName[ev.Optimize.Guardrail]
+			switch {
+			case g == nil:
+				c.fail(at, "No guardrail in the plan is named “%s”.", ev.Optimize.Guardrail)
+				continue
+			case c.windowed[g] && (g.ResolvedStart > c.end || g.ResolvedEnd < c.start):
+				c.fail(at, "Guardrail “%s” checks no month inside the plan, so it cannot hold this value.", g.Name)
+			case g.Kind == GuardrailLasts && resolved && !hasInvestment(sc, g.Investments):
+				c.fail(at, "Guardrail “%s” checks investments this scenario does not have, so it cannot hold this value.", g.Name)
+			}
+			ev.Optimize.ResolvedGuardrail = g
+		}
+	}
+}
+
+// hasInvestment reports whether a resolved scenario has an investment by any
+// of the names.
+func hasInvestment(sc *Scenario, names []string) bool {
+	for _, list := range [][]*Investment{sc.Resolved.Investments, sc.ResolvedShared.Investments} {
+		for _, inv := range list {
+			if inv != nil && slices.Contains(names, inv.Name) {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // checker gathers the problems of one plan.
@@ -116,6 +174,9 @@ type checker struct {
 	// against them only when they are.
 	start, end Month
 	window     bool
+	// windowed holds the guardrails whose window is known and in order,
+	// so that it can be held against the simulation's months.
+	windowed map[*Guardrail]bool
 }
 
 func (c *checker) fail(path, format string, args ...any) {
@@ -263,6 +324,11 @@ func (c *checker) guardrails(guardrails []*Guardrail, plan planNames) {
 		case g.StartDate != "" && g.EndDate != "" && end < start:
 			c.fail(at("endDate"), "The end month (%s) is before the start month (%s).", end, start)
 		case !c.window:
+		default:
+			c.windowed[g] = true
+		}
+		switch {
+		case !c.windowed[g]:
 		case start > c.end:
 			c.warn(at("startDate"), "This starts after the simulation ends (%s), so the guardrail has no month to check and does not apply.", c.end)
 		case end < c.start:

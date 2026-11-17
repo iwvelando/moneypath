@@ -61,6 +61,21 @@ export function outcomeOf(result: GuardrailResult, definition?: GuardrailModel):
   return { text, tone, detail };
 }
 
+function lowerFirst(text: string): string {
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+/**
+ * A debt-free result as one clause, for a line that names the guardrail
+ * already: "debt-free from 2026-06, right on time", or "breaks in 2025-08,
+ * owes … then; …" when it does not hold.
+ */
+export function debtFreeClause(result: GuardrailResult): string {
+  const { text, detail } = outcomeOf(result);
+  if (result.result === 'holds' && detail) return lowerFirst(detail);
+  return detail ? `${lowerFirst(text)}, ${lowerFirst(detail)}` : lowerFirst(text);
+}
+
 /** A month is never split at its dash when the text wraps. */
 function monthsKept(text: string) {
   return text.split(/(\d{4}-\d{2})/).map((part, i) =>

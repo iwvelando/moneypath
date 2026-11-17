@@ -95,6 +95,7 @@ function seedPlanWithOptimizer(): void {
         maxDate: '',
         tolerance: null,
         maxIterations: null,
+        guardrail: '',
       },
     },
   ];
@@ -807,12 +808,17 @@ describe('the app', () => {
       {
         ...emptyEvent(),
         amount: -100,
-        optimize: { field: 'amount', min: 5, max: 1, minDate: '', maxDate: '', tolerance: 0, maxIterations: 0 },
+        optimize: { field: 'amount', min: 5, max: 1, minDate: '', maxDate: '', tolerance: 0, maxIterations: 0, guardrail: '' },
       },
       {
         ...emptyEvent(),
         amount: -100,
-        optimize: { field: 'endDate', min: null, max: null, minDate: '', maxDate: 'x', tolerance: null, maxIterations: null },
+        optimize: { field: 'endDate', min: null, max: null, minDate: '', maxDate: 'x', tolerance: null, maxIterations: null, guardrail: '' },
+      },
+      {
+        ...emptyEvent(),
+        amount: -100,
+        optimize: { field: 'amount', min: -100, max: 0, minDate: '', maxDate: '', tolerance: null, maxIterations: null, guardrail: 'Nowhere' },
       },
     ];
     seedPlan(config);

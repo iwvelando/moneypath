@@ -46,6 +46,14 @@ export function entryNames(config: ConfigModel): EntryNames {
 }
 
 /**
+ * The plan's guardrail names, each once and in the plan's order: the
+ * guardrails an optimizer target can be held to.
+ */
+export function guardrailNames(config: ConfigModel): string[] {
+  return [...new Set(config.guardrails.map((guardrail) => guardrail.name.trim()).filter((name) => name !== ''))];
+}
+
+/**
  * Something a loaded plan gave a guardrail whose kind does not use it. It
  * stays on screen with the engine's warning until the reader takes it away.
  */

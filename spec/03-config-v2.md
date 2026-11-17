@@ -417,6 +417,7 @@ optimize:
   maxDate: 2026-08      # startDate/endDate: required upper bound (inclusive)
   tolerance: 0.5        # optional; default 0.01 for amount, 1 (month/count) otherwise
   maxIterations: 60     # optional; default 50
+  guardrail: Cushion    # optional; the guardrail the value is held to (default: the emergency fund)
 ```
 
 Validation: field must be one of the four (accept `startDate`/`start_date`/`start-date`
@@ -426,6 +427,26 @@ minDate ≤ maxDate. An `optimize` block on a `common` event or on an option's e
 error: the optimizer chooses a value against one scenario's floor and writes it into the
 plan, and those entries are shared by more than one scenario. A target goes in a
 scenario's own events. Optimizer semantics are in chapter 04 §Optimizer.
+
+`guardrail` names one of the plan's guardrails (Guardrails, above) by its `name`. The
+target is then held to that guardrail instead of the emergency-fund floor. Absent or
+empty, it is held to the emergency fund. Errors, each placed at the target's
+`optimize.guardrail`:
+
+- A name no guardrail of the plan has.
+- A guardrail whose window has no month inside the plan.
+- A `lasts` guardrail that names no investment the target's scenario has, among the
+  scenario's resolved lists (Choices) — those of its own entries, the options it
+  selects and `common`.
+
+In the last two cases the guardrail would not apply to the target's scenario (chapter 04
+§10), so it has nothing to hold the value to. The rules apply to every scenario, active or
+not, as every other rule does. A plan whose start defaults to the current month can come
+to break the second rule as time passes, as a guardrail can drift out of the plan.
+
+Canonical form: an optimizer block's keys are written `field`, `min`, `max`, `minDate`,
+`maxDate`, `tolerance`, `maxIterations`, `guardrail`, and an empty `guardrail` is left
+out.
 
 ## Files that are not version 2
 

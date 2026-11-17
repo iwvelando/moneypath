@@ -76,6 +76,65 @@ describe('the optimizer adjustments card', () => {
     expect(buttonLabels()).toContain('Apply all 2 to plan');
   });
 
+  function meta(): string {
+    return host.querySelector('.adjustments__meta')?.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+  }
+
+  it('reports the floor, lowest cash and headroom of the cash floor a target is held to', () => {
+    show(
+      [
+        summary({
+          floor: 5000,
+          minimumCash: 5000.12,
+          headroom: 0.12,
+          guardrail: { name: 'Cushion', kind: 'cashFloor', result: 'holds', tightestDate: '2026-12', margin: 0.12 },
+        }),
+      ],
+      'pending',
+    );
+    expect(meta()).toBe('held to Cushion · floor $5,000.00 · lowest cash $5,000.12 · headroom $0.12 · 16 iterations · converged');
+  });
+
+  it('reports a lasts guardrail by its lowest balance', () => {
+    show(
+      [
+        summary({
+          floor: 30000,
+          minimumCash: 45225,
+          headroom: 15225,
+          guardrail: { name: 'Brokerage lasts', kind: 'lasts', result: 'holds', tightestDate: '2025-06', margin: 15225 },
+        }),
+      ],
+      'pending',
+    );
+    expect(meta()).toBe(
+      'held to Brokerage lasts · floor $30,000.00 · lowest balance $45,225.00 · headroom $15,225.00 · 16 iterations · converged',
+    );
+  });
+
+  it('reports a debt-free guardrail by when the debt is cleared, with no dollar floor', () => {
+    const held = { name: 'Paid off', kind: 'debtFree', result: 'holds', tightestDate: '2026-06', marginMonths: 0 } as const;
+    show([summary({ floor: undefined, minimumCash: undefined, headroom: undefined, guardrail: held })], 'pending');
+    expect(meta()).toBe('held to Paid off · debt-free from 2026-06, right on time · 16 iterations · converged');
+
+    const late = {
+      name: 'Paid off',
+      kind: 'debtFree',
+      result: 'breaks',
+      firstBreachDate: '2025-08',
+      owed: 51234.5,
+      tightestDate: '2025-12',
+      marginMonths: -4,
+    } as const;
+    show(
+      [summary({ floor: undefined, minimumCash: undefined, headroom: undefined, guardrail: late, converged: false })],
+      'missing',
+    );
+    expect(meta()).toBe(
+      'held to Paid off · breaks in 2025-08, owes $51,234.50 then; debt-free from 2025-12, 4 months late · 16 iterations · not converged',
+    );
+  });
+
   it('claims no application when the optimizer kept the configured value', () => {
     show([summary({ original: -184.72, originalDisplay: '-$184.72', iterations: 0 })], 'unchanged');
     expect(host.textContent).not.toContain('Applied to your plan');

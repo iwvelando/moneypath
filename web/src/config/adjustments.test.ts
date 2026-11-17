@@ -27,6 +27,7 @@ function optimizedEvent(id: string, field: OptimizeField, extra: Partial<EventMo
       maxDate: '',
       tolerance: null,
       maxIterations: null,
+      guardrail: '',
     },
     ...extra,
   });

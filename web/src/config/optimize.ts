@@ -39,6 +39,7 @@ export function defaultOptimize(
     maxDate: '',
     tolerance: defaultTolerance(field),
     maxIterations: 50,
+    guardrail: '',
   };
 
   if (field === 'amount') {
@@ -65,8 +66,8 @@ export function defaultOptimize(
 }
 
 /**
- * Switching the picked field keeps the shared knobs and re-seeds the bounds
- * that belong to the new field.
+ * Switching the picked field keeps the shared knobs, including the guardrail
+ * the value is held to, and re-seeds the bounds that belong to the new field.
  */
 export function retargetOptimize(
   current: OptimizeModel,
@@ -79,5 +80,6 @@ export function retargetOptimize(
     ...seeded,
     tolerance: current.tolerance === defaultTolerance(current.field) ? seeded.tolerance : current.tolerance,
     maxIterations: current.maxIterations ?? seeded.maxIterations,
+    guardrail: current.guardrail,
   };
 }

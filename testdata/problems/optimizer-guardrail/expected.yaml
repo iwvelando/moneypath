@@ -1,0 +1,28 @@
+description: >
+  An optimizer target held to a guardrail. The name must be one of the plan's
+  guardrails. The guardrail must apply to the target's scenario: its window
+  needs a month inside the plan, and a lasts needs one of its investments among
+  the scenario's resolved entries, whether the scenario's own or an option's.
+  Each problem is placed at the target's guardrail field, inactive scenarios
+  included. An empty name means the emergency fund and is not a problem.
+problems:
+  - level: warning
+    path: guardrails.1.startDate
+    where: Guardrail “Too late”
+    message: This starts after the simulation ends (2026-12), so the guardrail has no month to check and does not apply.
+  - level: error
+    path: scenarios.0.events.0.optimize.guardrail
+    where: Scenario “no brokerage”, event “Unknown guardrail”
+    message: No guardrail in the plan is named “Nope”.
+  - level: error
+    path: scenarios.0.events.1.optimize.guardrail
+    where: Scenario “no brokerage”, event “Empty window”
+    message: Guardrail “Too late” checks no month inside the plan, so it cannot hold this value.
+  - level: error
+    path: scenarios.0.events.2.optimize.guardrail
+    where: Scenario “no brokerage”, event “No account”
+    message: Guardrail “Brokerage lasts” checks investments this scenario does not have, so it cannot hold this value.
+  - level: error
+    path: scenarios.2.events.1.optimize.guardrail
+    where: Scenario “own brokerage, inactive”, event “Inactive but checked”
+    message: No guardrail in the plan is named “Nope”.

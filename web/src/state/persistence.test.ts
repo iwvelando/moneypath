@@ -163,6 +163,8 @@ describe('editor state persistence', () => {
       max: 900,
       tolerance: null,
       minDate: '',
+      // A draft without the key is held to the emergency fund.
+      guardrail: '',
     });
     expect(outcome.config.simulation.startingCash).toBeNull();
   });

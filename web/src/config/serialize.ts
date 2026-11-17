@@ -60,6 +60,7 @@ function serializeOptimize(optimize: OptimizeModel): JsonObject {
   }
   put(out, 'tolerance', optimize.tolerance);
   put(out, 'maxIterations', optimize.maxIterations);
+  put(out, 'guardrail', optimize.guardrail.trim());
   return out;
 }
 
@@ -312,6 +313,7 @@ function parseOptimize(value: unknown): OptimizeModel | null {
     maxDate: readString(value['maxDate']),
     tolerance: readNumber(value['tolerance']),
     maxIterations: readNumber(value['maxIterations']),
+    guardrail: readString(value['guardrail']),
   };
 }
 

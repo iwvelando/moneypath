@@ -159,10 +159,15 @@ type Optimize struct {
 	MaxDate       string   `yaml:"maxDate,omitempty"`
 	Tolerance     *float64 `yaml:"tolerance,omitempty"`
 	MaxIterations *int     `yaml:"maxIterations,omitempty"`
+	// Guardrail names the guardrail the value is held to; empty holds it to
+	// the emergency fund (spec chapter 03, Optimizer block).
+	Guardrail string `yaml:"guardrail,omitempty"`
 
-	ResolvedField   string  `yaml:"-"` // canonical: amount|frequency|startDate|endDate
-	ResolvedMinDate Month   `yaml:"-"`
-	ResolvedMaxDate Month   `yaml:"-"`
-	ResolvedTol     float64 `yaml:"-"`
-	ResolvedMaxIter int     `yaml:"-"`
+	ResolvedField string `yaml:"-"` // canonical: amount|frequency|startDate|endDate
+	// ResolvedGuardrail is the guardrail Guardrail names, nil for none.
+	ResolvedGuardrail *Guardrail `yaml:"-"`
+	ResolvedMinDate   Month      `yaml:"-"`
+	ResolvedMaxDate   Month      `yaml:"-"`
+	ResolvedTol       float64    `yaml:"-"`
+	ResolvedMaxIter   int        `yaml:"-"`
 }

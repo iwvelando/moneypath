@@ -177,3 +177,44 @@ test('a debt-free and an investments-last built in the editor are checked and re
   ]);
   expect(found).toEqual([]);
 });
+
+test('an optimizer held to a guardrail reports against it, and a renamed guardrail is flagged where it is chosen', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'held.yaml',
+    mimeType: 'application/yaml',
+    buffer: Buffer.from(readFileSync('../testdata/conformance/optimizer-guardrail-cash-floor/config.yaml')),
+  });
+  await page.getByRole('button', { name: /^Optimizer:/ }).click();
+  await page.getByRole('checkbox', { name: 'Run the optimizer', exact: true }).check();
+  await page.getByRole('button', { name: /^Optimizer:/ }).click();
+  await runForecast(page);
+
+  await page.getByRole('tab', { name: /^held to the cushion/ }).click();
+  await expect(page.locator('.adjustments__meta').first()).toContainText(
+    'held to Cushion · floor $5,000.00 · lowest cash $5,000.12 · headroom $0.12',
+  );
+  await page.getByRole('tab', { name: /^held to the emergency fund/ }).click();
+  await expect(page.locator('.adjustments__meta').first()).toContainText('floor $5,738.46 · min cash $5,738.48');
+
+  await page.getByRole('tab', { name: 'Planning Workspace' }).click();
+  const guardrail = page.locator('#section-guardrails .editor-card').first();
+  await guardrail.locator('.editor-card__toggle').click();
+  await guardrail.getByRole('textbox', { name: 'Name', exact: true }).fill('Cushion of 5000');
+
+  const target = page.locator('.editor-card', { has: page.locator('.editor-card__title', { hasText: 'New expense' }) }).first();
+  await target.locator('.editor-card__toggle').click();
+  const heldTo = target.getByRole('combobox', { name: 'Held to' });
+  await expect(heldTo).toHaveValue('Cushion');
+  const field = target.locator('[data-path$="optimize.guardrail"]');
+  await expect(field).toContainText('No guardrail in the plan is named “Cushion”.');
+  await heldTo.selectOption({ label: 'Cushion of 5000' });
+  await expect(field).not.toContainText('No guardrail');
+
+  const written = await downloadConfig(page);
+  const scenarios = written['scenarios'] as { events: { optimize?: Record<string, unknown> }[] }[];
+  expect(Object.entries(scenarios[0]!.events[2]!.optimize!).at(-1)).toEqual(['guardrail', 'Cushion of 5000']);
+  expect(scenarios[1]!.events[2]!.optimize).not.toHaveProperty('guardrail');
+  expect(found).toEqual([]);
+});

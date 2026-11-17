@@ -28,12 +28,24 @@ interface OptimizeFormProps {
   event: EventModel;
   optimize: OptimizeModel;
   simulation: SimulationModel;
+  /** The plan's guardrail names, which a target can be held to. */
+  guardrailNames: readonly string[];
   onChange: (optimize: OptimizeModel) => void;
   onRemove: () => void;
 }
 
+/**
+ * The choices of what a value is held to: the emergency fund, then each
+ * guardrail. A name the plan no longer has stays listed while it is chosen,
+ * so it stays on screen with the engine's error under it.
+ */
+function heldToOptions(guardrailNames: readonly string[], current: string) {
+  const names = current !== '' && !guardrailNames.includes(current) ? [...guardrailNames, current] : guardrailNames;
+  return [{ value: '', label: 'Emergency fund' }, ...names.map((name) => ({ value: name, label: name }))];
+}
+
 /** The on-demand `optimize` sub-form (spec/03 §Optimizer block). */
-function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: OptimizeFormProps) {
+function OptimizeForm({ event, optimize, simulation, guardrailNames, onChange, onRemove }: OptimizeFormProps) {
   const patch = (changes: Partial<OptimizeModel>) => onChange({ ...optimize, ...changes });
   const dateBounds = optimize.field === 'startDate' || optimize.field === 'endDate';
 
@@ -53,6 +65,14 @@ function OptimizeForm({ event, optimize, simulation, onChange, onRemove }: Optim
           value={optimize.field}
           options={OPTIMIZE_FIELDS.map((field) => ({ value: field, label: OPTIMIZE_FIELD_LABEL[field] }))}
           onChange={(field) => onChange(retargetOptimize(optimize, field, event, simulation))}
+        />
+        <SelectField<string>
+          label="Held to"
+          field="guardrail"
+          help={HELP.optimizeGuardrail}
+          value={optimize.guardrail}
+          options={heldToOptions(guardrailNames, optimize.guardrail)}
+          onChange={(guardrail) => patch({ guardrail })}
         />
         {dateBounds ? (
           <>
@@ -232,6 +252,7 @@ interface EventRowProps extends EditorCardState {
   kind: EventKind;
   simulation: SimulationModel;
   allowOptimize: boolean;
+  guardrailNames: readonly string[];
   withdrawalStyle: WithdrawalStyle;
   moveAction?: EventMoveAction;
   onChange: (event: EventModel) => void;
@@ -245,6 +266,7 @@ function EventRow({
   kind,
   simulation,
   allowOptimize,
+  guardrailNames,
   withdrawalStyle,
   moveAction,
   onChange,
@@ -320,6 +342,7 @@ function EventRow({
             event={event}
             optimize={event.optimize}
             simulation={simulation}
+            guardrailNames={guardrailNames}
             onChange={(optimize) => patch({ optimize })}
             onRemove={() => patch({ optimize: null })}
           />
@@ -339,10 +362,14 @@ interface EventListProps {
   simulation: SimulationModel;
   /** Optimize blocks are legal on scenario events only (spec/03). */
   allowOptimize?: boolean;
+  /** The plan's guardrail names, for an optimizer to be held to. */
+  guardrailNames?: readonly string[];
   withdrawalStyle?: WithdrawalStyle;
   moveAction?: EventMoveAction;
   onChange: (events: EventModel[]) => void;
 }
+
+const NO_GUARDRAILS: readonly string[] = [];
 
 export function EventList({
   title,
@@ -351,6 +378,7 @@ export function EventList({
   events,
   simulation,
   allowOptimize = false,
+  guardrailNames = NO_GUARDRAILS,
   withdrawalStyle = 'amount',
   moveAction,
   onChange,
@@ -398,6 +426,7 @@ export function EventList({
                   kind={kind}
                   simulation={simulation}
                   allowOptimize={allowOptimize}
+                  guardrailNames={guardrailNames}
                   withdrawalStyle={withdrawalStyle}
                   moveAction={moveAction}
                   onChange={(next) => replace(index, next)}

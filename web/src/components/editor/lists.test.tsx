@@ -9,6 +9,7 @@ import {
   type EventModel,
   type InvestmentModel,
   type LoanModel,
+  type OptimizeModel,
   type SimulationModel,
 } from '../../config/types';
 import { EventList } from './EventList';
@@ -212,5 +213,70 @@ describe('the keyboard a loan asks a phone for', () => {
     };
     expect(keyboard('Net selling costs')).toBe('text');
     expect(keyboard('Sale price')).toBe('decimal');
+  });
+});
+
+describe('the guardrail an optimizer target is held to', () => {
+  const optimize: OptimizeModel = {
+    field: 'amount',
+    min: -500,
+    max: 0,
+    minDate: '',
+    maxDate: '',
+    tolerance: 0.01,
+    maxIterations: 50,
+    guardrail: '',
+  };
+
+  async function heldTo(event: EventModel, onChange = vi.fn<(events: EventModel[]) => void>()) {
+    await act(async () => render(
+      <EventList
+        title="Events"
+        kind="cashflow"
+        events={[event]}
+        simulation={simulation}
+        allowOptimize
+        guardrailNames={['Cushion', 'Paid off']}
+        onChange={onChange}
+      />,
+      container,
+    ));
+    await toggleCard(event.name);
+    const label = [...card(event.name).querySelectorAll('label')].find((l) => l.textContent?.trim() === 'Held to')!;
+    return card(event.name).querySelector<HTMLSelectElement>(`#${label.htmlFor}`)!;
+  }
+
+  it('offers the emergency fund first and then each guardrail by name', async () => {
+    const onChange = vi.fn<(events: EventModel[]) => void>();
+    const select = await heldTo({ ...emptyEvent(), name: 'Expense', amount: -100, optimize }, onChange);
+    expect([...select.options].map((o) => [o.value, o.textContent])).toEqual([
+      ['', 'Emergency fund'],
+      ['Cushion', 'Cushion'],
+      ['Paid off', 'Paid off'],
+    ]);
+    expect(select.value).toBe('');
+    await act(async () => {
+      select.value = 'Paid off';
+      select.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(onChange.mock.calls.at(-1)![0][0]!.optimize?.guardrail).toBe('Paid off');
+  });
+
+  it('keeps a name the plan no longer has on screen, selected', async () => {
+    const select = await heldTo({ ...emptyEvent(), name: 'Expense', amount: -100, optimize: { ...optimize, guardrail: 'Gone' } });
+    expect(select.value).toBe('Gone');
+    expect([...select.options].map((o) => o.value)).toEqual(['', 'Cushion', 'Paid off', 'Gone']);
+  });
+
+  it('keeps the guardrail when the field to adjust changes', async () => {
+    const onChange = vi.fn<(events: EventModel[]) => void>();
+    await heldTo({ ...emptyEvent(), name: 'Expense', amount: -100, optimize: { ...optimize, guardrail: 'Cushion' } }, onChange);
+    const label = [...card('Expense').querySelectorAll('label')].find((l) => l.textContent?.trim() === 'Field to adjust')!;
+    const field = card('Expense').querySelector<HTMLSelectElement>(`#${label.htmlFor}`)!;
+    await act(async () => {
+      field.value = 'endDate';
+      field.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(onChange.mock.calls.at(-1)![0][0]!.optimize).toMatchObject({ field: 'endDate', guardrail: 'Cushion' });
   });
 });
