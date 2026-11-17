@@ -222,16 +222,20 @@ type optJSON struct {
 	Field      string `json:"field"`
 	// The raw numbers searched over: currency for amount, a count for
 	// frequency, a month index for the date fields (spec chapter 02).
-	Original        float64  `json:"original"`
-	Value           float64  `json:"value"`
-	OriginalDisplay string   `json:"originalDisplay"`
-	ValueDisplay    string   `json:"valueDisplay"`
-	Floor           float64  `json:"floor"`
-	MinimumCash     float64  `json:"minimumCash"`
-	Headroom        float64  `json:"headroom"`
-	Iterations      int      `json:"iterations"`
-	Converged       bool     `json:"converged"`
-	Notes           []string `json:"notes"`
+	Original        float64 `json:"original"`
+	Value           float64 `json:"value"`
+	OriginalDisplay string  `json:"originalDisplay"`
+	ValueDisplay    string  `json:"valueDisplay"`
+	// Floor, MinimumCash and Headroom are absent for a target held to a
+	// debtFree guardrail, which has no dollar floor; Guardrail is present for
+	// a target held to any guardrail (spec chapter 02, Results JSON).
+	Floor       *float64       `json:"floor,omitempty"`
+	MinimumCash *float64       `json:"minimumCash,omitempty"`
+	Headroom    *float64       `json:"headroom,omitempty"`
+	Guardrail   *guardrailJSON `json:"guardrail,omitempty"`
+	Iterations  int            `json:"iterations"`
+	Converged   bool           `json:"converged"`
+	Notes       []string       `json:"notes"`
 }
 
 // ResultsJSON renders the normative WASM results shape (spec chapter 02).
@@ -292,20 +296,25 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 			if notes == nil {
 				notes = []string{}
 			}
-			m.Optimizations = append(m.Optimizations, optJSON{
+			oj := optJSON{
 				TargetName:      o.TargetName,
 				Field:           o.Field,
 				Original:        o.Original,
 				Value:           o.Value,
 				OriginalDisplay: o.OriginalDisplay,
 				ValueDisplay:    o.ValueDisplay,
-				Floor:           o.Floor,
-				MinimumCash:     o.MinimumCash,
-				Headroom:        o.Headroom,
 				Iterations:      o.Iterations,
 				Converged:       o.Converged,
 				Notes:           notes,
-			})
+			}
+			if o.Guardrail != nil {
+				oj.Guardrail = &guardrailsJSON([]engine.GuardrailResult{*o.Guardrail})[0]
+			}
+			if o.Guardrail == nil || o.Guardrail.Kind != config.GuardrailDebtFree {
+				floor, minimum, headroom := o.Floor, o.MinimumCash, o.Headroom
+				oj.Floor, oj.MinimumCash, oj.Headroom = &floor, &minimum, &headroom
+			}
+			m.Optimizations = append(m.Optimizations, oj)
 		}
 		out.Metrics = append(out.Metrics, m)
 	}

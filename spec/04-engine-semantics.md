@@ -337,7 +337,8 @@ Date-based early payoffs emit no note (the configured date is the user's own doi
 ## 7. Optimizer
 
 Activated by the `--optimize` flag / `optimize: true` option. Adjusts each event carrying
-an `optimize` block while keeping cash at or above the
+an `optimize` block while holding its scenario to the target's **floor**: the guardrail
+the block names (chapter 03, Optimizer block), or, when it names none, the
 emergency-fund floor. When the optimized field is `amount` and the configured original
 amount is negative, choose the **smallest feasible signed amount within the bounds**:
 the largest affordable expense, even if the original expense is already feasible.
@@ -346,34 +347,59 @@ configured original**. The original amount's sign determines the objective befor
 snapping or clamping, including when the bounds cross zero.
 
 Setup:
-- The **floor** a candidate is held to is the `emergencyFund.targetAmount` (§5) of the
-  forecast that candidate produces — the plan's own target with the candidate value in
-  place. A value that changes the plan's expenses moves its target with it, so a chosen
-  value never leaves the plan short of the emergency fund it then reports; a floor
-  frozen from the original plan would let a larger expense pass against a target the
-  expense itself has outgrown.
-- Run the baseline forecast (original config). If the recommendation is disabled, or a
-  scenario containing targets has a baseline `emergencyFund.targetAmount` ≤ 0,
-  optimization fails with an error.
+- A target that names a **guardrail** is held to that guardrail (§10) over its own window.
+  Validation guarantees the guardrail applies to the target's scenario (chapter 03).
+- A target that names none is held to the **emergency-fund floor**: the
+  `emergencyFund.targetAmount` (§5) of the forecast that candidate produces — the plan's
+  own target with the candidate value in place. A value that changes the plan's
+  expenses moves its target with it, so a chosen value never leaves the plan short of
+  the emergency fund it then reports; a floor frozen from the original plan would let a
+  larger expense pass against a target the expense itself has outgrown.
+- Run the baseline forecast (original config). If any active target names no guardrail
+  and the recommendation is disabled, or a scenario containing such a target has a
+  baseline `emergencyFund.targetAmount` ≤ 0, optimization fails with an error. A target
+  held to a guardrail needs neither, so a plan whose every target names one is optimized
+  with the recommendation disabled.
 - Field value spaces: `amount` — whole cents; `frequency` — integers ≥ 1; `startDate` /
   `endDate` — month index (`year·12 + month − 1`). Every candidate is snapped to its
   field's space and then clamped to `[min, max]`. `frequency` and the date fields snap by
   rounding to the nearest integer; `amount` snaps **upward** to the next cent,
   `ceilCents(x) = math.Ceil(x*100)/100` with a value already within `1e-9` of a cent
   taken as that cent (so the snap is idempotent). Amount snaps up rather than to nearest
-  because cash rises with an event's amount and the floor never does: rounding up can
-  only add headroom, so a chosen amount always satisfies the floor reported alongside
-  it. A bound that is not
+  because, in a plan without threshold payoffs funded from investments, cash rises with
+  an event's amount, so rounding up moves a candidate toward more cash. A bound that is not
   itself a whole cent is used as written, and a `tolerance` below one cent buys no extra
   precision.
 
-Feasibility of a candidate value `v`: write `v` into the event's field, run the full
-forecast, take the target scenario's floor from it, and find the first month where
-`liquid ≥ floor`. Feasible iff that month exists and `liquid ≥ floor` for **every** month
-from it through the end (i.e. once the floor is first reached, cash never dips below
-it). These comparisons are made in whole cents (`round2` on both sides, per the
-preamble). `minCash` = the minimum liquid over that suffix; `headroom = minCash − floor`,
-reported unrounded, so it can sit a fraction of a cent either side of zero.
+Feasibility of a candidate value `v`: write `v` into the event's field and run the full
+forecast. Then read the target scenario's path:
+
+- **Held to a guardrail**: feasible iff the guardrail **holds** on that path (§10): its
+  condition is met in every month of its window. For a `cashFloor` or a `lasts`,
+  `floor` is the guardrail's `amount` (0 for a `lasts` with none), `minCash` is the
+  balance the guardrail reads at its tightest month (`liquid`, or the listed accounts'
+  combined value), and `headroom` is its margin there (§10). A `debtFree` has no
+  dollar floor; its cleared month and `marginMonths` stand in for the three.
+- **Held to the emergency fund**: take the target scenario's floor from the forecast,
+  and find the first month where `liquid ≥ floor`. Feasible iff that month exists and
+  `liquid ≥ floor` for **every** month from it through the end (i.e. once the floor is
+  first reached, cash never dips below it). `minCash` = the minimum liquid over that
+  suffix (over every month when the floor is never reached); `headroom = minCash − floor`.
+
+These comparisons are made in whole cents (`round2` on both sides, per the preamble).
+`minCash` and `headroom` are reported unrounded, so a headroom can sit a fraction of a
+cent either side of zero.
+
+**What the search guarantees.** Every value the search chooses is one it evaluated,
+snapped and clamped: the anchor, a bound, or a bisection midpoint. The chosen value is
+therefore always feasible when the target is reported converged, and the figures
+reported with it describe its own forecast, which is the final forecast's. That holds
+for every floor. Bisection finds the feasible value closest to the anchor only when
+feasibility changes once between the anchor and the bound. That is not guaranteed. A
+threshold payoff funded from investments (§3.5) fires earlier as cash grows, and it can
+draw cash down to nothing, so a larger amount can make a plan fail a floor that a
+smaller one meets. Against any floor, the search can then choose a feasible value that
+is not the closest, or find neither bound feasible when a value between them is.
 
 A target is one of a scenario's own events. It cannot sit in `common` or in an option
 (chapter 03): both are shared between scenarios, and a chosen value is found against one
@@ -388,11 +414,16 @@ them):
 2. Anchor feasible → choose it. `converged = true`, `iterations = 0`. In particular,
    an affordable lower bound is chosen for an expense instead of keeping the original.
 3. Neither bound feasible (and anchor isn't) → keep the original value,
-   `converged = false`, note:
-   `unable to satisfy minimum cash <floor> within bounds <min> to <max>` (floor as
-   currency `$1,234.56`; bounds formatted per field — currency for amount, integer for
-   frequency, `YYYY-MM` for dates). Report the higher-headroom bound's
-   `floor`/`minCash`/`headroom`, and name that floor in the note.
+   `converged = false`, and report the better of the two bounds, the lower bound when
+   neither is better. Bounds are formatted per field in the note: currency for amount,
+   integer for frequency, `YYYY-MM` for dates.
+   - Held to the emergency fund: the better bound has the greater headroom. Report its
+     `floor`/`minCash`/`headroom`, and name that floor (as currency `$1,234.56`) in the note
+     `unable to satisfy minimum cash <floor> within bounds <min> to <max>`.
+   - Held to a guardrail: the better bound has the greater margin. For a `debtFree`, a
+     bound with a cleared month is better than one without, and of two with one, the
+     greater `marginMonths` is better. Report that bound's figures and guardrail result,
+     with the note `unable to hold guardrail “<name>” within bounds <min> to <max>`.
 4. Otherwise, for each feasible bound, bisect on the interval between the anchor
    and that bound: maintain (infeasibleSide, feasibleSide), evaluate the midpoint
    (snapped/clamped), narrow toward the boundary, stop when the interval ≤ `tolerance`
@@ -406,7 +437,9 @@ reflects them), the final forecast runs on the adjusted config, and each target 
 summary attached to its scenario's metrics: target event name, field, original and chosen
 values (raw numeric and display-formatted — currency for amounts, integer for frequency,
 `YYYY-MM` for dates), the chosen value's floor, minCash, headroom, iterations,
-converged, notes.
+converged, notes. A target held to a guardrail also carries the guardrail's result (§10)
+on the chosen value's forecast, or on the reported bound's when it did not converge, and
+a `debtFree` target carries no floor, minCash or headroom.
 
 ## 8. Key figures
 
@@ -479,8 +512,9 @@ engine reports: each active scenario's forecast and the flipped path (chapter 02
 Results JSON). Like the key figures (§8), a guardrail is read from the recorded series
 (§1) and adds nothing to the simulation, so the same rule evaluates any path the
 engine simulates. With the optimizer (§7), it describes the final forecast on the
-adjusted config. The optimizer's own floor is unchanged by guardrails, as is the
-emergency-fund recommendation (§5), which is not reported as a guardrail.
+adjusted config. An optimizer target is held to a guardrail only when it names one (§7);
+otherwise its floor is the emergency fund. The emergency-fund recommendation (§5) is
+unchanged by guardrails and is not reported as a guardrail.
 
 **The window.** A guardrail's window is its `startDate`–`endDate`, inclusive at both
 ends, defaulting to `start` and `end`, and clipped to the recorded months `start`–`end`

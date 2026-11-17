@@ -89,12 +89,17 @@ type Optimization struct {
 	Value           float64 // raw numeric chosen value
 	OriginalDisplay string
 	ValueDisplay    string
-	Floor           float64
-	MinimumCash     float64
-	Headroom        float64
-	Iterations      int
-	Converged       bool
-	Notes           []string
+	// Floor, MinimumCash and Headroom are zero for a target held to a
+	// debtFree guardrail, which has no dollar floor (spec chapter 04 §7).
+	Floor       float64
+	MinimumCash float64
+	Headroom    float64
+	// Guardrail is the result of the guardrail the target is held to, on the
+	// reported value's forecast; nil for a target held to the emergency fund.
+	Guardrail  *GuardrailResult
+	Iterations int
+	Converged  bool
+	Notes      []string
 }
 
 // round2 rounds to cents; every comparison that decides behavior uses it

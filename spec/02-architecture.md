@@ -201,6 +201,23 @@ scenario's are in its `metrics`. The flip is refused when the scenario is not an
 active scenario of the plan, the plan has no such choice, the choice has no such option,
 the scenario already selects that option, or the flipped path fails validation.
 
+An entry of `optimizations` for a target held to a guardrail (chapter 04 §7) has a
+`guardrail` object: the guardrail's result on the forecast of the value reported, in the
+shape of an entry of `metrics[].guardrails`. Its `result` is `holds` when the target
+converged. For a `debtFree` guardrail, the entry has no `floor`, `minimumCash` or
+`headroom`. Every other entry has all three, and a target held to the emergency fund has
+no `guardrail`.
+
+```json
+{"targetName": "New expense", "field": "amount",
+ "original": -500.0, "value": -312.9,
+ "originalDisplay": "-$500.00", "valueDisplay": "-$312.90",
+ "floor": 5000.0, "minimumCash": 5000.4, "headroom": 0.4,
+ "guardrail": {"name": "Cushion", "kind": "cashFloor", "result": "holds",
+               "tightestDate": "2026-12", "margin": 0.4},
+ "iterations": 15, "converged": true, "notes": []}
+```
+
 In `optimizations`, `original` and `value` are the raw numbers the optimizer searched over
 — currency for `amount`, a count for `frequency`, a month index (`year·12 + month − 1`)
 for `startDate`/`endDate` — and the `…Display` strings are those same numbers formatted

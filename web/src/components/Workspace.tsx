@@ -24,7 +24,7 @@ import { OptimizerControl } from './OptimizerControl';
 import { At, PathProblems, Problems } from './problems';
 import { problemText, type Problem } from '../engine/types';
 import { EventList } from './editor/EventList';
-import { GuardrailList, entryNames } from './editor/GuardrailList';
+import { GuardrailList, entryNames, guardrailNames } from './editor/GuardrailList';
 import { InvestmentList } from './editor/InvestmentList';
 import { LoanList } from './editor/LoanList';
 import { OptionList } from './editor/OptionList';
@@ -783,6 +783,7 @@ export function Workspace({
               events={scenario.events}
               simulation={config.simulation}
               allowOptimize
+              guardrailNames={guardrailNames(config)}
               moveAction={{
                 label: 'Move to baseline',
                 onMove: (eventIndex) => requestMoveToCommon(scenario.id, eventIndex),

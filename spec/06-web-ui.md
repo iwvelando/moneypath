@@ -118,6 +118,13 @@ The app covers, at a coarse grain:
   is applied to the plan only when the reader asks, and the results say plainly that the
   plan still holds their own values until then. Any download that would carry unapplied adjustments says so,
   so the plan on screen and the file that leaves the app never disagree in silence.
+  An optimizer block's **Held to** select offers "Emergency fund", the default, which
+  writes no key, and then each of the plan's guardrails by name. A name the plan no
+  longer has stays selected, with the engine's error under the select, until the
+  reader picks another. Each adjustment says what it was held to: against the
+  emergency fund, `floor · min cash · headroom`; against a cash floor or a lasts,
+  `held to <name> · floor · lowest cash` (or `lowest balance`) ` · headroom`; against a
+  debt-free, `held to <name>` with the guardrail's own wording for when the debt clears.
 - **Results** — per-scenario summary (emergency fund, optimizer adjustments), a chart of
   liquid and total over time, and the full month-by-month table. The table initially
   shows Date, Liquid, and Total. Months with notes have an arrow and a disclosure

@@ -126,9 +126,9 @@ export const HELP = {
 
   /* optimizer */
   optimizeBlock:
-    'Available on scenario events only. When adjusting a negative amount, the optimizer finds the largest affordable expense within your bounds while keeping cash at or above the emergency-fund floor. For other targets, it finds the smallest change from what you configured that preserves that floor.',
+    'Available on scenario events only. When adjusting a negative amount, the optimizer finds the largest affordable expense within your bounds while the scenario stays within what the value is held to: the emergency-fund floor, or a guardrail you choose. For other targets, it finds the smallest change from what you configured that keeps to it.',
   optimizeField:
-    'Which field to adjust: amount, frequency, start month or end month. For a negative amount, finds the largest affordable expense within your bounds. For other targets, finds the smallest change needed to preserve the emergency-fund floor.',
+    'Which field to adjust: amount, frequency, start month or end month. For a negative amount, finds the largest affordable expense within your bounds. For other targets, finds the smallest change needed to keep to what the value is held to.',
   optimizeMin: 'Required lower bound for amount or frequency. For frequency it must be an integer of at least 1.',
   optimizeMax: 'Required upper bound for amount or frequency; it must be greater than the lower bound.',
   optimizeMinDate: 'Required inclusive lower bound month for a start- or end-month search.',
@@ -136,6 +136,8 @@ export const HELP = {
   optimizeTolerance:
     'Optional. How close the search must get before stopping. Defaults to 0.01 for amount and 1 (month or count) otherwise. Amounts are searched in whole cents, so asking for less than a cent changes nothing.',
   optimizeMaxIterations: 'Optional, default 50. Caps how many candidate values the search evaluates.',
+  optimizeGuardrail:
+    'What the value is held to. The emergency fund keeps cash at or above this scenario’s emergency-fund target once it is reached. A guardrail must hold in every month it checks, on this scenario.',
 } as const;
 
 export type HelpKey = keyof typeof HELP;

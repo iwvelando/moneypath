@@ -21,6 +21,8 @@ export interface OptimizeModel {
   maxDate: string;
   tolerance: number | null;
   maxIterations: number | null;
+  /** The name of the guardrail the value is held to; `''` holds it to the emergency fund. */
+  guardrail: string;
 }
 
 export interface EventModel {
@@ -192,7 +194,16 @@ export function newId(prefix = 'i'): string {
 
 /** A blank optimizer block, for backfilling one a saved draft only partly has. */
 export function emptyOptimize(): OptimizeModel {
-  return { field: 'amount', min: null, max: null, minDate: '', maxDate: '', tolerance: null, maxIterations: null };
+  return {
+    field: 'amount',
+    min: null,
+    max: null,
+    minDate: '',
+    maxDate: '',
+    tolerance: null,
+    maxIterations: null,
+    guardrail: '',
+  };
 }
 
 /** A blank simulation block: every setting unset, which the engine reads as its default. */

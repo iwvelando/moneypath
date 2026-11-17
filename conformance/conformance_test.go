@@ -6,6 +6,7 @@ package conformance_test
 
 import (
 	"encoding/csv"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -88,8 +89,12 @@ type optMetric struct {
 	Floor           float64 `yaml:"floor"`
 	MinimumCash     float64 `yaml:"minimumCash"`
 	Headroom        float64 `yaml:"headroom"`
-	Iterations      int     `yaml:"iterations"`
-	Converged       bool    `yaml:"converged"`
+	// Guardrail is the result of the guardrail a target is held to, on the
+	// reported value's forecast; absent for a target held to the emergency
+	// fund.
+	Guardrail  *guardrailMetric `yaml:"guardrail"`
+	Iterations int              `yaml:"iterations"`
+	Converged  bool             `yaml:"converged"`
 }
 
 // arbitraryNow: every conformance config pins simulation.startDate, so the
@@ -355,6 +360,14 @@ func compareMetrics(t *testing.T, want []scenarioMetric, res *engine.Result) {
 					t.Errorf("scenario %q opt %d: %s want %.4f, got %.4f", wm.Scenario, i, c.name, c.want, c.got)
 				}
 			}
+			switch {
+			case wo.Guardrail == nil && go_.Guardrail != nil:
+				t.Errorf("scenario %q opt %d: want no guardrail, got %+v", wm.Scenario, i, *go_.Guardrail)
+			case wo.Guardrail != nil && go_.Guardrail == nil:
+				t.Errorf("scenario %q opt %d: want guardrail %+v, got none", wm.Scenario, i, *wo.Guardrail)
+			case wo.Guardrail != nil:
+				compareGuardrail(t, fmt.Sprintf("scenario %q opt %d guardrail", wm.Scenario, i), *wo.Guardrail, *go_.Guardrail)
+			}
 			if go_.Iterations != wo.Iterations {
 				t.Errorf("scenario %q opt %d: iterations want %d, got %d", wm.Scenario, i, wo.Iterations, go_.Iterations)
 			}
@@ -375,27 +388,33 @@ func compareGuardrails(t *testing.T, scenario string, want []guardrailMetric, go
 		return
 	}
 	for i, w := range want {
-		g := got[i]
-		have := guardrailMetric{Name: g.Name, Kind: g.Kind, Result: string(g.Result)}
-		if g.Result == engine.GuardrailBreaks {
-			have.FirstBreachDate = g.FirstBreach.String()
-		}
-		if g.HasTightest {
-			have.TightestDate = g.Tightest.String()
-			have.Margin = g.Margin
-			have.MarginMonths = g.MarginMonths
-		}
-		if g.Kind == config.GuardrailDebtFree && g.Result == engine.GuardrailBreaks {
-			have.Owed = g.Owed
-		}
-		if math.Abs(have.Margin-w.Margin) <= 0.01 {
-			have.Margin = w.Margin
-		}
-		if math.Abs(have.Owed-w.Owed) <= 0.01 {
-			have.Owed = w.Owed
-		}
-		if have != w {
-			t.Errorf("scenario %q guardrail %d:\n want %+v\n  got %+v", scenario, i, w, have)
-		}
+		compareGuardrail(t, fmt.Sprintf("scenario %q guardrail %d", scenario, i), w, got[i])
+	}
+}
+
+// compareGuardrail checks one guardrail result against the manifest, by the
+// rule of compareGuardrails.
+func compareGuardrail(t *testing.T, label string, w guardrailMetric, g engine.GuardrailResult) {
+	t.Helper()
+	have := guardrailMetric{Name: g.Name, Kind: g.Kind, Result: string(g.Result)}
+	if g.Result == engine.GuardrailBreaks {
+		have.FirstBreachDate = g.FirstBreach.String()
+	}
+	if g.HasTightest {
+		have.TightestDate = g.Tightest.String()
+		have.Margin = g.Margin
+		have.MarginMonths = g.MarginMonths
+	}
+	if g.Kind == config.GuardrailDebtFree && g.Result == engine.GuardrailBreaks {
+		have.Owed = g.Owed
+	}
+	if math.Abs(have.Margin-w.Margin) <= 0.01 {
+		have.Margin = w.Margin
+	}
+	if math.Abs(have.Owed-w.Owed) <= 0.01 {
+		have.Owed = w.Owed
+	}
+	if have != w {
+		t.Errorf("%s:\n want %+v\n  got %+v", label, w, have)
 	}
 }

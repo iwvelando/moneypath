@@ -56,6 +56,25 @@ describe('editor model -> config document', () => {
     expect(absent.simulation.cashInterestRate).toBeNull();
   });
 
+  it('reads the guardrail an optimizer target is held to, treating an absent one as blank', () => {
+    const read = fromConfigDocument({
+      version: 2,
+      simulation: { endDate: '2030-01', startingCash: 100 },
+      scenarios: [
+        {
+          name: 'a',
+          events: [
+            { amount: -1, optimize: { field: 'amount', min: -1, max: 0, guardrail: 'Cushion' } },
+            { amount: -1, optimize: { field: 'amount', min: -1, max: 0 } },
+          ],
+        },
+      ],
+    });
+    const [held, fund] = read.scenarios[0]!.events;
+    expect(held!.optimize?.guardrail).toBe('Cushion');
+    expect(fund!.optimize?.guardrail).toBe('');
+  });
+
   it('round-trips the cash interest rate through YAML text', () => {
     const original = model();
     original.simulation.cashInterestRate = 4.5;
@@ -88,6 +107,7 @@ describe('editor model -> config document', () => {
       maxDate: '2026-01',
       tolerance: 1,
       maxIterations: 50,
+      guardrail: '',
     };
     expect(serializeEvent(event, 'cashflow')['optimize']).toEqual({
       field: 'startDate',
@@ -110,12 +130,32 @@ describe('editor model -> config document', () => {
       maxDate: '2026-01',
       tolerance: 0.01,
       maxIterations: 50,
+      guardrail: '',
     };
     const optimize = serializeEvent(event, 'cashflow')['optimize'] as Record<string, unknown>;
     expect(optimize['min']).toBe(0);
     expect(optimize['max']).toBe(2500);
     expect(optimize['minDate']).toBeUndefined();
     expect(optimize['maxDate']).toBeUndefined();
+  });
+
+  it('writes the guardrail a target is held to last, and leaves out none', () => {
+    const event = emptyEvent();
+    event.optimize = {
+      field: 'amount',
+      min: -500,
+      max: 0,
+      minDate: '',
+      maxDate: '',
+      tolerance: 0.01,
+      maxIterations: 50,
+      guardrail: 'Cushion',
+    };
+    const optimize = serializeEvent(event, 'cashflow')['optimize'] as Record<string, unknown>;
+    expect(Object.keys(optimize)).toEqual(['field', 'min', 'max', 'tolerance', 'maxIterations', 'guardrail']);
+    expect(optimize['guardrail']).toBe('Cushion');
+    event.optimize.guardrail = '';
+    expect(serializeEvent(event, 'cashflow')['optimize']).not.toHaveProperty('guardrail');
   });
 
   it('uses percentage instead of amount for percentage-style withdrawals', () => {

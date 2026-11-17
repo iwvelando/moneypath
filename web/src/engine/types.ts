@@ -26,9 +26,16 @@ export interface OptimizationSummary {
   value: number;
   originalDisplay: string;
   valueDisplay: string;
-  floor: number;
-  minimumCash: number;
-  headroom: number;
+  /**
+   * The floor the value was held to, the least balance it was checked
+   * against and their difference. Absent for a target held to a debt-free
+   * guardrail, which has no dollar floor.
+   */
+  floor?: number;
+  minimumCash?: number;
+  headroom?: number;
+  /** The result of the guardrail the target is held to; absent for the emergency fund. */
+  guardrail?: GuardrailResult;
   iterations: number;
   converged: boolean;
   notes?: string[] | null;

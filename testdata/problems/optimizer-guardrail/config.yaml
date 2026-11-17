@@ -1,0 +1,59 @@
+version: 2
+simulation: {startDate: 2025-01, endDate: 2026-12, startingCash: 1000}
+guardrails:
+  - name: Cushion
+    kind: cashFloor
+    amount: 500
+  - name: Too late
+    kind: cashFloor
+    amount: 500
+    startDate: 2027-01
+  - name: Brokerage lasts
+    kind: lasts
+    investments: [Brokerage]
+choices:
+  - name: Savings
+    options:
+      - name: None
+      - name: Open a brokerage
+        investments:
+          - name: Brokerage
+            startingValue: 1000
+scenarios:
+  - name: no brokerage
+    select: {Savings: None}
+    events:
+      - name: Unknown guardrail
+        amount: -100
+        optimize: {field: amount, min: -500, max: 0, guardrail: Nope}
+      - name: Empty window
+        amount: -100
+        optimize: {field: amount, min: -500, max: 0, guardrail: Too late}
+      - name: No account
+        amount: -100
+        optimize: {field: amount, min: -500, max: 0, guardrail: Brokerage lasts}
+      - name: Cash floor
+        amount: -100
+        optimize: {field: amount, min: -500, max: 0, guardrail: Cushion}
+      - name: Blank
+        amount: -100
+        optimize: {field: amount, min: -500, max: 0, guardrail: ""}
+  - name: brokerage from an option
+    select: {Savings: Open a brokerage}
+    events:
+      - name: Account from the option
+        amount: -100
+        optimize: {field: amount, min: -500, max: 0, guardrail: Brokerage lasts}
+  - name: own brokerage, inactive
+    active: false
+    select: {Savings: None}
+    events:
+      - name: Own account
+        amount: -100
+        optimize: {field: amount, min: -500, max: 0, guardrail: Brokerage lasts}
+      - name: Inactive but checked
+        amount: -100
+        optimize: {field: amount, min: -500, max: 0, guardrail: Nope}
+    investments:
+      - name: Brokerage
+        startingValue: 1000

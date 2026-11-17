@@ -1,0 +1,45 @@
+description: >-
+  An optimizer target held to a named cash floor, beside the same target held to
+  the emergency fund. Held to the $5,000.00 cushion, the largest affordable new
+  expense is -$266.66: cash falls to $5,000.12 in the last month, and one cent
+  more of expense would leave $4,999.94. The floor, lowest cash and headroom are
+  the cushion's, and the guardrail result rides along. The second scenario names
+  no guardrail and chooses exactly what optimizer-amount chooses, against its own
+  emergency-fund target.
+normative: true
+optimize: true
+tolerance: 0.01
+expectedMetrics:
+  - scenario: held to the cushion
+    optimizations:
+      - targetName: New expense
+        field: amount
+        original: -500.00
+        value: -266.66
+        originalDisplay: "-$500.00"
+        valueDisplay: "-$266.66"
+        floor: 5000.00
+        minimumCash: 5000.12
+        headroom: 0.12
+        guardrail: {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2026-12", margin: 0.12}
+        iterations: 16
+        converged: true
+    guardrails:
+      - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2026-12", margin: 0.12}
+  - scenario: held to the emergency fund
+    emergencyFund:
+      targetAmount: 5738.46
+    optimizations:
+      - targetName: New expense
+        field: amount
+        original: -500.00
+        value: -225.64
+        originalDisplay: "-$500.00"
+        valueDisplay: "-$225.64"
+        floor: 5738.46
+        minimumCash: 5738.48
+        headroom: 0.02
+        iterations: 15
+        converged: true
+    guardrails:
+      - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2025-01", margin: 200.00}

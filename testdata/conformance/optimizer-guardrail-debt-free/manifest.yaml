@@ -1,0 +1,26 @@
+description: >-
+  An optimizer target held to a debt-free guardrail, with the emergency-fund
+  recommendation disabled: a plan whose every target names a guardrail needs no
+  emergency fund. The house loan is paid off by threshold once cash and the
+  brokerage can cover it, so spending less brings the payoff forward. The largest
+  spending that still clears the loan in 2026-06, the deadline's own month, is
+  -$2,720.35; a cent more delays the payoff. A debt-free has no dollar floor, so
+  the adjustment carries the guardrail's cleared month and months to spare and no
+  floor, lowest cash or headroom.
+normative: true
+optimize: true
+tolerance: 0.01
+expectedMetrics:
+  - scenario: brokerage payoff
+    optimizations:
+      - targetName: Spending
+        field: amount
+        original: -2600.00
+        value: -2720.35
+        originalDisplay: "-$2,600.00"
+        valueDisplay: "-$2,720.35"
+        guardrail: {name: Mortgage gone by mid-2026, kind: debtFree, result: holds, tightestDate: "2026-06", marginMonths: 0}
+        iterations: 17
+        converged: true
+    guardrails:
+      - {name: Mortgage gone by mid-2026, kind: debtFree, result: holds, tightestDate: "2026-06", marginMonths: 0}

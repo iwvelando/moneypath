@@ -12,26 +12,16 @@ import (
 )
 
 // runOptimized implements spec chapter 04 §7: adjust each event carrying an
-// optimize block while keeping cash at or above the emergency-fund floor,
-// which is each candidate plan's own emergency-fund target.
+// optimize block while holding its scenario to the target's floor. That is
+// the guardrail the block names, or else the emergency-fund floor, which is
+// each candidate plan's own emergency-fund target.
 // Negative amount targets maximize affordable spending within their bounds;
 // other targets require the smallest adjustment from the configured original.
 // Chosen values are written back into cfg before the final forecast.
 func runOptimized(cfg *config.Config, opts Options) (*Result, error) {
-	if cfg.ResolvedEmergencyFundMonths <= 0 {
-		return nil, fmt.Errorf("optimization requires the emergency-fund recommendation, which is disabled")
-	}
-
-	baseline := forecast(cfg, opts)
-	floors := map[string]float64{}
-	for _, sr := range baseline.Scenarios {
-		if sr.EmergencyFund != nil {
-			floors[sr.Name] = sr.EmergencyFund.TargetAmount
-		}
-	}
-
 	type targetRef struct{ scIdx, evIdx int }
 	var targets []targetRef
+	needsFund := false
 	for si, sc := range cfg.Scenarios {
 		if !sc.ResolvedActive {
 			continue
@@ -39,6 +29,20 @@ func runOptimized(cfg *config.Config, opts Options) (*Result, error) {
 		for ei, ev := range sc.Events {
 			if ev.Optimize != nil {
 				targets = append(targets, targetRef{si, ei})
+				needsFund = needsFund || ev.Optimize.ResolvedGuardrail == nil
+			}
+		}
+	}
+	// Only a target held to the emergency fund needs the recommendation.
+	if needsFund && cfg.ResolvedEmergencyFundMonths <= 0 {
+		return nil, fmt.Errorf("optimization requires the emergency-fund recommendation, which is disabled")
+	}
+
+	floors := map[string]float64{}
+	if needsFund {
+		for _, sr := range forecast(cfg, opts).Scenarios {
+			if sr.EmergencyFund != nil {
+				floors[sr.Name] = sr.EmergencyFund.TargetAmount
 			}
 		}
 	}
@@ -47,8 +51,10 @@ func runOptimized(cfg *config.Config, opts Options) (*Result, error) {
 	for _, tr := range targets {
 		sc := cfg.Scenarios[tr.scIdx]
 		ev := sc.Events[tr.evIdx]
-		if floor, ok := floors[sc.Name]; !ok || floor <= 0 {
-			return nil, fmt.Errorf("optimization failed: scenario %q has no positive emergency-fund floor", sc.Name)
+		if ev.Optimize.ResolvedGuardrail == nil {
+			if floor, ok := floors[sc.Name]; !ok || floor <= 0 {
+				return nil, fmt.Errorf("optimization failed: scenario %q has no positive emergency-fund floor", sc.Name)
+			}
 		}
 		summary, err := optimizeTarget(cfg, opts, tr.scIdx, tr.evIdx)
 		if err != nil {
@@ -67,15 +73,31 @@ func runOptimized(cfg *config.Config, opts Options) (*Result, error) {
 	return final, nil
 }
 
-// evalResult is one candidate's outcome. floor is the candidate plan's own
-// emergency-fund target, the level its cash was held to.
+// evalResult is one candidate's outcome. Held to the emergency fund, floor
+// is the candidate plan's own emergency-fund target, the level its cash was
+// held to. Held to a guardrail, guardrail is its result on the candidate's
+// forecast, and floor and minCash are the guardrail's floor and its balance
+// at the tightest month (zero for a debtFree, which has no dollar floor).
 type evalResult struct {
-	feasible bool
-	minCash  float64
-	floor    float64
+	feasible  bool
+	minCash   float64
+	floor     float64
+	headroom  float64
+	guardrail *GuardrailResult
 }
 
-func (e evalResult) headroom() float64 { return e.minCash - e.floor }
+// better reports whether e is the better of two infeasible bounds (spec
+// chapter 04 §7 step 3): the greater headroom or margin, and for a debtFree
+// a cleared month over none, then more months to spare.
+func (e evalResult) better(than evalResult) bool {
+	if g, h := e.guardrail, than.guardrail; g != nil && h != nil && g.Kind == config.GuardrailDebtFree {
+		if g.HasTightest != h.HasTightest {
+			return g.HasTightest
+		}
+		return g.HasTightest && g.MarginMonths > h.MarginMonths
+	}
+	return e.headroom > than.headroom
+}
 
 func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int) (*Optimization, error) {
 	sc := cfg.Scenarios[scIdx]
@@ -105,9 +127,13 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int) (*Optimi
 		setEventField(cp.Scenarios[scIdx].Events[evIdx], field, v)
 		res := forecast(cp, opts)
 		for _, sr := range res.Scenarios {
-			if sr.Name == sc.Name {
-				return feasibility(sr.Liquid, sr.EmergencyFund.TargetAmount), nil
+			if sr.Name != sc.Name {
+				continue
 			}
+			if g := o.ResolvedGuardrail; g != nil {
+				return guardrailFeasibility(g, res.Start, sr), nil
+			}
+			return feasibility(sr.Liquid, sr.EmergencyFund.TargetAmount), nil
 		}
 		return evalResult{}, fmt.Errorf("scenario %q missing from optimizer evaluation", sc.Name)
 	}
@@ -121,7 +147,8 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int) (*Optimi
 	report := func(e evalResult) {
 		sum.Floor = e.floor
 		sum.MinimumCash = e.minCash
-		sum.Headroom = e.headroom()
+		sum.Headroom = e.headroom
+		sum.Guardrail = e.guardrail
 	}
 
 	anchor := snapClamp(original)
@@ -152,18 +179,22 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int) (*Optimi
 	}
 
 	if !loEval.feasible && !hiEval.feasible {
-		// Keep the original value; report the higher-headroom bound.
+		// Keep the original value; report the better bound, the lower one
+		// when neither is better.
 		best := loEval
-		if hiEval.headroom() > loEval.headroom() {
+		if hiEval.better(loEval) {
 			best = hiEval
 		}
 		sum.Value = original
 		sum.ValueDisplay = displayValue(field, original)
 		report(best)
 		sum.Converged = false
-		sum.Notes = append(sum.Notes, fmt.Sprintf(
-			"unable to satisfy minimum cash %s within bounds %s to %s",
-			money.Format(best.floor), displayValue(field, lo), displayValue(field, hi)))
+		bounds := fmt.Sprintf("within bounds %s to %s", displayValue(field, lo), displayValue(field, hi))
+		if g := o.ResolvedGuardrail; g != nil {
+			sum.Notes = append(sum.Notes, fmt.Sprintf("unable to hold guardrail “%s” %s", g.Name, bounds))
+		} else {
+			sum.Notes = append(sum.Notes, fmt.Sprintf("unable to satisfy minimum cash %s %s", money.Format(best.floor), bounds))
+		}
 		return sum, nil
 	}
 
@@ -234,13 +265,26 @@ func feasibility(liquid []float64, floor float64) evalResult {
 		for _, v := range liquid {
 			min = math.Min(min, v)
 		}
-		return evalResult{feasible: false, minCash: min, floor: floor}
+		return evalResult{feasible: false, minCash: min, floor: floor, headroom: min - floor}
 	}
 	min := math.Inf(1)
 	for _, v := range liquid[first:] {
 		min = math.Min(min, v)
 	}
-	return evalResult{feasible: round2(min) >= centFloor, minCash: min, floor: floor}
+	return evalResult{feasible: round2(min) >= centFloor, minCash: min, floor: floor, headroom: min - floor}
+}
+
+// guardrailFeasibility holds a candidate's path to a guardrail: feasible iff
+// the guardrail holds (spec chapter 04 §7, §10). A cashFloor or a lasts
+// reports its floor, its balance at the tightest month and its margin there;
+// a debtFree reports only its result.
+func guardrailFeasibility(g *config.Guardrail, start config.Month, path *ScenarioResult) evalResult {
+	r := EvaluateGuardrail(g, start, path)
+	e := evalResult{feasible: r.Result == GuardrailHolds, guardrail: &r}
+	if balance, ok := guardrailBalance(g, start, path); ok && r.HasTightest {
+		e.floor, e.minCash, e.headroom = guardrailFloor(g), balance(r.Tightest), r.Margin
+	}
+	return e
 }
 
 // fieldBounds returns the numeric search bounds (dates as month indexes).

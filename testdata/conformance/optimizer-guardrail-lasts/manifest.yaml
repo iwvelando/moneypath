@@ -1,0 +1,29 @@
+description: >-
+  An optimizer target held to a lasts guardrail on the account that funds a
+  threshold payoff. More income fires the payoff sooner, and the payoff draws
+  the brokerage down, so income works against this guardrail. At the configured
+  $3,600.00 the payoff draws the brokerage down to about $5,600; the smallest change
+  that keeps it at $30,000 or more is $2,913.79, the highest income at which the
+  payoff does not fire inside the plan. The brokerage is then never drawn on, so
+  the headroom is large: the guardrail's balance jumps rather than shrinks at the
+  boundary. Floor, lowest balance and headroom are the guardrail's.
+normative: true
+optimize: true
+tolerance: 0.01
+expectedMetrics:
+  - scenario: brokerage payoff
+    optimizations:
+      - targetName: Income
+        field: amount
+        original: 3600.00
+        value: 2913.79
+        originalDisplay: "$3,600.00"
+        valueDisplay: "$2,913.79"
+        floor: 30000.00
+        minimumCash: 45225.00
+        headroom: 15225.00
+        guardrail: {name: Brokerage keeps 30000, kind: lasts, result: holds, tightestDate: "2025-06", margin: 15225.00}
+        iterations: 17
+        converged: true
+    guardrails:
+      - {name: Brokerage keeps 30000, kind: lasts, result: holds, tightestDate: "2025-06", margin: 15225.00}

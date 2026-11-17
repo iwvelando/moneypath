@@ -63,9 +63,35 @@ func EvaluateGuardrail(g *config.Guardrail, start config.Month, path *ScenarioRe
 	if first > last {
 		return out
 	}
+	if g.Kind == config.GuardrailDebtFree {
+		debtFreeTest(&out, g, start, first, last, path)
+		return out
+	}
+	balance, ok := guardrailBalance(g, start, path)
+	if !ok {
+		return out
+	}
+	floorTest(&out, first, last, guardrailFloor(g), balance, g.Kind == config.GuardrailLasts && g.Amount == nil)
+	return out
+}
+
+// guardrailFloor is the amount a cashFloor's or a lasts' balance is held
+// to: its amount, or 0 for a lasts with none (spec chapter 04 §10).
+func guardrailFloor(g *config.Guardrail) float64 {
+	if g.Amount == nil {
+		return 0
+	}
+	return *g.Amount
+}
+
+// guardrailBalance is the balance a cashFloor or a lasts reads in month m:
+// cash, or the combined value of the path's accounts with the listed names.
+// It is false for a lasts that names no account the path has, and for a
+// debtFree, which reads what is owed instead.
+func guardrailBalance(g *config.Guardrail, start config.Month, path *ScenarioResult) (func(config.Month) float64, bool) {
 	switch g.Kind {
 	case config.GuardrailCashFloor:
-		floorTest(&out, first, last, *g.Amount, func(m config.Month) float64 { return path.Liquid[m-start] }, false)
+		return func(m config.Month) float64 { return path.Liquid[m-start] }, true
 	case config.GuardrailLasts:
 		var accounts [][]float64
 		for _, name := range g.Investments {
@@ -74,24 +100,17 @@ func EvaluateGuardrail(g *config.Guardrail, start config.Month, path *ScenarioRe
 			}
 		}
 		if len(accounts) == 0 {
-			return out
+			return nil, false
 		}
-		value := func(m config.Month) float64 {
+		return func(m config.Month) float64 {
 			total := 0.0
 			for _, v := range accounts {
 				total += v[m-start]
 			}
 			return total
-		}
-		if g.Amount == nil {
-			floorTest(&out, first, last, 0, value, true)
-		} else {
-			floorTest(&out, first, last, *g.Amount, value, false)
-		}
-	case config.GuardrailDebtFree:
-		debtFreeTest(&out, g, start, first, last, path)
+		}, true
 	}
-	return out
+	return nil, false
 }
 
 // floorTest reads a balance that must stay at or above a floor in every month

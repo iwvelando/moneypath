@@ -72,6 +72,7 @@ describe('moveEventToCommon', () => {
         maxDate: '',
         tolerance: null,
         maxIterations: null,
+        guardrail: '',
       },
     });
     const cfg = config([], [scenario('a', [moved])]);

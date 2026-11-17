@@ -2,16 +2,28 @@ import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Adjustment, AdjustmentStatus } from '../config/adjustments';
 import { flipSubject } from '../config/choices';
 import type { ConfigModel, GuardrailModel } from '../config/types';
-import type { FlipComparison, FlipRequest, ForecastResults, ScenarioMetrics } from '../engine/types';
+import type { FlipComparison, FlipRequest, ForecastResults, OptimizationSummary, ScenarioMetrics } from '../engine/types';
 import { formatDuration, formatMoney, formatMonths } from '../util/format';
 import { Chart } from './Chart';
 import { Comparison } from './Comparison';
 import { Difference } from './Difference';
 import { Flip } from './Flip';
-import { GuardrailList, RunGuardrails } from './Guardrails';
+import { GuardrailList, RunGuardrails, debtFreeClause } from './Guardrails';
 import { MonthlyTable, type MonthlyRow } from './MonthlyTable';
 import { EmergencyFundGauge } from './Gauge';
 import { OverlaySparkline, Sparkline } from './Sparkline';
+
+/**
+ * What an adjustment was held to, as the engine reported it: the floor, the
+ * lowest balance and the headroom, or for a debt-free when the debt clears.
+ */
+function heldTo(summary: OptimizationSummary): string {
+  const guardrail = summary.guardrail;
+  if (guardrail?.kind === 'debtFree') return `held to ${guardrail.name} · ${debtFreeClause(guardrail)}`;
+  const lowest = guardrail === undefined ? 'min cash' : guardrail.kind === 'lasts' ? 'lowest balance' : 'lowest cash';
+  const figures = `floor ${formatMoney(summary.floor ?? 0)} · ${lowest} ${formatMoney(summary.minimumCash ?? 0)} · headroom ${formatMoney(summary.headroom ?? 0)}`;
+  return guardrail === undefined ? figures : `held to ${guardrail.name} · ${figures}`;
+}
 
 interface ResultsViewProps {
   results: ForecastResults;
@@ -131,8 +143,7 @@ function SummaryPanel({ metrics, scenarioName, statusOf, onApply }: SummaryPanel
                   )}
                 </p>
                 <p class="adjustments__meta">
-                  floor {formatMoney(summary.floor)} · min cash {formatMoney(summary.minimumCash)} ·
-                  headroom {formatMoney(summary.headroom)} · {summary.iterations} iteration
+                  {heldTo(summary)} · {summary.iterations} iteration
                   {summary.iterations === 1 ? '' : 's'} ·{' '}
                   <span class={summary.converged ? 'is-positive' : 'is-negative'}>
                     {summary.converged ? 'converged' : 'not converged'}
