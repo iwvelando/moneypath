@@ -27,7 +27,7 @@ choices:
       - {name: Stay}
       - name: Move
         events:
-          - {name: Movers, amount: -900, startDate: 2025-03, endDate: 2025-03}
+          - {name: Movers, amount: -1200, startDate: 2025-03, endDate: 2025-03}
         change:
           events:
             - name: Rent
@@ -240,7 +240,8 @@ func TestResultsJSONCarriesTheFlip(t *testing.T) {
 	if !reflect.DeepEqual(got.Flip.Cash.Difference, f.Flip.Comparison.Cash.Difference) {
 		t.Errorf("cash difference = %v", got.Flip.Cash.Difference)
 	}
-	// The movers put the flipped path behind in March (300 + 300 - 900);
+	// Cheaper rent puts the flipped path ahead from January, which overtakes
+	// nobody; the movers put it behind in March (300 + 300 + 300 - 1200);
 	// cheaper rent draws level in April and overtakes in May.
 	be := got.Flip.Cash.BreakEven
 	if len(be) != 2 || be[0].Flipped == nil || be[1].Flipped == nil ||

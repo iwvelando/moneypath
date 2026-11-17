@@ -44,7 +44,8 @@ test('the run button stays reachable deep in the editor', async ({ page }) => {
 test('results-table dates stay on one line', async ({ page }) => {
   await openApp(page);
   await runForecast(page);
-  const cell = page.locator('.results-table tbody th').first();
+  // The date's own text, whether or not the month has events to expand.
+  const cell = page.locator('.results-table tbody th').first().locator('span');
   await expect(cell).toHaveText(/^\d{4}-\d{2}$/);
   const lines = await cell.evaluate((el) => {
     const range = document.createRange();
@@ -131,7 +132,7 @@ test('monthly events expand by keyboard or row and reset for another forecast', 
   await runForecast(page);
   const table = page.locator('.results-table');
   await expect(table.locator('thead th')).toHaveText(['Date', 'Liquid', 'Total']);
-  await expect(table.locator('.month-row').first().getByRole('button')).toHaveCount(0);
+  await expect(table.locator('.month-row:not(.is-expandable)').getByRole('button')).toHaveCount(0);
   const toggle = table.getByRole('button').first();
   await toggle.scrollIntoViewIfNeeded();
   await expect(toggle).toHaveAttribute('aria-expanded', 'false');
@@ -605,15 +606,15 @@ scenarios:
   const rows = table.locator('tbody').getByRole('row');
   await expect(rows).toHaveCount(3);
 
-  // The engine's figures: the earlier of two equal lows, a low that is the
-  // starting cash, and one in the final month.
+  // The engine's figures: the earlier of two equal lows, a low in the start
+  // month, and one in the final month.
   const values = (row: number) => rows.nth(row).locator('.figures-table__value');
   const lowest = (row: number) => rows.nth(row).getByRole('cell').first();
   await expect(lowest(0)).toContainText('$3,000.00 in 2025-02');
-  await expect(lowest(1)).toContainText('$5,000.00 in 2025-01');
-  await expect(lowest(2)).toContainText('-$5,995,000.00 in 2025-07');
-  await expect(values(0)).toHaveText(['$3,000.00', '$5,500.00', '$16,115.20', '$1,000.00 surplus']);
-  await expect(values(2)).toHaveText(['-$5,995,000.00', '-$5,995,000.00', '-$5,984,384.80', '$5,995,000.00 short']);
+  await expect(lowest(1)).toContainText('$5,500.00 in 2025-01');
+  await expect(lowest(2)).toContainText('-$6,995,000.00 in 2025-07');
+  await expect(values(0)).toHaveText(['$3,000.00', '$5,500.00', '$16,221.35', '$1,571.43 surplus']);
+  await expect(values(2)).toHaveText(['-$6,995,000.00', '-$6,995,000.00', '-$6,984,278.65', '$5,995,000.00 short']);
 
   // The ending totals are the ones the chart's legend reads for the final month.
   const legend = await page.locator('.comparison__value').allTextContents();
@@ -730,7 +731,7 @@ scenarios:
   await expect(chart.locator('.chart__line')).toHaveCount(2);
   await chart.focus();
   await chart.press('End');
-  await expect(difference.getByRole('status')).toHaveText('2025-09: liquid $500.00, total $2,900.00');
+  await expect(difference.getByRole('status')).toHaveText('2025-09: liquid $500.00, total $3,200.00');
 
   // Long names stay inside the page, and inside their pickers.
   await chart.scrollIntoViewIfNeeded();
@@ -756,12 +757,12 @@ scenarios:
   await expect(rows.nth(1).locator('dd')).toHaveText('The lead never changes hands.');
   await chart.focus();
   await chart.press('End');
-  await expect(difference.getByRole('status')).toHaveText('2025-09: liquid $4,000.00, total $6,400.00');
+  await expect(difference.getByRole('status')).toHaveText('2025-09: liquid $4,500.00, total $7,200.00');
   await first.selectOption({ label: 'Coast' });
   expect(await chosen()).toEqual(['Coast', employed]);
   await chart.focus();
   await chart.press('End');
-  await expect(difference.getByRole('status')).toHaveText('2025-09: liquid -$4,000.00, total -$6,400.00');
+  await expect(difference.getByRole('status')).toHaveText('2025-09: liquid -$4,500.00, total -$7,200.00');
   expect(await overflow(page), 'difference after choosing').toBeLessThanOrEqual(0);
 });
 

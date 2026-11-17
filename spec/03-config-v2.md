@@ -152,7 +152,8 @@ mechanism is a warning (it has no effect). `mortgageInsurance > 0` with no
 
 ```yaml
 - name: Brokerage account    # required, unique within its list
-  startingValue: 25000.00    # optional; default 0; balance at simulation start
+  startingValue: 25000.00    # optional; default 0; balance as of the END of the
+                             # month preceding the simulation's startDate
   annualReturnRate: 6.5      # optional; default 0; APR, compounded monthly — about
                              # 6.70 % a year; may be negative
   taxRate: 15.0              # optional; default 0; percent applied to positive monthly

@@ -1,0 +1,5 @@
+"date","liquid (car at start)","total (car at start)","notes (car at start)","liquid (car next month)","total (car next month)","notes (car next month)","liquid (fund)","total (fund)","notes (fund)"
+"2026-01","44500.00","44500.00","","50000.00","50000.00","","49900.00","51010.00","scenario Fund: contribution (reduces cash balance) +100.00, growth +10.00"
+"2026-02","43500.00","43500.00","","44000.00","44000.00","","49900.00","51021.10","scenario Fund: growth +11.10"
+"2026-03","42500.00","42500.00","","43000.00","43000.00","","49900.00","51032.31","scenario Fund: growth +11.21"
+"2026-04","41500.00","41500.00","","42000.00","42000.00","","49900.00","51043.63","scenario Fund: growth +11.32"

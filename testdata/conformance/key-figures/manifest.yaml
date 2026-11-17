@@ -1,4 +1,4 @@
-description: "Key figures across three scenarios: lowest cash reached twice (the earlier month is reported), lowest cash that is the starting cash, and lowest cash in the final month, below zero."
+description: "Key figures across three scenarios: lowest cash reached twice (the earlier month is reported), lowest cash in the start month, after that month's own income, and lowest cash in the final month, below zero."
 normative: true
 optimize: false
 tolerance: 0.01
@@ -8,21 +8,21 @@ expectedMetrics:
       lowestCash: 3000.00
       lowestCashDate: "2025-02"
       endingCash: 5500.00
-      endingTotal: 16115.2015
+      endingTotal: 16221.3535
     emergencyFund:
       targetMonths: 6.00
-      averageMonthlyExpenses: 666.6667
-      targetAmount: 4000.00
+      averageMonthlyExpenses: 571.4286
+      targetAmount: 3428.5714
       initialLiquid: 5000.00
-      fundedMonths: 7.50
+      fundedMonths: 8.75
       shortfall: 0.00
-      surplus: 1000.00
+      surplus: 1571.4286
   - scenario: only grows
     keyFigures:
-      lowestCash: 5000.00
+      lowestCash: 5500.00
       lowestCashDate: "2025-01"
-      endingCash: 8000.00
-      endingTotal: 18615.2015
+      endingCash: 8500.00
+      endingTotal: 19221.3535
     emergencyFund:
       targetMonths: 6.00
       averageMonthlyExpenses: 0.00
@@ -33,10 +33,10 @@ expectedMetrics:
       surplus: 5000.00
   - scenario: spends down
     keyFigures:
-      lowestCash: -1000.00
+      lowestCash: -2000.00
       lowestCashDate: "2025-07"
-      endingCash: -1000.00
-      endingTotal: 9615.2015
+      endingCash: -2000.00
+      endingTotal: 8721.3535
     emergencyFund:
       targetMonths: 6.00
       averageMonthlyExpenses: 1000.00

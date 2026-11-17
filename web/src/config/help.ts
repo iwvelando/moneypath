@@ -13,7 +13,7 @@ export const HELP = {
   endDate:
     'Required. The simulation runs through this month, inclusive. It must not be before the start month.',
   startingCash:
-    'Required. Cash balance as of the end of the month preceding the start month. It may be zero or negative (debt); leaving it blank is treated as 0.00 with a warning.',
+    'Required. Cash balance as of the end of the month preceding the start month, so everything dated in the start month is counted from it. It may be zero or negative (debt); leaving it blank is treated as 0.00 with a warning.',
   cashInterestRate:
     'Optional, default 0. The yearly interest rate your cash earns, entered as an APR (4.5 means 4.5%). ' +
     'One twelfth of it is added every month to the cash you had at the end of the previous month, so it ' +
@@ -30,7 +30,7 @@ export const HELP = {
   guardrailKind:
     'What the guardrail checks. A cash floor checks that your cash never falls below an amount. A guardrail never stops a forecast: each scenario reports whether it holds, the first month it breaks, and the month it comes closest to breaking.',
   guardrailAmount:
-    'Required for a cash floor. Your cash must be at least this much, to the cent, at the end of every month the guardrail covers, including the start month, whose cash is your starting cash. The same amount applies in every month. It may be negative, to mean “never more than this much overdrawn”.',
+    'Required for a cash floor. Your cash must be at least this much, to the cent, at the end of every month the guardrail covers, including the start month, after that month’s own income and spending. The same amount applies in every month. It may be negative, to mean “never more than this much overdrawn”.',
   guardrailStartDate:
     'Optional. The first month checked. Defaults to the simulation start month. If the cushion is something you are still building up, start from the month you expect to have it: the result then tells you whether you got there and kept it.',
   guardrailEndDate:
@@ -102,7 +102,7 @@ export const HELP = {
 
   /* investment */
   investmentName: 'Required, and unique within its list.',
-  investmentStartingValue: 'Optional, default 0. Balance at the simulation start; must be at least 0.',
+  investmentStartingValue: 'Optional, default 0. Balance as of the end of the month preceding the start month, like starting cash, so it grows from the start month on; must be at least 0.',
   investmentAnnualReturnRate:
     'Optional, default 0. The yearly return, entered like an APR: one twelfth is applied each month, so it compounds to slightly more over a year (7 grows about 7.23% a year). To model an average annual return of exactly 7%, enter 6.78. It may be negative.',
   investmentTaxRate:

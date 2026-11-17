@@ -1,0 +1,39 @@
+version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2026-04
+  startingCash: 50000.00
+recommendations:
+  emergencyFundMonths: 1
+scenarios:
+  - name: car at start
+    events:
+      - name: Bonus
+        amount: 500.00
+        startDate: 2026-01
+        endDate: 2026-01
+    loans:
+      - name: Car
+        principal: 30000.00
+        downPayment: 5000.00
+        interestRate: 0
+        term: 25
+        startDate: 2026-01
+  - name: car next month
+    loans:
+      - name: Car
+        principal: 30000.00
+        downPayment: 5000.00
+        interestRate: 0
+        term: 25
+        startDate: 2026-02
+  - name: fund
+    investments:
+      - name: Fund
+        startingValue: 1000.00
+        annualReturnRate: 12.00
+        contributionsFromCash: true
+        contributions:
+          - amount: 100.00
+            startDate: 2026-01
+            endDate: 2026-01

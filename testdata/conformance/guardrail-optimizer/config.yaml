@@ -8,7 +8,7 @@ recommendations:
 guardrails:
   - name: Hold what the optimizer leaves
     kind: cashFloor
-    amount: 5772.30
+    amount: 5738.48
     startDate: 2025-05
   - name: Never below 5500
     kind: cashFloor

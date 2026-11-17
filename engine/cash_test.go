@@ -40,12 +40,12 @@ func TestCashInterestDefaultsToNone(t *testing.T) {
 }
 
 // Spec chapter 04 §1.1: monthly rate = annual / 12, compounding — each
-// month's interest joins the balance the next month earns on. The initial row
-// carries no interest.
+// month's interest joins the balance the next month earns on. The first
+// interest accrues in the start month, on startingCash.
 func TestCashInterestCompoundsMonthly(t *testing.T) {
 	got := liquidOf(t, cashPlan("  cashInterestRate: 12\n", "scenarios: [{name: a}]\n"))
 	// 1% a month.
-	assertSeries(t, got, []float64{1200, 1212, 1224.12, 1236.3612, 1248.724812})
+	assertSeries(t, got, []float64{1212, 1224.12, 1236.3612, 1248.724812, 1261.21206012})
 }
 
 // Spec chapter 04 §1.1: the base is the previous month's ending balance, so
@@ -60,10 +60,11 @@ func TestCashInterestIsOnPriorBalance(t *testing.T) {
       - {name: Bill, amount: -500, startDate: 2025-03, endDate: 2025-03}
 `)
 	got := liquidOf(t, doc)
-	feb := 1200 + 12.0 + 1000   // interest on 1200 only, not on the windfall
-	mar := feb + feb*0.01 - 500 // interest on the full February balance
-	apr := mar + mar*0.01       // interest on the post-bill balance
-	assertSeries(t, got, []float64{1200, feb, mar, apr, apr * 1.01})
+	jan := 1200 + 12.0
+	feb := jan + jan*0.01 + 1000 // interest on January's balance only, not on the windfall
+	mar := feb + feb*0.01 - 500  // interest on the full February balance
+	apr := mar + mar*0.01        // interest on the post-bill balance
+	assertSeries(t, got, []float64{jan, feb, mar, apr, apr * 1.01})
 }
 
 // Spec chapter 04 §1.1: only positive balances earn. Negative cash is debt and
@@ -76,10 +77,11 @@ func TestCashInterestIgnoresNegativeBalance(t *testing.T) {
       - {name: Refund, amount: 1000, startDate: 2025-04, endDate: 2025-04}
 `)
 	got := liquidOf(t, doc)
-	feb := 1200 + 12.0 - 2000 // -788
-	mar := feb                // negative: no interest and no charge
-	apr := mar + 1000         // still no interest this month (prior balance negative)
-	assertSeries(t, got, []float64{1200, feb, mar, apr, apr * 1.01})
+	jan := 1200 + 12.0
+	feb := jan + jan*0.01 - 2000 // -775.88
+	mar := feb                   // negative: no interest and no charge
+	apr := mar + 1000            // still no interest this month (prior balance negative)
+	assertSeries(t, got, []float64{jan, feb, mar, apr, apr * 1.01})
 }
 
 // Spec chapter 04 §1.1: one rate for the simulation, applied in every scenario
@@ -95,9 +97,9 @@ func TestCashInterestAppliesToEveryScenario(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	assertSeries(t, res.Scenarios[0].Liquid, []float64{1200, 1212, 1224.12, 1236.3612, 1248.724812})
-	feb := 1200 + 12.0 - 200
-	assertSeries(t, res.Scenarios[1].Liquid, []float64{1200, feb, feb * 1.01, feb * 1.01 * 1.01, feb * 1.01 * 1.01 * 1.01})
+	assertSeries(t, res.Scenarios[0].Liquid, []float64{1212, 1224.12, 1236.3612, 1248.724812, 1261.21206012})
+	feb := 1212 + 12.12 - 200
+	assertSeries(t, res.Scenarios[1].Liquid, []float64{1212, feb, feb * 1.01, feb * 1.01 * 1.01, feb * 1.01 * 1.01 * 1.01})
 }
 
 // Spec chapter 04 §1.1: total = cash (with its interest) + investment values.
@@ -112,8 +114,8 @@ func TestCashInterestFlowsIntoTotal(t *testing.T) {
 		t.Fatal(err)
 	}
 	sr := res.Scenarios[0]
-	if math.Abs(sr.Total[1]-(1212+1000)) > 1e-9 {
-		t.Errorf("total[1] = %.6f, want 2212", sr.Total[1])
+	if math.Abs(sr.Total[0]-(1212+1000)) > 1e-9 {
+		t.Errorf("total[0] = %.6f, want 2212", sr.Total[0])
 	}
 }
 
@@ -144,7 +146,7 @@ func TestCashInterestLeavesEmergencyFundAlone(t *testing.T) {
 // of the 100.00 margin; a month of interest at 1% (11.695) clears it.
 func TestCashInterestCountsTowardThresholdPayoff(t *testing.T) {
 	plan := func(rate string) string {
-		return "version: 2\nsimulation:\n  startDate: 2025-01\n  endDate: 2025-04\n  startingCash: 1169.50\n" + rate + `scenarios:
+		return "version: 2\nsimulation:\n  startDate: 2025-02\n  endDate: 2025-05\n  startingCash: 1169.50\n" + rate + `scenarios:
   - name: a
     loans:
       - name: Loan
@@ -159,7 +161,7 @@ func TestCashInterestCountsTowardThresholdPayoff(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if notes := with.Scenarios[0].Notes[1]; len(notes) != 1 || !strings.Contains(notes[0], "paying off asset Loan for 1070.00") {
+	if notes := with.Scenarios[0].Notes[0]; len(notes) != 1 || !strings.Contains(notes[0], "paying off asset Loan for 1070.00") {
 		t.Errorf("with interest, want a payoff note in the first month, got %q", notes)
 	}
 	without, err := Run(loadConfig(t, plan("")), Options{})

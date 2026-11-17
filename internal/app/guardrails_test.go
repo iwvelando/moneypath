@@ -11,7 +11,7 @@ import (
 
 const guardrailPlan = `
 version: 2
-simulation: {startDate: 2025-01, endDate: 2025-04, startingCash: 1000}
+simulation: {startDate: 2025-01, endDate: 2025-04, startingCash: 1200}
 recommendations: {emergencyFundMonths: 0}
 guardrails:
   - {name: Cushion, kind: cashFloor, amount: 700}
@@ -84,9 +84,9 @@ func TestChoicesExampleCashFloor(t *testing.T) {
 		margin                   float64
 	}
 	wants := map[string]want{
-		"as we are":          {"holds", "", "2026-01", 5000},
-		"sell":               {"holds", "", "2026-01", 5000},
-		"sell and freelance": {"breaks", "2027-02", "2027-02", -4545.36},
+		"as we are":          {"holds", "", "2026-01", 5044.20},
+		"sell":               {"holds", "", "2026-01", 5044.20},
+		"sell and freelance": {"breaks", "2027-02", "2027-02", -4441.15},
 	}
 	for _, sc := range f.Result.Scenarios {
 		if len(sc.Guardrails) != 1 {

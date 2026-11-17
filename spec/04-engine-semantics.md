@@ -36,19 +36,24 @@ For each **active** scenario, independently:
 
 - Let `start` = `simulation.startDate` (or the caller-supplied current month when
   absent), `end` = `simulation.endDate`.
-- If `start ≥ end`, the simulation records only the initial row (no iteration). This MUST
-  NOT loop or error.
-- State: `cash = simulation.startingCash`; `r_cash` = the monthly rate derived from
-  `simulation.cashInterestRate` (0 when unset); per-investment states (§4); loan schedules
-  precomputed (§3) for the loans of the resolved scenario list and of the resolved
-  shared list.
-- Record the initial row at `start`: `liquid = cash`,
-  `total = cash + Σ investment startingValue` (scenario + common investments).
-- For each month `m` = `start+1`, `start+2`, … up to and including `end`:
+- The months simulated are `start` through `end`, both included, and every one of them is
+  recorded. When `start == end` the plan is that one month. A plan whose end is before
+  its start is a validation error (chapter 03) and is never simulated.
+- State: `cash = simulation.startingCash`, which is the balance at the **end of the month
+  before `start`** (chapter 03); `r_cash` = the monthly rate derived from
+  `simulation.cashInterestRate` (0 when unset); per-investment states (§4), whose
+  `startingValue` is read the same way; loan schedules precomputed (§3) for the loans of
+  the resolved scenario list and of the resolved shared list.
+- The month before `start` is not recorded. `startingCash` and the starting values are
+  where the first simulated month begins, so everything dated in `start` — an event
+  occurrence, a loan's down payment and payment, an investment contribution, a month of
+  interest and growth — is part of the row recorded at `start`.
+- For each month `m` = `start`, `start+1`, … up to and including `end`:
 
   1. **Events and cash interest**: `eventDelta` = sum of `amount` over every occurrence
      (§2) at `m` among the resolved scenario and common events. `cashInterest` =
-     `max(0, cash) · r_cash`, where `cash` is the balance recorded at `m−1` (see §1.1).
+     `max(0, cash) · r_cash`, where `cash` is the balance at the end of `m−1`: the one
+     recorded there, or `startingCash` when `m = start` (see §1.1).
   2. **Investments** (§4): process every scenario and common investment for `m`,
      yielding `investmentDelta` (net change in combined investment value),
      `cashContributions` (Σ contributions of investments with
@@ -68,7 +73,7 @@ For each **active** scenario, independently:
      `cash += cashInterest + eventDelta + loanDelta − cashContributions + withdrawalCash`.
   6. **Record**: `liquid[m] = cash`;
      `total[m] = cash + (running sum of investment values)`.
-  7. Accumulate emergency-fund expense stats (§5) for the first 12 iterated months.
+  7. Accumulate emergency-fund expense stats (§5) for the first 12 simulated months.
 
 Results per scenario: the date→liquid and date→total series, date→notes lists, and
 metrics (§5, §7).
@@ -92,11 +97,10 @@ balance the next month earns on.
 - **Silent**: interest emits no notes (§6) — it would put a line in every month of every
   scenario.
 - **Not an expense or an income**: interest is not part of `monthlyExpenses` (§5) and
-  does not change `initialLiquid`, which is the starting balance before any month
-  iterates. It does count in `projectedLiquid` for threshold payoffs (§3.5), because it
+  does not change `initialLiquid`, which is `startingCash` (§5). It does count in `projectedLiquid` for threshold payoffs (§3.5), because it
   is cash in hand that month.
-- The initial row (month `start`) carries no interest: `startingCash` is the balance at
-  the end of the month before `start`, and interest first accrues on it in `start+1`.
+- The first interest accrues in month `start`, on `startingCash`: that is the balance at
+  the end of the month before `start`.
 - Unrounded, like investment growth; only the rendered CSV rounds to cents.
 
 ## 2. Event occurrences
@@ -152,8 +156,9 @@ SHOULD treat `round2(remaining) < 0` as an internal error worth surfacing
 (assertion/logged error), never as an amount to keep billing.
 
 Payments dated before `simulation.startDate` exist in the schedule but are never billed
-(the loop only reads simulated months). The down payment is cash-out only if the loan
-starts inside the simulated window.
+(the loop only reads simulated months); a payment dated in the start month is billed. The
+down payment is cash-out only if the loan starts inside the simulated window, which
+includes the start month.
 
 ### 3.3 Extra principal payments
 
@@ -255,7 +260,9 @@ seller, insurer premium refunds) are deliberately out of scope; model them with
 ## 4. Investments
 
 Each investment carries state: `value` (starts at `startingValue`), `basis` (starts at
-`startingValue`), `growthBalance` (starts 0). For month `m`, in this exact order:
+`startingValue`), `growthBalance` (starts 0). Like `startingCash`, `startingValue` is the
+balance at the end of the month before `start`, so the first growth is in month `start`.
+For month `m`, in this exact order:
 
 1. **Growth**: `g = value · r` (`r` from `annualReturnRate`), computed on the balance
    **before** this month's contribution — new money starts compounding the following
@@ -288,9 +295,10 @@ Skipped when the target `N` months is 0 (config default 6).
   and common, counted individually — income never nets against expenses) + Σ loan
   payments billed at `m` (only positive payments; a cash-in sale month contributes 0)
   + `cashContributions(m)`.
-- `avg` = mean of `monthlyExpenses` over the first `min(12, monthsSimulated)` iterated
-  months.
-- `targetAmount = avg · N`; `initialLiquid = liquid[start]`;
+- `avg` = mean of `monthlyExpenses` over the first `min(12, monthsSimulated)` simulated
+  months, `start` included.
+- `targetAmount = avg · N`; `initialLiquid = startingCash`, the balance the plan starts
+  with, before the start month's own activity;
   `fundedMonths = initialLiquid / avg` (0 if `avg == 0`);
   `shortfall = max(0, targetAmount − initialLiquid)`;
   `surplus = max(0, initialLiquid − targetAmount)`. When the two differ by less than
@@ -406,15 +414,16 @@ Each scenario reports the few figures a comparison between scenarios turns on. T
 are read from the recorded series (§1) and add nothing to the simulation:
 
 - `lowestCash` and `lowestCashDate` — the least recorded `liquid` and the month it is
-  recorded at. Every recorded month counts, the initial row included. Months are
+  recorded at. Every recorded month counts, `start` included; `startingCash` itself is
+  not a recorded month (§1). Months are
   compared in whole cents (`round2`, per the preamble), and when several months share
   the least value the **earliest** is reported: `lowestCashDate` is the first month `m`
   with `round2(liquid[m]) = min round2(liquid)`, and `lowestCash = liquid[m]`, unrounded
-  like every other reported number. A scenario whose cash never falls below where it
-  starts therefore reports its starting cash and `start`.
+  like every other reported number. A scenario whose cash never falls after the start
+  month therefore reports that month's cash and `start`.
 - `endingCash` and `endingTotal` — `liquid` and `total` of the last recorded month.
 
-When `start ≥ end` only the initial row is recorded (§1), so all four describe it:
+When `start == end` only that one month is recorded (§1), so all four describe it:
 `lowestCash = endingCash = liquid[start]`, `endingTotal = total[start]`, and
 `lowestCashDate = start`.
 
@@ -447,12 +456,14 @@ What follows from the rule, each deliberate:
   overtaken: nothing is reported.
 - When a level month does precede an overtaking, the month reported is the first one
   the other scenario is actually ahead, not the level month.
-- The first lead taken from a level start is not a break-even month, because nobody
-  was overtaken. Scenarios usually start level: they share `startingCash`.
+- The first lead is not a break-even month, because nobody was overtaken: neither a
+  lead held from the first recorded month nor one taken after level months. Scenarios
+  share `startingCash`, but the first recorded month already carries each one's own
+  start-month activity, so they need not be level there.
 - Every change of lead is reported, in month order, so two paths that cross twice
   report two months.
 - A series with one scenario ahead in every month it is not level reports no
-  break-even months, as does a plan with only its initial row (§1).
+  break-even months, as does a plan of one month (§1).
 
 The cash and total series are walked independently, so a path can catch up in cash in a
 month in which it is still behind in total. The break-even months of (B, A) are those of
@@ -473,7 +484,8 @@ emergency-fund recommendation (§5), which is not reported as a guardrail.
 
 **The window.** A guardrail's window is its `startDate`–`endDate`, inclusive at both
 ends, defaulting to `start` and `end`, and clipped to the recorded months `start`–`end`
-(§1). The initial row at `start` counts, as it does for lowest cash (§8). A window with
+(§1). The month `start` counts, after its own activity, as it does for lowest cash (§8);
+`startingCash` itself is not checked. A window with
 no recorded month in it is **empty**.
 
 **The test in one month.** A guardrail holds in month `m` when its condition is met at
@@ -503,8 +515,10 @@ not apply.
 What follows from the rule, each deliberate:
 
 - A floor met exactly, to the cent, holds; one cent less breaks.
-- A path whose cash starts below its floor breaks in its opening month, at `start`. The
-  same guardrail with a later `startDate` is judged from that month.
+- A path whose cash at the end of the start month is below its floor breaks in that
+  month, at `start`. Starting cash below the floor that the start month's own income
+  lifts above it does not break. The same guardrail with a later `startDate` is judged
+  from that month.
 - The first breach can come before the tightest month, when cash falls below the floor
   and later falls further.
 - Inactive scenarios are not simulated, so they report nothing.

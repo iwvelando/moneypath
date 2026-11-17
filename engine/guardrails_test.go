@@ -145,7 +145,7 @@ version: 2
 simulation: {startDate: 2025-01, endDate: 2025-03, startingCash: 1000}
 guardrails:
   - {name: Low, kind: cashFloor, amount: 0}
-  - {name: High, kind: cashFloor, amount: 1050}
+  - {name: High, kind: cashFloor, amount: 1150}
 scenarios:
   - name: grows
     events: [{name: Pay, amount: 100}]

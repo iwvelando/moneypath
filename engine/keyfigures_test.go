@@ -1,12 +1,13 @@
 package engine
 
 import (
+	"math"
 	"testing"
 
 	"github.com/iwvelando/moneypath/config"
 )
 
-// Spec chapter 04 §8: lowest cash is the least recorded liquid, initial row
+// Spec chapter 04 §8: lowest cash is the least recorded liquid, start month
 // included, and the ending figures are the last recorded month's.
 func TestKeyFiguresReadTheRecordedSeries(t *testing.T) {
 	start := month(t, "2025-01")
@@ -43,18 +44,18 @@ func TestKeyFiguresLowestCashComparesWholeCents(t *testing.T) {
 	}
 }
 
-// Spec chapter 04 §8: cash that never falls below where it starts reports the
-// starting cash and the start month.
-func TestKeyFiguresLowestCashCanBeTheStartingCash(t *testing.T) {
+// Spec chapter 04 §8: cash that never falls after the start month reports
+// that month's cash and the start month.
+func TestKeyFiguresLowestCashCanBeTheStartMonth(t *testing.T) {
 	got := keyFigures(month(t, "2025-01"), []float64{5000, 5500, 6000}, []float64{5000, 5500, 6000})
 	if got.LowestCashDate != month(t, "2025-01") || got.LowestCash != 5000 {
 		t.Errorf("lowest cash = %v at %s, want 5000 at 2025-01", got.LowestCash, got.LowestCashDate)
 	}
 }
 
-// Spec chapter 04 §1 and §8: a plan whose start is its end records only the
-// initial row, and every key figure describes that row.
-func TestKeyFiguresOfAPlanWithOnlyItsInitialRow(t *testing.T) {
+// Spec chapter 04 §1 and §8: a plan whose start is its end simulates and
+// records that one month, and every key figure describes it.
+func TestKeyFiguresOfAPlanOfOneMonth(t *testing.T) {
 	cfg, _, err := config.Parse([]byte(`
 version: 2
 simulation: {startDate: 2025-03, endDate: 2025-03, startingCash: 1200}
@@ -77,13 +78,9 @@ scenarios:
 		t.Fatal(err)
 	}
 	got := res.Scenarios[0].KeyFigures
-	want := KeyFigures{
-		LowestCash:     1200,
-		LowestCashDate: month(t, "2025-03"),
-		EndingCash:     1200,
-		EndingTotal:    2000,
-	}
-	if got != want {
-		t.Errorf("KeyFigures = %+v, want %+v", got, want)
+	// The month's rent is paid and the fund grows half a percent.
+	if got.LowestCash != 300 || got.LowestCashDate != month(t, "2025-03") || got.EndingCash != 300 ||
+		math.Abs(got.EndingTotal-(300+800*1.005)) > 1e-9 {
+		t.Errorf("KeyFigures = %+v, want cash 300 in 2025-03 and a total of 1104", got)
 	}
 }
