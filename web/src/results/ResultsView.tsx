@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Adjustment, AdjustmentStatus } from '../config/adjustments';
 import { flipSubject } from '../config/choices';
-import type { ConfigModel } from '../config/types';
+import type { ConfigModel, GuardrailModel } from '../config/types';
 import type { FlipComparison, FlipRequest, ForecastResults, ScenarioMetrics } from '../engine/types';
 import { formatDuration, formatMoney, formatMonths } from '../util/format';
 import { Chart } from './Chart';
 import { Comparison } from './Comparison';
 import { Difference } from './Difference';
 import { Flip } from './Flip';
-import { GuardrailList } from './Guardrails';
+import { GuardrailList, RunGuardrails } from './Guardrails';
 import { MonthlyTable, type MonthlyRow } from './MonthlyTable';
 import { EmergencyFundGauge } from './Gauge';
 import { OverlaySparkline, Sparkline } from './Sparkline';
@@ -23,6 +23,8 @@ interface ResultsViewProps {
   onApply: (adjustments: Adjustment[]) => void;
   /** What it takes to flip one choice of a scenario; without it nothing is offered. */
   flip?: FlipAccess;
+  /** The guardrails of the plan these results came from, to word each result by what it checked. */
+  guardrails?: readonly GuardrailModel[];
 }
 
 export interface FlipAccess {
@@ -184,6 +186,7 @@ export function ResultsView({
   statusOf,
   onApply,
   flip,
+  guardrails = [],
 }: ResultsViewProps) {
   // A scenario's position, or the comparison of all of them.
   const [selected, setSelected] = useState<number | 'compare'>(0);
@@ -272,90 +275,92 @@ export function ResultsView({
   }, [results.rows, index]);
 
   return (
-    <div class="results">
-      <div class="results__head">
-        <div class="tablist" role="tablist" aria-label="Scenarios">
-          {results.scenarios.map((name, i) => (
-            <button
-              key={name}
-              type="button"
-              role="tab"
-              id={tabId(i)}
-              aria-selected={i === current}
-              aria-controls="scenario-panel"
-              tabIndex={i === current ? 0 : -1}
-              class={`tablist__tab${i === current ? ' is-active' : ''}${i === quietTab ? ' is-focus-quiet' : ''}`}
-              onBlur={() => setQuietTab(null)}
-              onClick={(event) => choose(event, i)}
-              onKeyDown={(event) => stepTab(event, i)}
-            >
-              {name}
-              <Sparkline series={scenarioTotals[i] ?? []} />
-            </button>
-          ))}
-          {canCompare ? (
-            <button
-              type="button"
-              role="tab"
-              id={tabId('compare')}
-              aria-selected={comparing}
-              aria-controls="scenario-panel"
-              tabIndex={comparing ? 0 : -1}
-              class={comparing ? 'tablist__tab tablist__tab--compare is-active' : 'tablist__tab tablist__tab--compare'}
-              onClick={(event) => choose(event, 'compare')}
-              onKeyDown={(event) => stepTab(event, 'compare')}
-            >
-              Compare
-              <OverlaySparkline series={scenarioTotals} />
-            </button>
-          ) : null}
-        </div>
-        <div class="results__actions">
-          <span class="results__meta">
-            Ran in {formatDuration(durationMs)}
-            {optimizerRan ? ' · optimizer on' : ''}
-          </span>
-          <button type="button" class="btn btn--primary" onClick={onDownloadCsv}>
-            Download CSV
-          </button>
-        </div>
-      </div>
-
-      <div id="scenario-panel" role="tabpanel" aria-labelledby={tabId(current)} tabIndex={0}>
-        {comparing ? (
-          <>
-            <Comparison results={results} onOpenScenario={openScenario} />
-            <Difference results={results} />
-          </>
-        ) : (
-          <>
-        <div class="results__overview">
-          <div class="results__projection">
-            <div class="results__section-heading">
-              <h3>Net worth over time</h3>
-            </div>
-            <Chart dates={dates} liquid={liquid} total={total} scenarioName={scenarioName} />
+    <RunGuardrails.Provider value={guardrails}>
+      <div class="results">
+        <div class="results__head">
+          <div class="tablist" role="tablist" aria-label="Scenarios">
+            {results.scenarios.map((name, i) => (
+              <button
+                key={name}
+                type="button"
+                role="tab"
+                id={tabId(i)}
+                aria-selected={i === current}
+                aria-controls="scenario-panel"
+                tabIndex={i === current ? 0 : -1}
+                class={`tablist__tab${i === current ? ' is-active' : ''}${i === quietTab ? ' is-focus-quiet' : ''}`}
+                onBlur={() => setQuietTab(null)}
+                onClick={(event) => choose(event, i)}
+                onKeyDown={(event) => stepTab(event, i)}
+              >
+                {name}
+                <Sparkline series={scenarioTotals[i] ?? []} />
+              </button>
+            ))}
+            {canCompare ? (
+              <button
+                type="button"
+                role="tab"
+                id={tabId('compare')}
+                aria-selected={comparing}
+                aria-controls="scenario-panel"
+                tabIndex={comparing ? 0 : -1}
+                class={comparing ? 'tablist__tab tablist__tab--compare is-active' : 'tablist__tab tablist__tab--compare'}
+                onClick={(event) => choose(event, 'compare')}
+                onKeyDown={(event) => stepTab(event, 'compare')}
+              >
+                Compare
+                <OverlaySparkline series={scenarioTotals} />
+              </button>
+            ) : null}
           </div>
-          <SummaryPanel
-            metrics={results.metrics[index]}
-            scenarioName={scenarioName}
-            statusOf={statusOf}
-            onApply={onApply}
-          />
+          <div class="results__actions">
+            <span class="results__meta">
+              Ran in {formatDuration(durationMs)}
+              {optimizerRan ? ' · optimizer on' : ''}
+            </span>
+            <button type="button" class="btn btn--primary" onClick={onDownloadCsv}>
+              Download CSV
+            </button>
+          </div>
         </div>
 
-        {flip && flipOf ? (
-          <Flip results={results} scenario={index} subject={flipOf} run={flip.run} onKeep={flip.onKeep} />
-        ) : null}
+        <div id="scenario-panel" role="tabpanel" aria-labelledby={tabId(current)} tabIndex={0}>
+          {comparing ? (
+            <>
+              <Comparison results={results} onOpenScenario={openScenario} />
+              <Difference results={results} />
+            </>
+          ) : (
+            <>
+          <div class="results__overview">
+            <div class="results__projection">
+              <div class="results__section-heading">
+                <h3>Net worth over time</h3>
+              </div>
+              <Chart dates={dates} liquid={liquid} total={total} scenarioName={scenarioName} />
+            </div>
+            <SummaryPanel
+              metrics={results.metrics[index]}
+              scenarioName={scenarioName}
+              statusOf={statusOf}
+              onApply={onApply}
+            />
+          </div>
 
-        <div class="results__section-heading">
-          <h3>Month by month</h3>
-          <p>The numbers behind your path.</p>
+          {flip && flipOf ? (
+            <Flip results={results} scenario={index} subject={flipOf} run={flip.run} onKeep={flip.onKeep} />
+          ) : null}
+
+          <div class="results__section-heading">
+            <h3>Month by month</h3>
+            <p>The numbers behind your path.</p>
+          </div>
+          <MonthlyTable key={scenarioName} rows={rows} scenarioName={scenarioName} />
+            </>
+          )}
         </div>
-        <MonthlyTable key={scenarioName} rows={rows} scenarioName={scenarioName} />
-          </>
-        )}
       </div>
-    </div>
+    </RunGuardrails.Provider>
   );
 }

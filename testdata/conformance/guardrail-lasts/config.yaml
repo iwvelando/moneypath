@@ -1,0 +1,83 @@
+version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2025-08
+  startingCash: 10000.00
+recommendations:
+  emergencyFundMonths: 0
+guardrails:
+  - name: Brokerage lasts
+    kind: lasts
+    investments: [Brokerage]
+  - name: Both last
+    kind: lasts
+    investments: [Brokerage, IRA]
+  - name: Keep 1500
+    kind: lasts
+    investments: [Brokerage, IRA]
+    amount: 1500.00
+  - name: Keep 1500 in March
+    kind: lasts
+    investments: [Brokerage, IRA]
+    amount: 1500.00
+    startDate: 2025-03
+    endDate: 2025-03
+  - name: Keep a cent more in March
+    kind: lasts
+    investments: [Brokerage, IRA]
+    amount: 1500.01
+    startDate: 2025-03
+    endDate: 2025-03
+  - name: Savings last
+    kind: lasts
+    investments: [Savings]
+  - name: Savings last from April
+    kind: lasts
+    investments: [Savings]
+    startDate: 2025-04
+  - name: Old 401k lasts
+    kind: lasts
+    investments: [Old 401k]
+  - name: After the plan
+    kind: lasts
+    investments: [Brokerage]
+    startDate: 2026-01
+scenarios:
+  - name: draws down
+    investments:
+      - name: Brokerage
+        startingValue: 3000.00
+        withdrawals:
+          - name: Monthly draw
+            amount: 1000.00
+            startDate: 2025-02
+      - name: IRA
+        startingValue: 500.00
+      - name: Savings
+        contributionsFromCash: true
+        contributions:
+          - name: Monthly saving
+            amount: 1000.00
+            startDate: 2025-03
+  - name: pays a loan
+    investments:
+      - name: Brokerage
+        startingValue: 8000.00
+        fundLoanPayoffs: true
+    loans:
+      - name: Car
+        principal: 6000.00
+        interestRate: 0
+        term: 6
+        startDate: 2025-01
+        earlyPayoffThreshold: 1000.00
+    events:
+      - name: Spending
+        amount: -8500.00
+        startDate: 2025-01
+        endDate: 2025-01
+  - name: parked
+    active: false
+    investments:
+      - name: Old 401k
+        startingValue: 1000.00

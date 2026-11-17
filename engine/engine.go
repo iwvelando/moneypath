@@ -24,10 +24,16 @@ type Result struct {
 }
 
 type ScenarioResult struct {
-	Name       string
-	Liquid     []float64
-	Total      []float64
-	Notes      [][]string
+	Name   string
+	Liquid []float64
+	Total  []float64
+	Notes  [][]string
+	// Owed is the principal each loan name owes at the end of each month,
+	// summed over the path's loans with that name, and Holdings each account
+	// name's value; both are index-aligned with Liquid. They are read by
+	// guardrails only, never written to the CSV (spec chapter 04 §10).
+	Owed       map[string][]float64
+	Holdings   map[string][]float64
 	KeyFigures KeyFigures
 	// Guardrails holds one result per guardrail of the plan, in its order;
 	// nil when it has none (spec chapter 04 §10).
@@ -179,6 +185,19 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		invs = append(invs, newInvSim(inv, "common"))
 	}
 
+	sr.Owed = make(map[string][]float64, len(loans))
+	for _, ls := range loans {
+		if sr.Owed[ls.l.Name] == nil {
+			sr.Owed[ls.l.Name] = make([]float64, n)
+		}
+	}
+	sr.Holdings = make(map[string][]float64, len(invs))
+	for _, iv := range invs {
+		if sr.Holdings[iv.inv.Name] == nil {
+			sr.Holdings[iv.inv.Name] = make([]float64, n)
+		}
+	}
+
 	// startingCash and each startingValue are balances at the end of the
 	// month before start, so the start month's own activity is simulated.
 	startingCash := cfg.Simulation.ResolvedStartingCash
@@ -249,6 +268,10 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		invTotal := 0.0
 		for _, iv := range invs {
 			invTotal += iv.value
+			sr.Holdings[iv.inv.Name][idx] += iv.value
+		}
+		for _, ls := range loans {
+			sr.Owed[ls.l.Name][idx] += ls.owedAt(m)
 		}
 		sr.Liquid[idx] = cash
 		sr.Total[idx] = cash + invTotal

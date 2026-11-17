@@ -71,7 +71,7 @@ func Check(cfg *Config, now Month) []Problem {
 		cfg.ResolvedEmergencyFundMonths = n
 	}
 
-	c.guardrails(cfg.Guardrails)
+	c.guardrails(cfg.Guardrails, entryNames(cfg))
 
 	// Scenarios.
 	if len(cfg.Scenarios) == 0 {
@@ -136,9 +136,61 @@ func (c *checker) month(path, label, s string) (Month, bool) {
 	return m, true
 }
 
+// planNames is every loan and investment name written anywhere in the plan:
+// in common, an option's added entries, or a scenario's own, active or not.
+type planNames struct{ loans, investments map[string]bool }
+
+func entryNames(cfg *Config) planNames {
+	names := planNames{loans: map[string]bool{}, investments: map[string]bool{}}
+	add := func(s *Section) {
+		for _, l := range s.Loans {
+			if l != nil {
+				names.loans[l.Name] = true
+			}
+		}
+		for _, inv := range s.Investments {
+			if inv != nil {
+				names.investments[inv.Name] = true
+			}
+		}
+	}
+	add(&cfg.Common)
+	for _, ch := range cfg.Choices {
+		if ch == nil {
+			continue
+		}
+		for _, opt := range ch.Options {
+			if opt != nil {
+				add(&opt.Section)
+			}
+		}
+	}
+	for _, sc := range cfg.Scenarios {
+		if sc != nil {
+			add(&sc.Section)
+		}
+	}
+	return names
+}
+
+// guardrailNames checks the names a guardrail lists: each once, and each the
+// name of an entry of that kind in the plan (spec chapter 03, Guardrails).
+func (c *checker) guardrailNames(path string, names []string, known map[string]bool, noun string) {
+	listed := map[string]bool{}
+	for j, name := range names {
+		switch {
+		case listed[name]:
+			c.fail(join(path, j), "“%s” is already listed.", name)
+		case !known[name]:
+			c.fail(join(path, j), "No %s in the plan is named “%s”.", noun, name)
+		}
+		listed[name] = true
+	}
+}
+
 // guardrails checks the plan's guardrails and resolves each one's window
 // (spec chapter 03, Guardrails).
-func (c *checker) guardrails(guardrails []*Guardrail) {
+func (c *checker) guardrails(guardrails []*Guardrail, plan planNames) {
 	names := map[string]bool{}
 	for i, g := range guardrails {
 		path := join("guardrails", i)
@@ -168,10 +220,33 @@ func (c *checker) guardrails(guardrails []*Guardrail) {
 			if g.Loans != nil {
 				c.warn(at("loans"), "A cash floor does not use loans, so this has no effect.")
 			}
-		case GuardrailDebtFree, GuardrailLasts:
-			c.fail(at("kind"), "This kind of guardrail cannot be checked yet. For now, a guardrail can only be a cash floor.")
+		case GuardrailDebtFree:
+			if g.StartDate == "" {
+				c.fail(at("startDate"), "A debt-free guardrail needs a start month, the month from which nothing may be owed.")
+			}
+			if g.Amount != nil {
+				c.warn(at("amount"), "A debt-free guardrail does not use an amount, so this has no effect.")
+			}
+			if g.Investments != nil {
+				c.warn(at("investments"), "A debt-free guardrail does not use investments, so this has no effect.")
+			}
+			if g.Loans != nil && len(g.Loans) == 0 {
+				c.fail(at("loans"), "List at least one loan, or leave the list out to check every loan.")
+			}
+			c.guardrailNames(at("loans"), g.Loans, plan.loans, "loan")
+		case GuardrailLasts:
+			if len(g.Investments) == 0 {
+				c.fail(at("investments"), "List at least one investment whose balance must last.")
+			}
+			c.guardrailNames(at("investments"), g.Investments, plan.investments, "investment")
+			if g.Amount != nil && *g.Amount <= 0 {
+				c.fail(at("amount"), "The amount must be more than 0. Leave it out to mean the investments must never be emptied.")
+			}
+			if g.Loans != nil {
+				c.warn(at("loans"), "A guardrail on investments that last does not use loans, so this has no effect.")
+			}
 		default:
-			c.fail(at("kind"), "“%s” is not a kind of guardrail. For now, a guardrail can only be a cash floor.", g.Kind)
+			c.fail(at("kind"), "“%s” is not a kind of guardrail. Use cashFloor, debtFree or lasts.", g.Kind)
 		}
 
 		start, haveStart := c.start, c.window

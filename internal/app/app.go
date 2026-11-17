@@ -157,15 +157,18 @@ type metricJSON struct {
 }
 
 // guardrailJSON is one guardrail read from one path (spec chapter 02, Results
-// JSON): a first breach only on a breach, and the tightest month and margin
-// unless the guardrail does not apply.
+// JSON): a first breach only on a breach, and the tightest month with its
+// margin when the path has one. A debtFree's margin is in months, and it
+// reports what is owed at a breach.
 type guardrailJSON struct {
 	Name            string   `json:"name"`
 	Kind            string   `json:"kind"`
 	Result          string   `json:"result"`
 	FirstBreachDate string   `json:"firstBreachDate,omitempty"`
+	Owed            *float64 `json:"owed,omitempty"`
 	TightestDate    string   `json:"tightestDate,omitempty"`
 	Margin          *float64 `json:"margin,omitempty"`
+	MarginMonths    *int     `json:"marginMonths,omitempty"`
 }
 
 func guardrailsJSON(results []engine.GuardrailResult) []guardrailJSON {
@@ -175,13 +178,23 @@ func guardrailsJSON(results []engine.GuardrailResult) []guardrailJSON {
 	out := make([]guardrailJSON, len(results))
 	for i, g := range results {
 		out[i] = guardrailJSON{Name: g.Name, Kind: g.Kind, Result: string(g.Result)}
+		debtFree := g.Kind == config.GuardrailDebtFree
 		if g.Result == engine.GuardrailBreaks {
 			out[i].FirstBreachDate = g.FirstBreach.String()
+			if debtFree {
+				owed := g.Owed
+				out[i].Owed = &owed
+			}
 		}
-		if g.Result != engine.GuardrailDoesNotApply {
-			margin := g.Margin
+		if g.HasTightest {
 			out[i].TightestDate = g.Tightest.String()
-			out[i].Margin = &margin
+			if debtFree {
+				months := g.MarginMonths
+				out[i].MarginMonths = &months
+			} else {
+				margin := g.Margin
+				out[i].Margin = &margin
+			}
 		}
 	}
 	return out

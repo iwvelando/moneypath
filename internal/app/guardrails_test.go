@@ -89,8 +89,8 @@ func TestChoicesExampleCashFloor(t *testing.T) {
 		"sell and freelance": {"breaks", "2027-02", "2027-02", -4441.15},
 	}
 	for _, sc := range f.Result.Scenarios {
-		if len(sc.Guardrails) != 1 {
-			t.Fatalf("%s: want one guardrail, got %+v", sc.Name, sc.Guardrails)
+		if len(sc.Guardrails) == 0 || sc.Guardrails[0].Name != "Cushion" {
+			t.Fatalf("%s: want the cushion first, got %+v", sc.Name, sc.Guardrails)
 		}
 		g, w := sc.Guardrails[0], wants[sc.Name]
 		breach := ""

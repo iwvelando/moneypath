@@ -44,8 +44,11 @@ export interface KeyFigureMetrics {
 
 /**
  * One guardrail read from one path, decided by the engine. `firstBreachDate`
- * is present only when it breaks; `tightestDate` and `margin` (the cash less
- * the floor in the tightest month) unless it does not apply.
+ * is present only when it breaks. For a cash floor or a lasts, `tightestDate`
+ * and `margin` (the balance less the floor there) are present unless it does
+ * not apply. For a debt-free, `tightestDate` is the month the debt is cleared
+ * and `marginMonths` the months to spare, both absent while debt remains at the
+ * window's end, and `owed` is what is owed at a breach.
  */
 export interface GuardrailResult {
   name: string;
@@ -54,6 +57,8 @@ export interface GuardrailResult {
   firstBreachDate?: string;
   tightestDate?: string;
   margin?: number;
+  marginMonths?: number;
+  owed?: number;
 }
 
 export interface ScenarioMetrics {

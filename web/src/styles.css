@@ -1839,6 +1839,34 @@ select.input {
   overflow-wrap: anywhere;
 }
 
+/* The loans or investments a guardrail lists, one box for each name in the plan. */
+.name-checklist {
+  border: 0;
+  margin: 18px 0 0;
+  padding: 0;
+  min-width: 0;
+}
+
+/* Read as a field's label, not as the heading of the group it sits in. */
+.name-checklist > legend.field__label {
+  padding: 0;
+  margin-bottom: 4px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--text-muted);
+}
+
+.name-checklist__list {
+  list-style: none;
+  margin: 2px 0 0;
+  padding: 0;
+}
+
+.name-checklist__list label {
+  overflow-wrap: anywhere;
+}
+
 /* What a loaded plan named that the guardrail's kind does not use. */
 .field__static {
   margin: 0;

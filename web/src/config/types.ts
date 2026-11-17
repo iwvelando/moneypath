@@ -146,13 +146,14 @@ export interface CommonModel {
 }
 
 /** The kinds of guardrail the engine can check. */
-export type GuardrailKind = 'cashFloor';
+export type GuardrailKind = 'cashFloor' | 'debtFree' | 'lasts';
 
 /**
  * A condition every path is checked against. `kind` is kept as written, so a
  * kind the engine cannot check stays on screen with its error. `investments`
- * and `loans` are null when absent; a cash floor uses neither, and a plan that
- * names them keeps them until the reader takes them away.
+ * and `loans` are null when absent. A debt-free uses `loans`, and a lasts
+ * `investments`; a value a kind does not use stays until the reader takes it
+ * away.
  */
 export interface GuardrailModel {
   id: string;

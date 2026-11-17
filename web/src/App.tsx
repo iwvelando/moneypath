@@ -553,6 +553,7 @@ export function App() {
                 flip={
                   ranConfig.current ? { plan: ranConfig.current, run: runFlip, onKeep: keepFlip } : undefined
                 }
+                guardrails={ranConfig.current?.guardrails}
               />
             </>
           ) : null}

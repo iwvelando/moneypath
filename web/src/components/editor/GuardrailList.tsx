@@ -2,18 +2,54 @@ import { useId } from 'preact/hooks';
 import { EditorCard, EditorFields, useEditorCards, type EditorCardState } from './EditorCard';
 import { guardrailSummary } from './summaries';
 import { HELP } from '../../config/help';
-import { cloneGuardrail, emptyGuardrail, type GuardrailModel } from '../../config/types';
+import {
+  cloneGuardrail,
+  emptyGuardrail,
+  type ConfigModel,
+  type GuardrailModel,
+  type InvestmentModel,
+  type LoanModel,
+} from '../../config/types';
+import { formatMoney } from '../../util/format';
 import { HelpTip } from '../HelpTip';
 import { MonthField, NumberField, SelectField, TextField } from '../fields';
-import { At, Notes, noteOf, usePath, useProblemsAt } from '../problems';
+import { At, Notes, PathProblems, noteOf, usePath, useProblemsAt } from '../problems';
 
-const KINDS = [{ value: 'cashFloor', label: 'Cash floor' }] as const;
+const KINDS = [
+  { value: 'cashFloor', label: 'Cash floor' },
+  { value: 'debtFree', label: 'Debt-free' },
+  { value: 'lasts', label: 'Investments last' },
+] as const;
+
+/** The loan and investment names written anywhere in a plan, each once, in the plan's order. */
+export interface EntryNames {
+  loans: string[];
+  investments: string[];
+}
 
 /**
- * Names a loaded plan gave a guardrail whose kind does not use them. They stay
- * on screen with the engine's warning until the reader takes them away.
+ * Every loan and investment name in the plan: the baseline's, those an option
+ * adds and each scenario's own, active or not. These are the names a guardrail
+ * can list; the engine says when a listed one is not among them.
  */
-function UnusedNames({ field, label, names, onRemove }: { field: string; label: string; names: string[]; onRemove: () => void }) {
+export function entryNames(config: ConfigModel): EntryNames {
+  const sections: { loans: LoanModel[]; investments: InvestmentModel[] }[] = [
+    config.common,
+    ...config.choices.flatMap((choice) => choice.options),
+    ...config.scenarios,
+  ];
+  const unique = (names: string[]) => [...new Set(names.map((name) => name.trim()).filter((name) => name !== ''))];
+  return {
+    loans: unique(sections.flatMap((section) => section.loans.map((loan) => loan.name))),
+    investments: unique(sections.flatMap((section) => section.investments.map((investment) => investment.name))),
+  };
+}
+
+/**
+ * Something a loaded plan gave a guardrail whose kind does not use it. It
+ * stays on screen with the engine's warning until the reader takes it away.
+ */
+function Unused({ field, label, help, text, onRemove }: { field: string; label: string; help: string; text: string; onRemove: () => void }) {
   const path = usePath(field);
   const helpId = `${useId()}-help`;
   const notes = useProblemsAt(path).map(noteOf);
@@ -21,9 +57,9 @@ function UnusedNames({ field, label, names, onRemove }: { field: string; label: 
     <div class="field field--wide" data-path={path}>
       <div class="field__label">
         <span>{label}</span>
-        <HelpTip id={helpId} label={label} text={HELP.guardrailUnusedNames} />
+        <HelpTip id={helpId} label={label} text={help} />
       </div>
-      <p class="field__static">{names.length > 0 ? names.join(', ') : 'None listed'}</p>
+      <p class="field__static">{text}</p>
       <Notes notes={notes} />
       <p>
         <button type="button" class="btn btn--quiet btn--small" onClick={onRemove}>
@@ -34,15 +70,107 @@ function UnusedNames({ field, label, names, onRemove }: { field: string; label: 
   );
 }
 
+function UnusedNames({ field, label, names, onRemove }: { field: string; label: string; names: string[]; onRemove: () => void }) {
+  return (
+    <Unused
+      field={field}
+      label={label}
+      help={HELP.guardrailUnusedNames}
+      text={names.length > 0 ? names.join(', ') : 'None listed'}
+      onRemove={onRemove}
+    />
+  );
+}
+
+interface NameChecklistProps {
+  field: 'loans' | 'investments';
+  label: string;
+  help: string;
+  /** Said under the boxes; the rule itself is the engine's. */
+  hint: string;
+  /** What the guardrail lists, as written; null when it lists nothing. */
+  listed: string[] | null;
+  /** The names of that kind in the plan. */
+  available: string[];
+  /** Said when the plan has no entry of that kind yet. */
+  none: string;
+  /** Optional action to remove an explicitly empty list. */
+  clearEmptyLabel?: string;
+  onChange: (listed: string[] | null) => void;
+}
+
+/**
+ * A box for every name of one kind in the plan, ticked when the guardrail
+ * lists it. A listed name the plan does not have keeps its ticked box, with
+ * the engine's problem at its place in the list, until it is unticked.
+ */
+function NameChecklist({ field, label, help, hint, listed, available, none, clearEmptyLabel, onChange }: NameChecklistProps) {
+  const path = usePath(field);
+  const base = useId();
+  const labelId = `${base}-label`;
+  const helpId = `${base}-help`;
+  const messageId = `${base}-msg`;
+  const notes = useProblemsAt(path).map(noteOf);
+  const names = [...available, ...(listed ?? []).filter((name, i, all) => !available.includes(name) && all.indexOf(name) === i)];
+  const toggle = (name: string, ticked: boolean) => {
+    const next = ticked ? [...(listed ?? []), name] : (listed ?? []).filter((existing) => existing !== name);
+    onChange(next.length > 0 ? next : null);
+  };
+  return (
+    <fieldset
+      class="field field--wide name-checklist"
+      data-path={path}
+      aria-labelledby={labelId}
+      aria-describedby={notes.length > 0 ? messageId : undefined}
+    >
+      <legend class="field__label">
+        <span id={labelId}>{label}</span>
+        <HelpTip id={helpId} label={label} text={help} />
+      </legend>
+      {names.length === 0 ? (
+        <p class="field__static">{none}</p>
+      ) : (
+        <ul class="check-grid name-checklist__list">
+          {names.map((name, n) => {
+            const id = `${base}-${n}`;
+            const places = (listed ?? []).flatMap((existing, j) => (existing === name ? [j] : []));
+            return (
+              <li key={name}>
+                <div class="check-row">
+                  <input id={id} type="checkbox" checked={places.length > 0} onChange={(event) => toggle(name, (event.currentTarget as HTMLInputElement).checked)} />
+                  <label for={id}>{name}</label>
+                </div>
+                {places.map((j) => (
+                  <PathProblems key={j} field={`${field}.${j}`} />
+                ))}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      <p class="field__message">{hint}</p>
+      <Notes id={messageId} notes={notes} />
+      {clearEmptyLabel && listed?.length === 0 ? (
+        <p>
+          <button type="button" class="btn btn--quiet btn--small" onClick={() => onChange(null)}>
+            {clearEmptyLabel}
+          </button>
+        </p>
+      ) : null}
+    </fieldset>
+  );
+}
+
 interface GuardrailCardProps extends EditorCardState {
   guardrail: GuardrailModel;
+  names: EntryNames;
   index: number;
   onChange: (guardrail: GuardrailModel) => void;
   onRemove: () => void;
   onDuplicate: () => void;
 }
 
-function GuardrailCard({ guardrail, index, onChange, onRemove, onDuplicate, open, autoFocus, onOpenChange }: GuardrailCardProps) {
+function GuardrailCard({ guardrail, names, index, onChange, onRemove, onDuplicate, open, autoFocus, onOpenChange }: GuardrailCardProps) {
   const title = guardrail.name.trim() || `Guardrail ${index + 1}`;
   const patch = (changes: Partial<GuardrailModel>) => onChange({ ...guardrail, ...changes });
   const known = KINDS.some((kind) => kind.value === guardrail.kind);
@@ -93,24 +221,80 @@ function GuardrailCard({ guardrail, index, onChange, onRemove, onDuplicate, open
               onChange={(amount) => patch({ amount })}
             />
           ) : null}
+          {guardrail.kind === 'lasts' ? (
+            <NumberField
+              field="amount"
+              label="Never below"
+              help={HELP.guardrailLastsAmount}
+              value={guardrail.amount}
+              step={500}
+              placeholder="Never emptied"
+              onChange={(amount) => patch({ amount })}
+            />
+          ) : null}
         </div>
-        {guardrail.investments !== null ? (
+        {guardrail.kind === 'debtFree' ? (
+          <NameChecklist
+            field="loans"
+            label="Loans"
+            help={HELP.guardrailLoans}
+            hint="Leave every box unticked to check every loan."
+            listed={guardrail.loans}
+            available={names.loans}
+            none="The plan has no loans yet, so every loan a scenario takes out later is checked."
+            clearEmptyLabel="Use every loan"
+            onChange={(loans) => patch({ loans })}
+          />
+        ) : null}
+        {guardrail.kind === 'lasts' ? (
+          <NameChecklist
+            field="investments"
+            label="Investments"
+            help={HELP.guardrailInvestments}
+            hint="Tick at least one. Their balances are added together."
+            listed={guardrail.investments}
+            available={names.investments}
+            none="The plan has no investments yet. Add one to the baseline, an option or a scenario first."
+            onChange={(investments) => patch({ investments })}
+          />
+        ) : null}
+        {guardrail.kind === 'debtFree' && guardrail.amount !== null ? (
+          <Unused
+            field="amount"
+            label="Amount"
+            help={HELP.guardrailUnusedAmount}
+            text={formatMoney(guardrail.amount)}
+            onRemove={() => patch({ amount: null })}
+          />
+        ) : null}
+        {guardrail.kind !== 'lasts' && guardrail.investments !== null ? (
           <UnusedNames field="investments" label="Investments" names={guardrail.investments} onRemove={() => patch({ investments: null })} />
         ) : null}
-        {guardrail.loans !== null ? (
+        {guardrail.kind !== 'debtFree' && guardrail.loans !== null ? (
           <UnusedNames field="loans" label="Loans" names={guardrail.loans} onRemove={() => patch({ loans: null })} />
         ) : null}
       </EditorFields>
       <EditorFields title="Months checked">
         <div class="field-grid">
-          <MonthField
-            field="startDate"
-            label="Start month"
-            help={HELP.guardrailStartDate}
-            value={guardrail.startDate}
-            placeholder="Simulation start"
-            onChange={(startDate) => patch({ startDate })}
-          />
+          {guardrail.kind === 'debtFree' ? (
+            <MonthField
+              field="startDate"
+              label="Debt-free from"
+              help={HELP.guardrailDeadline}
+              value={guardrail.startDate}
+              required
+              onChange={(startDate) => patch({ startDate })}
+            />
+          ) : (
+            <MonthField
+              field="startDate"
+              label="Start month"
+              help={HELP.guardrailStartDate}
+              value={guardrail.startDate}
+              placeholder="Simulation start"
+              onChange={(startDate) => patch({ startDate })}
+            />
+          )}
           <MonthField
             field="endDate"
             label="End month"
@@ -127,11 +311,13 @@ function GuardrailCard({ guardrail, index, onChange, onRemove, onDuplicate, open
 
 interface GuardrailListProps {
   guardrails: GuardrailModel[];
+  /** The loan and investment names in the plan, for the guardrails that list them. */
+  names: EntryNames;
   onChange: (guardrails: GuardrailModel[]) => void;
 }
 
 /** The plan's guardrails, each at `guardrails.<i>` in the config document. */
-export function GuardrailList({ guardrails, onChange }: GuardrailListProps) {
+export function GuardrailList({ guardrails, names, onChange }: GuardrailListProps) {
   const cards = useEditorCards(guardrails);
   return (
     <div class="list-block">
@@ -155,7 +341,7 @@ export function GuardrailList({ guardrails, onChange }: GuardrailListProps) {
       {guardrails.length === 0 ? (
         <p class="empty">
           No guardrails yet. Add one to check every scenario against a condition you care about, such as never
-          letting cash fall below a cushion.
+          letting cash fall below a cushion, owing nothing by a certain month, or savings that last.
         </p>
       ) : (
         <ul class="row-list">
@@ -164,6 +350,7 @@ export function GuardrailList({ guardrails, onChange }: GuardrailListProps) {
               <GuardrailCard
                 {...cards.cardProps(guardrail.id)}
                 guardrail={guardrail}
+                names={names}
                 index={index}
                 onChange={(next) => onChange(guardrails.map((existing, i) => (i === index ? next : existing)))}
                 onRemove={() => onChange(guardrails.filter((_, i) => i !== index))}

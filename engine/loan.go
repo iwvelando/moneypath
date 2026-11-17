@@ -155,6 +155,16 @@ func (ls *loanSim) remainingAsOf(m config.Month) float64 {
 	return ls.remainAfter[m]
 }
 
+// owedAt is the principal outstanding at the end of month m, as a guardrail
+// reads it: nothing before the loan starts, and nothing from the month it
+// ends (spec chapter 04 §10).
+func (ls *loanSim) owedAt(m config.Month) float64 {
+	if m < ls.l.ResolvedStart {
+		return 0
+	}
+	return ls.remainingAsOf(m)
+}
+
 // escrowAccruedBefore sums escrow included in this loan's payments during
 // m's calendar year, before m (§3.6 refund for payoff payments).
 func (ls *loanSim) escrowAccruedBefore(m config.Month) float64 {

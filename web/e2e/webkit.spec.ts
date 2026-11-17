@@ -315,3 +315,35 @@ test('an iPhone adds a guardrail, taps its kind, and reads the result', async ({
   const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
   expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
 });
+
+test('an iPhone picks the loans and investments a guardrail checks', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await uploadChoices(page);
+  const section = page.locator('#section-guardrails');
+  await section.getByRole('button', { name: 'Edit Mortgage gone by 2030' }).tap();
+  const debt = section.locator('.editor-card').filter({ has: page.getByRole('button', { name: 'Collapse Mortgage gone by 2030' }) });
+  const mortgage = debt.getByRole('checkbox', { name: 'Mortgage', exact: true });
+  await expect(mortgage).toBeChecked();
+  await debt.locator('label', { hasText: /^Mortgage$/ }).tap();
+  await expect(mortgage).not.toBeChecked();
+  await mortgage.press('Space');
+  await expect(mortgage).toBeChecked();
+  await expect(debt.getByRole('textbox', { name: 'Debt-free from', exact: true })).toHaveValue('2030-01');
+  expect(await overflow(page), 'loan checklist').toBeLessThanOrEqual(0);
+
+  await section.getByRole('button', { name: 'Edit Brokerage lasts' }).tap();
+  const lasts = section.locator('.editor-card').filter({ has: page.getByRole('button', { name: 'Collapse Brokerage lasts' }) });
+  const brokerage = lasts.getByRole('checkbox', { name: 'Brokerage', exact: true });
+  await expect(brokerage).toBeChecked();
+  await lasts.locator('label', { hasText: /^Brokerage$/ }).tap();
+  await expect(brokerage).not.toBeChecked();
+  await expect(lasts.locator('[data-path="guardrails.2.investments"]')).toContainText('List at least one investment');
+  await lasts.locator('label', { hasText: /^Brokerage$/ }).tap();
+  await expect(brokerage).toBeChecked();
+  expect(await overflow(page), 'investment checklist').toBeLessThanOrEqual(0);
+  await runForecast(page);
+  await expect(page.locator('.guardrails__list')).toContainText('Brokerage lasts Holds Tightest 2026-01, $40,600.00 left');
+  const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
+  expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
+});

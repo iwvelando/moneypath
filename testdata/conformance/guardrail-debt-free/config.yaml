@@ -1,0 +1,82 @@
+version: 2
+simulation:
+  startDate: 2025-01
+  endDate: 2025-12
+  startingCash: 100000.00
+recommendations:
+  emergencyFundMonths: 0
+guardrails:
+  - name: Car gone by June
+    kind: debtFree
+    loans: [Car]
+    startDate: 2025-06
+  - name: Car gone by May
+    kind: debtFree
+    loans: [Car]
+    startDate: 2025-05
+  - name: Deadline before the plan
+    kind: debtFree
+    loans: [Car]
+    startDate: 2024-06
+  - name: Debt-free from April
+    kind: debtFree
+    startDate: 2025-04
+  - name: Boat gone by March
+    kind: debtFree
+    loans: [Boat]
+    startDate: 2025-03
+  - name: Car gone, checked to April
+    kind: debtFree
+    loans: [Car]
+    startDate: 2025-03
+    endDate: 2025-04
+  - name: After the plan
+    kind: debtFree
+    startDate: 2026-01
+scenarios:
+  - name: on schedule
+    loans:
+      - name: Car
+        principal: 6000.00
+        interestRate: 0
+        term: 6
+        startDate: 2025-01
+        escrow: 100.00
+  - name: sold early
+    loans:
+      - name: Car
+        principal: 6000.00
+        interestRate: 0
+        term: 6
+        startDate: 2025-01
+        earlyPayoffDate: 2025-03
+        sellProperty: true
+        sellPrice: 6000.00
+  - name: threshold
+    loans:
+      - name: Car
+        principal: 6000.00
+        interestRate: 0
+        term: 6
+        startDate: 2025-01
+        escrow: 100.00
+        earlyPayoffThreshold: 90000.00
+  - name: boat later
+    loans:
+      - name: Boat
+        principal: 4000.00
+        interestRate: 0
+        term: 4
+        startDate: 2025-10
+  - name: two cars
+    loans:
+      - name: Car
+        principal: 6000.00
+        interestRate: 0
+        term: 6
+        startDate: 2025-01
+      - name: Car
+        principal: 3000.00
+        interestRate: 0
+        term: 3
+        startDate: 2025-01

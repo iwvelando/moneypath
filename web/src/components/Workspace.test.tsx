@@ -4,8 +4,12 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { defaultOptimize } from '../config/optimize';
 import {
+  emptyChoice,
   emptyEvent,
   emptyGuardrail,
+  emptyInvestment,
+  emptyLoan,
+  emptyOption,
   emptyScenario,
   type ConfigModel,
   type EventModel,
@@ -271,7 +275,7 @@ describe('the Guardrails section', () => {
     expect(document.activeElement).toBe(name);
     const kind = field('Kind', section) as HTMLSelectElement;
     expect(kind.value).toBe('cashFloor');
-    expect(Array.from(kind.options, (option) => option.textContent)).toEqual(['Cash floor']);
+    expect(Array.from(kind.options, (option) => option.textContent)).toEqual(['Cash floor', 'Debt-free', 'Investments last']);
 
     await type(name, 'Cushion');
     await type(field('Floor', section) as HTMLInputElement, '-250');
@@ -319,11 +323,177 @@ describe('the Guardrails section', () => {
 
   it('keeps a kind it cannot check, as written, for its error to explain', async () => {
     const config = makeConfig([], [emptyScenario('plan a')]);
-    config.guardrails = [{ ...emptyGuardrail(), name: 'Mortgage gone', kind: 'debtFree' }];
+    config.guardrails = [{ ...emptyGuardrail(), name: 'Typo', kind: 'cashfloor' }];
     await mount(config);
     const kind = field('Kind', container.querySelector('#section-guardrails')!) as HTMLSelectElement;
-    expect(kind.value).toBe('debtFree');
+    expect(kind.value).toBe('cashfloor');
     expect(kind.closest('[data-path]')?.getAttribute('data-path')).toBe('guardrails.0.kind');
+  });
+
+  /** A plan with a loan and an investment in the baseline, an option and a scenario each. */
+  function planWithEntries(): ConfigModel {
+    const config = makeConfig([], [emptyScenario('plan a'), emptyScenario('plan b')]);
+    config.common.loans = [{ ...emptyLoan(), name: 'Mortgage' }];
+    config.common.investments = [{ ...emptyInvestment(), name: 'Brokerage' }];
+    const car = emptyOption('Car');
+    car.loans = [{ ...emptyLoan(), name: 'Car loan' }];
+    car.investments = [{ ...emptyInvestment(), name: 'HSA' }];
+    config.choices = [{ ...emptyChoice('Ride'), options: [car, emptyOption('Walk')] }];
+    config.scenarios[0]!.loans = [{ ...emptyLoan(), name: 'Boat' }, { ...emptyLoan(), name: 'Mortgage' }];
+    config.scenarios[1]!.investments = [{ ...emptyInvestment(), name: 'IRA' }, { ...emptyInvestment(), name: '' }];
+    return config;
+  }
+
+  function checklist(field: string): HTMLElement {
+    return container.querySelector<HTMLElement>(`#section-guardrails [data-path="guardrails.0.${field}"]`)!;
+  }
+
+  function boxes(scope: HTMLElement): [string, boolean][] {
+    return Array.from(scope.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'), (box) => [
+      scope.querySelector(`label[for="${CSS.escape(box.id)}"]`)?.textContent ?? '',
+      box.checked,
+    ]);
+  }
+
+  async function toggle(scope: HTMLElement, name: string): Promise<void> {
+    const label = Array.from(scope.querySelectorAll('label')).find((element) => element.textContent === name)!;
+    await act(async () => {
+      container.querySelector<HTMLInputElement>(`#${CSS.escape(label.htmlFor)}`)!.click();
+    });
+  }
+
+  it('makes a debt-free from a month, on the loans ticked or on every loan', async () => {
+    const config = planWithEntries();
+    config.guardrails = [{ ...emptyGuardrail(), name: 'Debt gone' }];
+    await mount(config);
+    const section = container.querySelector<HTMLElement>('#section-guardrails')!;
+    const kind = field('Kind', section) as HTMLSelectElement;
+    await act(async () => {
+      kind.value = 'debtFree';
+      kind.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(latest.guardrails[0]!.kind).toBe('debtFree');
+    expect(section.querySelector('.editor-card__detail')?.textContent).toBe('Debt-free month not set');
+    expect(Array.from(section.querySelectorAll('label'), (label) => label.textContent?.trim())).not.toContain('Floor');
+
+    const loans = checklist('loans');
+    // The group is named by its label, not by its help text.
+    expect(container.querySelector(`#${CSS.escape(loans.getAttribute('aria-labelledby')!)}`)?.textContent).toBe('Loans');
+    expect(boxes(loans)).toEqual([
+      ['Mortgage', false],
+      ['Car loan', false],
+      ['Boat', false],
+    ]);
+    expect(loans.textContent).toContain('Leave every box unticked to check every loan.');
+    await toggle(loans, 'Boat');
+    await toggle(loans, 'Mortgage');
+    expect(latest.guardrails[0]!.loans).toEqual(['Boat', 'Mortgage']);
+    await toggle(loans, 'Boat');
+    await toggle(loans, 'Mortgage');
+    expect(latest.guardrails[0]!.loans).toBeNull();
+
+    await type(field('Debt-free from', section) as HTMLInputElement, '203001');
+    expect(latest.guardrails[0]!.startDate).toBe('2030-01');
+    expect(section.querySelector('.editor-card__summary')?.textContent).toBe('Nothing owed on any loan');
+    expect(section.querySelector('.editor-card__detail')?.textContent).toBe('From 2030-01');
+  });
+
+  it('makes an investments-last on the investments ticked, with an optional amount', async () => {
+    const config = planWithEntries();
+    config.guardrails = [{ ...emptyGuardrail(), name: 'Savings last', kind: 'lasts' }];
+    await mount(config);
+    const section = container.querySelector<HTMLElement>('#section-guardrails')!;
+    const investments = checklist('investments');
+    expect(boxes(investments)).toEqual([
+      ['Brokerage', false],
+      ['HSA', false],
+      ['IRA', false],
+    ]);
+    expect(section.querySelector('.editor-card__summary')?.textContent).toBe('Investments not picked');
+    await toggle(investments, 'IRA');
+    await toggle(investments, 'Brokerage');
+    expect(latest.guardrails[0]!.investments).toEqual(['IRA', 'Brokerage']);
+    expect(section.querySelector('.editor-card__summary')?.textContent).toBe('IRA, Brokerage never emptied');
+    await type(field('Never below', section) as HTMLInputElement, '50000');
+    expect(latest.guardrails[0]!.amount).toBe(50000);
+    expect(section.querySelector('.editor-card__summary')?.textContent).toBe('IRA, Brokerage never below $50,000.00');
+    expect(field('Start month', section)).toBeDefined();
+  });
+
+  it('lets an explicitly empty loan list become every loan even when the plan has no loans', async () => {
+    const config = makeConfig([], [emptyScenario('plan')]);
+    config.guardrails = [{ ...emptyGuardrail(), name: 'Debt gone', kind: 'debtFree', startDate: '2030-01', loans: [] }];
+    await mount(config);
+    const loans = checklist('loans');
+    expect(boxes(loans)).toEqual([]);
+    // Preserve the uploaded input until the reader explicitly removes the list.
+    expect(latest.guardrails[0]!.loans).toEqual([]);
+    const everyLoan = Array.from(loans.querySelectorAll('button')).find((button) => button.textContent?.trim() === 'Use every loan');
+    expect(everyLoan).toBeDefined();
+    await act(async () => everyLoan!.click());
+    expect(latest.guardrails[0]!.loans).toBeNull();
+    expect(loans.textContent).not.toContain('Use every loan');
+    expect(latest.guardrails[0]!.name).toBe('Debt gone');
+    expect(latest.guardrails[0]!.startDate).toBe('2030-01');
+  });
+
+  it('keeps a listed name the plan does not have, ticked, with its error, until it is unticked', async () => {
+    const config = planWithEntries();
+    config.guardrails = [{ ...emptyGuardrail(), name: 'Debt gone', kind: 'debtFree', startDate: '2030-01', loans: ['Mortgage', 'Yacht'] }];
+    const problems: Problem[] = [
+      {
+        level: 'error',
+        path: 'guardrails.0.loans.1',
+        where: 'Guardrail “Debt gone”, loan “Yacht”',
+        message: 'No loan in the plan is named “Yacht”.',
+      },
+    ];
+    await act(async () => {
+      render(
+        <Problems.Provider value={problemSet(problems)}>
+          <Harness initial={config} />
+        </Problems.Provider>,
+        container,
+      );
+    });
+    const loans = checklist('loans');
+    expect(boxes(loans)).toEqual([
+      ['Mortgage', true],
+      ['Car loan', false],
+      ['Boat', false],
+      ['Yacht', true],
+    ]);
+    expect(loans.querySelector('[data-path="guardrails.0.loans.1"]')?.textContent).toBe('No loan in the plan is named “Yacht”.');
+    await toggle(loans, 'Yacht');
+    expect(latest.guardrails[0]!.loans).toEqual(['Mortgage']);
+  });
+
+  it('shows an amount a debt-free does not use, with its warning and a way to take it away', async () => {
+    const config = planWithEntries();
+    config.guardrails = [{ ...emptyGuardrail(), name: 'Debt gone', kind: 'debtFree', startDate: '2030-01', amount: 15000 }];
+    const problems: Problem[] = [
+      {
+        level: 'warning',
+        path: 'guardrails.0.amount',
+        where: 'Guardrail “Debt gone”',
+        message: 'A debt-free guardrail does not use an amount, so this has no effect.',
+      },
+    ];
+    await act(async () => {
+      render(
+        <Problems.Provider value={problemSet(problems)}>
+          <Harness initial={config} />
+        </Problems.Provider>,
+        container,
+      );
+    });
+    const unused = container.querySelector('#section-guardrails [data-path="guardrails.0.amount"]')!;
+    expect(unused.textContent).toContain('$15,000.00');
+    expect(unused.textContent).toContain('Warning: A debt-free guardrail does not use an amount, so this has no effect.');
+    await act(async () => {
+      Array.from(unused.querySelectorAll('button')).find((b) => b.textContent === 'Take away')!.click();
+    });
+    expect(latest.guardrails[0]!.amount).toBeNull();
   });
 
   it('shows the names a cash floor does not use, with their warning and a way to take them away', async () => {
