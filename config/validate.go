@@ -71,6 +71,8 @@ func Check(cfg *Config, now Month) []Problem {
 		cfg.ResolvedEmergencyFundMonths = n
 	}
 
+	c.guardrails(cfg.Guardrails)
+
 	// Scenarios.
 	if len(cfg.Scenarios) == 0 {
 		c.fail("scenarios", "A plan needs at least one scenario.")
@@ -132,6 +134,66 @@ func (c *checker) month(path, label, s string) (Month, bool) {
 		return 0, false
 	}
 	return m, true
+}
+
+// guardrails checks the plan's guardrails and resolves each one's window
+// (spec chapter 03, Guardrails).
+func (c *checker) guardrails(guardrails []*Guardrail) {
+	names := map[string]bool{}
+	for i, g := range guardrails {
+		path := join("guardrails", i)
+		if g == nil {
+			c.fail(path, "This guardrail is empty.")
+			continue
+		}
+		at := func(field string) string { return join(path, field) }
+		switch {
+		case g.Name == "":
+			c.fail(at("name"), "The guardrail needs a name.")
+		case names[g.Name]:
+			c.fail(at("name"), "Another guardrail is already named “%s”. Give each guardrail its own name.", g.Name)
+		}
+		names[g.Name] = true
+
+		switch g.Kind {
+		case "":
+			c.fail(at("kind"), "The guardrail needs a kind.")
+		case GuardrailCashFloor:
+			if g.Amount == nil {
+				c.fail(at("amount"), "The floor amount is required.")
+			}
+			if g.Investments != nil {
+				c.warn(at("investments"), "A cash floor does not use investments, so this has no effect.")
+			}
+			if g.Loans != nil {
+				c.warn(at("loans"), "A cash floor does not use loans, so this has no effect.")
+			}
+		case GuardrailDebtFree, GuardrailLasts:
+			c.fail(at("kind"), "This kind of guardrail cannot be checked yet. For now, a guardrail can only be a cash floor.")
+		default:
+			c.fail(at("kind"), "“%s” is not a kind of guardrail. For now, a guardrail can only be a cash floor.", g.Kind)
+		}
+
+		start, haveStart := c.start, c.window
+		if g.StartDate != "" {
+			start, haveStart = c.month(at("startDate"), "start month", g.StartDate)
+		}
+		end, haveEnd := c.end, c.window
+		if g.EndDate != "" {
+			end, haveEnd = c.month(at("endDate"), "end month", g.EndDate)
+		}
+		g.ResolvedStart, g.ResolvedEnd = start, end
+		switch {
+		case !haveStart || !haveEnd:
+		case g.StartDate != "" && g.EndDate != "" && end < start:
+			c.fail(at("endDate"), "The end month (%s) is before the start month (%s).", end, start)
+		case !c.window:
+		case start > c.end:
+			c.warn(at("startDate"), "This starts after the simulation ends (%s), so the guardrail has no month to check and does not apply.", c.end)
+		case end < c.start:
+			c.warn(at("endDate"), "This ends before the simulation starts (%s), so the guardrail has no month to check and does not apply.", c.start)
+		}
+	}
 }
 
 // section checks one list of entries at path. noOptimize, when set, is why

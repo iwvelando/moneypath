@@ -10,6 +10,7 @@ type Config struct {
 	Version         *int             `yaml:"version"`
 	Simulation      Simulation       `yaml:"simulation"`
 	Recommendations *Recommendations `yaml:"recommendations,omitempty"`
+	Guardrails      []*Guardrail     `yaml:"guardrails,omitempty"`
 	Common          Section          `yaml:"common,omitempty"`
 	Choices         []*Choice        `yaml:"choices,omitempty"`
 	Scenarios       []*Scenario      `yaml:"scenarios"`
@@ -38,6 +39,32 @@ type Simulation struct {
 
 type Recommendations struct {
 	EmergencyFundMonths *float64 `yaml:"emergencyFundMonths,omitempty"`
+}
+
+// The kinds of guardrail (spec chapter 03, Guardrails). Only a cash floor
+// can be checked so far; the others are refused by validation.
+const (
+	GuardrailCashFloor = "cashFloor"
+	GuardrailDebtFree  = "debtFree"
+	GuardrailLasts     = "lasts"
+)
+
+// Guardrail is a condition every path is checked against, month by month
+// over its window (spec chapter 03, Guardrails; chapter 04 §10).
+type Guardrail struct {
+	Name        string   `yaml:"name"`
+	Kind        string   `yaml:"kind"`
+	Amount      *float64 `yaml:"amount,omitempty"`
+	Investments []string `yaml:"investments,omitempty"`
+	Loans       []string `yaml:"loans,omitempty"`
+	StartDate   string   `yaml:"startDate,omitempty"`
+	EndDate     string   `yaml:"endDate,omitempty"`
+
+	// The window as written, with the simulation's months as its defaults.
+	// It is not clipped to the simulation: the engine reads it against the
+	// months a path records.
+	ResolvedStart Month `yaml:"-"`
+	ResolvedEnd   Month `yaml:"-"`
 }
 
 type Section struct {

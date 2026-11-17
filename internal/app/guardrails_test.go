@@ -27,14 +27,17 @@ scenarios:
 // results in the plan's order, with a first breach only on a breach and the
 // tightest month and margin unless the guardrail does not apply.
 func TestResultsJSONCarriesGuardrails(t *testing.T) {
-	out := runPlan(t, guardrailPlan, false)
-	metrics := out["metrics"].([]any)[0].(map[string]any)
-	got, _ := json.Marshal(metrics["guardrails"])
-	want := `[{"name":"Cushion","kind":"cashFloor","result":"breaks","firstBreachDate":"2025-03","tightestDate":"2025-04","margin":-500},` +
-		`{"name":"Overdraft","kind":"cashFloor","result":"holds","tightestDate":"2025-03","margin":400},` +
-		`{"name":"Later","kind":"cashFloor","result":"doesNotApply"}]`
-	if string(got) != want {
-		t.Errorf("guardrails =\n %s\nwant\n %s", got, want)
+	// Cash is 1000, 800, 600 and 400.
+	got := runPlan(t, guardrailPlan, false)["metrics"].([]any)[0].(map[string]any)["guardrails"]
+	var want any
+	if err := json.Unmarshal([]byte(`[
+		{"name":"Cushion","kind":"cashFloor","result":"breaks","firstBreachDate":"2025-03","tightestDate":"2025-04","margin":-300},
+		{"name":"Overdraft","kind":"cashFloor","result":"holds","tightestDate":"2025-03","margin":600},
+		{"name":"Later","kind":"cashFloor","result":"doesNotApply"}]`), &want); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("guardrails =\n %v\nwant\n %v", got, want)
 	}
 }
 

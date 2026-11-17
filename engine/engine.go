@@ -24,11 +24,14 @@ type Result struct {
 }
 
 type ScenarioResult struct {
-	Name          string
-	Liquid        []float64
-	Total         []float64
-	Notes         [][]string
-	KeyFigures    KeyFigures
+	Name       string
+	Liquid     []float64
+	Total      []float64
+	Notes      [][]string
+	KeyFigures KeyFigures
+	// Guardrails holds one result per guardrail of the plan, in its order;
+	// nil when it has none (spec chapter 04 §10).
+	Guardrails    []GuardrailResult
 	EmergencyFund *EmergencyFund
 	Optimizations []*Optimization
 }
@@ -108,10 +111,21 @@ func ceilCents(x float64) float64 {
 // opts.Optimize it first runs the optimizer, writing the chosen values
 // back into cfg (so a re-serialized cfg reflects them).
 func Run(cfg *config.Config, opts Options) (*Result, error) {
+	var out *Result
 	if opts.Optimize {
-		return runOptimized(cfg, opts)
+		var err error
+		if out, err = runOptimized(cfg, opts); err != nil {
+			return nil, err
+		}
+	} else {
+		out = forecast(cfg, opts)
 	}
-	return forecast(cfg, opts), nil
+	// Guardrails describe the forecast that is reported: with the optimizer,
+	// the final one (spec chapter 04 §10).
+	for _, sr := range out.Scenarios {
+		sr.Guardrails = EvaluateGuardrails(cfg.Guardrails, out.Start, sr)
+	}
+	return out, nil
 }
 
 func forecast(cfg *config.Config, opts Options) *Result {

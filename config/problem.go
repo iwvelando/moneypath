@@ -105,6 +105,7 @@ func join(path string, parts ...any) string {
 var nouns = map[string]string{
 	"scenarios":              "Scenario",
 	"choices":                "Choice",
+	"guardrails":             "Guardrail",
 	"options":                "option",
 	"events":                 "event",
 	"loans":                  "loan",
