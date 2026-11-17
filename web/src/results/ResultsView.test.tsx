@@ -143,7 +143,7 @@ describe('the optimizer adjustments card', () => {
   });
 });
 
-function showScenarios(names: string[], plan?: ConfigModel): void {
+function showScenarios(names: string[], plan?: ConfigModel, earliestPlan?: ConfigModel): void {
   const results: ForecastResults = {
     version: 'test',
     scenarios: names,
@@ -166,6 +166,7 @@ function showScenarios(names: string[], plan?: ConfigModel): void {
         statusOf={(_: Adjustment) => 'missing'}
         onApply={() => {}}
         flip={plan ? { plan, run: () => new Promise(() => {}), onKeep: () => null } : undefined}
+        earliest={earliestPlan ? { plan: earliestPlan, run: () => new Promise(() => {}) } : undefined}
       />,
       host,
     );
@@ -357,5 +358,45 @@ describe('flipping one choice from a scenario', () => {
     expect(flipHeading()).toBeNull();
     showScenarios(['only']);
     expect(flipHeading()).toBeNull();
+  });
+});
+
+describe('the earliest month from a scenario', () => {
+  const plan = (guardrails: Record<string, unknown>[], scenarios: Record<string, unknown>[]) =>
+    fromConfigDocument({ version: 2, simulation: { endDate: '2030-01' }, guardrails, scenarios });
+  const cushion = [{ name: 'Cushion', kind: 'cashFloor', amount: 0 }];
+  const heading = () => [...host.querySelectorAll('h3')].find((h) => h.textContent?.trim() === 'Earliest month') ?? null;
+  const moves = () => [...host.querySelectorAll<HTMLOptionElement>('.earliest select option')].map((o) => o.textContent);
+
+  it('is offered on a scenario’s own tab, for the entries on its path, even with one scenario', () => {
+    showScenarios(['only'], undefined, plan(cushion, [{ name: 'only', events: [{ name: 'Roof', amount: -1 }] }]));
+    expect(heading()).not.toBeNull();
+    expect(moves()).toEqual(['Roof: when it starts', 'Roof: when it ends']);
+  });
+
+  it('follows the scenario whose tab is open, and stays out of the comparison', () => {
+    showScenarios(
+      ['a', 'b'],
+      undefined,
+      plan(cushion, [
+        { name: 'a', events: [{ name: 'Roof', amount: -1, startDate: '2027-01', endDate: '2027-01' }] },
+        { name: 'parked', active: false },
+        { name: 'b', loans: [{ name: 'Car', principal: 1, interestRate: 1, term: 2, startDate: '2027-01' }] },
+      ]),
+    );
+    expect(moves()).toEqual(['Roof: when it happens']);
+    act(() => tabs()[1]!.click());
+    expect(moves()).toEqual(['Car: when it starts']);
+    act(() => tabs()[2]!.click());
+    expect(heading()).toBeNull();
+  });
+
+  it('is absent when the plan has no guardrails, or the path nothing to move', () => {
+    showScenarios(['only'], undefined, plan([], [{ name: 'only', events: [{ name: 'Roof', amount: -1 }] }]));
+    expect(heading()).toBeNull();
+    showScenarios(['only'], undefined, plan(cushion, [{ name: 'only' }]));
+    expect(heading()).toBeNull();
+    showScenarios(['only']);
+    expect(heading()).toBeNull();
   });
 });

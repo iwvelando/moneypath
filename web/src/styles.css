@@ -2955,6 +2955,88 @@ input[type='checkbox'], input[type='radio'] {
   scroll-margin-block: 12px;
 }
 
+/* The earliest month one entry can take, on a scenario's own tab. */
+.earliest {
+  margin-bottom: 28px;
+}
+
+.earliest__form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 20px;
+}
+
+.earliest__form .field {
+  margin: 0;
+}
+
+.earliest__form .field--wide {
+  grid-column: 1 / -1;
+}
+
+.earliest__form select {
+  width: 100%;
+  min-width: 0;
+}
+
+.earliest__ask {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin-top: 16px;
+}
+
+.earliest__ask p {
+  flex: 1 1 220px;
+  min-width: 0;
+  margin: 0;
+  font-size: 0.83rem;
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+
+.earliest__ask .flip__error {
+  flex-basis: 100%;
+  color: var(--danger);
+}
+
+.earliest__answer {
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+
+.earliest__answer > p,
+.earliest__answer > div > p {
+  margin: 0 0 8px;
+}
+
+.earliest__headline {
+  font-size: 1rem;
+}
+
+.earliest__holds {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  font-size: 0.9rem;
+}
+
+.earliest__holds li + li {
+  margin-top: 4px;
+}
+
+.earliest__decided,
+.earliest__at {
+  margin-bottom: 12px;
+}
+
+@media (max-width: 620px) {
+  .earliest__form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 /* --------------------------------------------------------------- choices */
 
 .option__usage {

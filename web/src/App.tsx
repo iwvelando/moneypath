@@ -18,6 +18,8 @@ import type { ConfigModel } from './config/types';
 import { loadEngine, type EngineStatus } from './engine';
 import {
   EngineError,
+  type EarliestAnswer,
+  type EarliestRequest,
   type FlipComparison,
   type FlipRequest,
   type ForecastResults,
@@ -298,6 +300,23 @@ export function App() {
     [engine, lastRunInput, ranWithOptimizer],
   );
 
+  /* ---- the earliest month an entry can take ---- */
+
+  // Asked, like a flip, of the plan the results came from, run the way they were.
+  const runEarliest = useCallback(
+    async (request: EarliestRequest): Promise<EarliestAnswer> => {
+      if (!engine || lastRunInput === null) throw new EngineError('The engine is not available.');
+      const forecast = await engine.forecast(lastRunInput, {
+        optimize: ranWithOptimizer,
+        now: ranNow.current,
+        earliest: request,
+      });
+      if (!forecast.earliest) throw new EngineError('The engine did not report the earliest month.');
+      return forecast.earliest;
+    },
+    [engine, lastRunInput, ranWithOptimizer],
+  );
+
   // Like an optimizer adjustment, a flipped path enters the plan only when asked.
   const keepFlip = useCallback(
     (scenarioId: string, choiceId: string, optionId: string, name: string): string | null => {
@@ -553,6 +572,7 @@ export function App() {
                 flip={
                   ranConfig.current ? { plan: ranConfig.current, run: runFlip, onKeep: keepFlip } : undefined
                 }
+                earliest={ranConfig.current ? { plan: ranConfig.current, run: runEarliest } : undefined}
                 guardrails={ranConfig.current?.guardrails}
               />
             </>

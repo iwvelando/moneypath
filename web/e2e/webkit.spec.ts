@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp, overflow, problems, runForecast, uploadChoices } from './helpers';
+import { EARLIEST_LOAN_PLAN, openApp, overflow, problems, runForecast, uploadAndRun, uploadChoices } from './helpers';
 
 // Safari's engine on an iPhone profile, which every iOS browser uses. Runs in
 // the `webkit` project only (`make test-webkit`, and the macOS CI job).
@@ -248,6 +248,24 @@ test('an iPhone flips one choice of a scenario and keeps the path', async ({ pag
   expect(await overflow(page), 'workspace').toBeLessThanOrEqual(0);
   // WebKit logs this once for every native dropdown on the page, whatever the
   // app does (#71). Anything else it reports still fails the test.
+  const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
+  expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
+});
+
+test('an iPhone asks for the earliest month a loan can start', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await uploadAndRun(page, EARLIEST_LOAN_PLAN);
+
+  const panel = page.locator('.earliest');
+  await panel.scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'the form').toBeLessThanOrEqual(0);
+  await panel.getByRole('combobox', { name: 'Move' }).selectOption({ label: 'Car: when it starts' });
+  await panel.getByRole('checkbox', { name: 'Car gone by 2028-06' }).tap();
+  await expect(panel.getByRole('checkbox', { name: 'Car gone by 2028-06' })).not.toBeChecked();
+  await panel.getByRole('button', { name: 'Find the earliest month' }).tap();
+  await expect(panel.locator('.earliest__answer')).toContainText('Earliest month: 2026-03.');
+  expect(await overflow(page), 'the answer').toBeLessThanOrEqual(0);
   const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
   expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
 });

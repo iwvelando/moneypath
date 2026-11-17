@@ -175,6 +175,20 @@ The app covers, at a coarse grain:
   Keeping requires the plan to be unchanged since the forecast. After an edit, it is
   refused with an explanation beside the Keep button to run the forecast again, while
   the earlier comparison remains readable. The refusal is announced as an alert.
+  When the plan has guardrails, a scenario's own view also asks for the **earliest
+  month** an event or a loan of its path can take (chapter 04 §11): pick what to move
+  (an event's start or end, a one-off event as a whole, or a loan's start, grouped by
+  where the entry comes from), the first and last months to try, and the guardrails that
+  must hold, those that apply to the scenario ticked at first. The range starts as the
+  whole plan, short of the month the entry keeps: a start can move no later than its
+  end, an end no earlier than its start. The engine answers with the earliest month
+  and the month the plan has; the guardrails that break a month earlier, worded as the
+  Guardrails table words them, or that the range's first month already works; every
+  stretch of months that works; and each guardrail's months. When no month works it
+  says so, and the guardrails' months show why. A question the engine refuses is
+  explained beside the button that asked it. Like the flip, it describes the plan as it
+  was run, works for a plan with one scenario, is left out when the path has nothing
+  to move, and changes nothing in the plan.
   Editing the config
   marks all of these as describing an earlier version of the plan; they stay readable,
   being the baseline the next run will be compared against.

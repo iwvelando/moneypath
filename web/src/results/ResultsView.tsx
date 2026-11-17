@@ -1,12 +1,22 @@
 import { useEffect, useMemo, useState } from 'preact/hooks';
 import type { Adjustment, AdjustmentStatus } from '../config/adjustments';
 import { flipSubject } from '../config/choices';
+import { earliestSubject } from '../config/earliest';
 import type { ConfigModel, GuardrailModel } from '../config/types';
-import type { FlipComparison, FlipRequest, ForecastResults, OptimizationSummary, ScenarioMetrics } from '../engine/types';
+import type {
+  EarliestAnswer,
+  EarliestRequest,
+  FlipComparison,
+  FlipRequest,
+  ForecastResults,
+  OptimizationSummary,
+  ScenarioMetrics,
+} from '../engine/types';
 import { formatDuration, formatMoney, formatMonths } from '../util/format';
 import { Chart } from './Chart';
 import { Comparison } from './Comparison';
 import { Difference } from './Difference';
+import { Earliest } from './Earliest';
 import { Flip } from './Flip';
 import { GuardrailList, RunGuardrails, debtFreeClause } from './Guardrails';
 import { MonthlyTable, type MonthlyRow } from './MonthlyTable';
@@ -35,6 +45,8 @@ interface ResultsViewProps {
   onApply: (adjustments: Adjustment[]) => void;
   /** What it takes to flip one choice of a scenario; without it nothing is offered. */
   flip?: FlipAccess;
+  /** What it takes to ask for a scenario's earliest month; without it nothing is offered. */
+  earliest?: EarliestAccess;
   /** The guardrails of the plan these results came from, to word each result by what it checked. */
   guardrails?: readonly GuardrailModel[];
 }
@@ -45,6 +57,12 @@ export interface FlipAccess {
   run: (request: FlipRequest) => Promise<FlipComparison>;
   /** Adds the path, or returns an explanation displayed beside Keep. */
   onKeep: (scenarioId: string, choiceId: string, optionId: string, name: string) => string | null;
+}
+
+export interface EarliestAccess {
+  /** The plan these results came from. */
+  plan: ConfigModel;
+  run: (request: EarliestRequest) => Promise<EarliestAnswer>;
 }
 
 interface SummaryPanelProps {
@@ -197,6 +215,7 @@ export function ResultsView({
   statusOf,
   onApply,
   flip,
+  earliest,
   guardrails = [],
 }: ResultsViewProps) {
   // A scenario's position, or the comparison of all of them.
@@ -255,6 +274,14 @@ export function ResultsView({
     const subject = flip ? flipSubject(flip.plan, index) : null;
     return subject && subject.choices.length > 0 ? subject : null;
   }, [flip?.plan, index]);
+
+  // Offered only when the plan has a guardrail to hold and the path an entry to move.
+  const earliestOf = useMemo(() => {
+    if (!earliest || earliest.plan.guardrails.length === 0) return null;
+    const subject = earliestSubject(earliest.plan, index);
+    return subject && subject.targets.length > 0 ? subject : null;
+  }, [earliest?.plan, index]);
+  const guardrailNames = useMemo(() => earliest?.plan.guardrails.map((g) => g.name.trim()) ?? [], [earliest?.plan]);
 
   // One Total series per scenario, for the sparkline in each tab.
   const scenarioTotals = useMemo(
@@ -361,6 +388,16 @@ export function ResultsView({
 
           {flip && flipOf ? (
             <Flip results={results} scenario={index} subject={flipOf} run={flip.run} onKeep={flip.onKeep} />
+          ) : null}
+
+          {earliest && earliestOf ? (
+            <Earliest
+              results={results}
+              scenario={index}
+              subject={earliestOf}
+              guardrails={guardrailNames}
+              run={earliest.run}
+            />
           ) : null}
 
           <div class="results__section-heading">

@@ -90,8 +90,11 @@ function monthsKept(text: string) {
 }
 
 function OutcomeText({ result, index }: { result: GuardrailResult; index: number }) {
-  const definition = useContext(RunGuardrails)[index];
-  const outcome = outcomeOf(result, definition?.name.trim() === result.name ? definition : undefined);
+  // A list of some of the plan's guardrails finds each by its unique name.
+  const definitions = useContext(RunGuardrails);
+  const at = definitions[index];
+  const definition = at?.name.trim() === result.name ? at : definitions.find((d) => d.name.trim() === result.name);
+  const outcome = outcomeOf(result, definition);
   return (
     <>
       <span class={`guardrails__outcome ${outcome.tone}`.trim()}>{monthsKept(outcome.text)}</span>
