@@ -54,6 +54,28 @@ The WASM module exposes to JavaScript (names normative):
   Options also accept `"flip"`, `{"scenario": "…", "choice": "…", "option": "…"}`, which
   asks for the comparison described under `flip` below. A flip that cannot be made
   returns `{"error": "..."}` and no results.
+  Options also accept `"earliest"`, which asks the question of chapter 04 §11 and is
+  answered under `earliest` below:
+
+  ```json
+  {"earliest": {"scenario": "as we are", "entry": "common.loans.0", "field": "startDate",
+                "from": "2026-02", "to": "2031-01", "guardrails": ["Cushion"]}}
+  ```
+
+  `scenario` is an active scenario's name. `entry` is the entry's place in the plan as
+  written, in the form of a problem's `path`: `common.events.<i>`, `common.loans.<i>`,
+  `scenarios.<i>.events.<j>`, `scenarios.<i>.loans.<j>`,
+  `choices.<i>.options.<j>.events.<k>` or `choices.<i>.options.<j>.loans.<k>`. `field`
+  is `startDate` or `endDate` for an event and `startDate` for a loan. `from` and `to`
+  are `YYYY-MM` months, and `guardrails` names one or more of the plan's guardrails,
+  each once. A question that cannot be asked returns `{"error": "..."}` and no
+  results: the scenario is not active; the entry is not an event or loan of the plan,
+  or is not on the scenario's path; the field is not one the entry can move; a month
+  does not parse, `from` is after `to`, or a month is outside the plan; no guardrail is
+  named, a name is not a guardrail of the plan or is given twice; a chosen guardrail
+  cannot apply to the path; or a month of the range makes the path invalid. The
+  message names the entry and the guardrail in words, never by a path. A `flip` and an
+  `earliest` can be asked together; each is answered as if asked alone.
 - `moneypathValidate(configYAML string, optionsJSON string) → string` — parses and
   validates the config without running it and returns the **problems JSON** below. It
   never returns `{"error": "..."}` for a config it could read as text: a config that
@@ -147,6 +169,18 @@ Each entry has:
            "total": {"difference": [0.0, …], "breakEven": []},
            "guardrails": [{"name": "Cushion", "kind": "cashFloor", "result": "holds",
                            "tightestDate": "2026-01", "margin": 5000.0}, …]},
+  "earliest": {"scenario": 0, "entry": "common.loans.0", "name": "Car",
+               "field": "startDate", "from": "2026-01", "to": "2028-08",
+               "guardrails": ["Cushion", "Car gone by 2028-06"],
+               "configured": "2027-01", "month": "2026-03",
+               "works": [{"from": "2026-03", "to": "2026-08"}, {"from": "2027-05", "to": "2027-06"}],
+               "holds": [{"name": "Cushion", "months": [{"from": "2026-03", "to": "2026-08"}, …]},
+                         {"name": "Car gone by 2028-06", "months": [{"from": "2026-01", "to": "2028-05"}]}],
+               "decidedBy": [{"name": "Cushion", "kind": "cashFloor", "result": "breaks",
+                              "firstBreachDate": "2028-04", "tightestDate": "2028-04",
+                              "margin": -7.75}],
+               "atEarliest": [{"name": "Cushion", "kind": "cashFloor", "result": "holds",
+                               "tightestDate": "2028-04", "margin": 4.09}, …]},
   "warnings": ["…validation warnings…"],
   "configYaml": "…the config as run (reflects optimizer adjustments when enabled)…"
 }
@@ -200,6 +234,22 @@ is the flipped path's own guardrail results, present under the same rule; the
 scenario's are in its `metrics`. The flip is refused when the scenario is not an
 active scenario of the plan, the plan has no such choice, the choice has no such option,
 the scenario already selects that option, or the flipped path fails validation.
+
+`earliest` is present only when the `earliest` option asked for it; every other field
+is then exactly what the same run reports without the option, and `csv` and
+`configYaml` do not carry it. It answers chapter 04 §11. `scenario` indexes
+`scenarios`; `entry`, `field`, `from` and `to` repeat the request; `name` is the
+entry's name; and `guardrails` lists the chosen guardrails in the plan's order.
+`configured` is the month the entry's field has on the path as run. `month` is the
+earliest month that works, and is absent when none does. `works` lists every stretch of
+consecutive working months in ascending order, each with its first and last month
+(`from` and `to`), and is empty when no month works. `holds` has one entry per chosen
+guardrail, in the plan's order: its `name` and the stretches of `months` in which it
+holds, in the same form, empty when it holds in none. `decidedBy` lists the chosen
+guardrails that break when the entry is in the month before `month`, each as an entry
+of `metrics[].guardrails`; it is absent when `month` is `from` or absent. `atEarliest`
+holds every chosen guardrail's result when the entry is in `month`, in the same shape,
+and is absent when `month` is. Every month is a `YYYY-MM` string.
 
 An entry of `optimizations` for a target held to a guardrail (chapter 04 §7) has a
 `guardrail` object: the guardrail's result on the forecast of the value reported, in the

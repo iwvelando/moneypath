@@ -19,6 +19,7 @@ import (
 
 	"github.com/iwvelando/moneypath/config"
 	"github.com/iwvelando/moneypath/engine"
+	"github.com/iwvelando/moneypath/internal/app"
 	"github.com/iwvelando/moneypath/render"
 )
 
@@ -30,6 +31,36 @@ type manifest struct {
 	ExpectedMetrics []scenarioMetric `yaml:"expectedMetrics"`
 	// ExpectedComparisons pins ordered pairs of scenarios (spec chapter 04 §9).
 	ExpectedComparisons []pairComparison `yaml:"expectedComparisons"`
+	// Earliest asks earliest-month questions of the plan (spec chapter 04 §11).
+	Earliest []earliestCase `yaml:"earliest"`
+}
+
+// earliestCase is one earliest-month question and its whole answer.
+type earliestCase struct {
+	Ask struct {
+		Scenario   string   `yaml:"scenario"`
+		Entry      string   `yaml:"entry"`
+		Field      string   `yaml:"field"`
+		From       string   `yaml:"from"`
+		To         string   `yaml:"to"`
+		Guardrails []string `yaml:"guardrails"`
+	} `yaml:"ask"`
+	Configured string            `yaml:"configured"`
+	Month      string            `yaml:"month"`
+	Works      []monthSpan       `yaml:"works"`
+	Holds      []guardrailMonths `yaml:"holds"`
+	DecidedBy  []guardrailMetric `yaml:"decidedBy"`
+	AtEarliest []guardrailMetric `yaml:"atEarliest"`
+}
+
+type monthSpan struct {
+	From string `yaml:"from"`
+	To   string `yaml:"to"`
+}
+
+type guardrailMonths struct {
+	Name   string      `yaml:"name"`
+	Months []monthSpan `yaml:"months"`
 }
 
 type pairComparison struct {
@@ -155,6 +186,81 @@ func runCase(t *testing.T, dir string) {
 	compareCSV(t, string(wantBytes), got, mf.Tolerance)
 	compareMetrics(t, mf.ExpectedMetrics, res)
 	compareComparisons(t, mf.ExpectedComparisons, res, string(wantBytes), mf.Tolerance)
+	for i, want := range mf.Earliest {
+		compareEarliest(t, fmt.Sprintf("earliest %d", i), cdata, now, mf.Optimize, want)
+	}
+}
+
+// compareEarliest asks one earliest-month question of the case's plan and
+// checks the whole answer (spec chapter 08).
+func compareEarliest(t *testing.T, label string, cdata []byte, now config.Month, optimize bool, want earliestCase) {
+	t.Helper()
+	a := want.Ask
+	f, err := app.RunForecast(app.ForecastInput{
+		ConfigYAML: cdata,
+		Now:        now,
+		Optimize:   optimize,
+		Earliest: &app.Earliest{
+			Scenario: a.Scenario, Entry: a.Entry, Field: a.Field,
+			From: a.From, To: a.To, Guardrails: a.Guardrails,
+		},
+	})
+	if err != nil {
+		t.Errorf("%s: %v", label, err)
+		return
+	}
+	got := f.Earliest
+	if got == nil {
+		t.Errorf("%s: no answer", label)
+		return
+	}
+	spans := func(in []app.MonthSpan) []monthSpan {
+		out := []monthSpan{}
+		for _, s := range in {
+			out = append(out, monthSpan{From: s.From.String(), To: s.To.String()})
+		}
+		return out
+	}
+	if c := got.Configured.String(); c != want.Configured {
+		t.Errorf("%s: configured want %s, got %s", label, want.Configured, c)
+	}
+	month := ""
+	if got.Found {
+		month = got.Month.String()
+	}
+	if month != want.Month {
+		t.Errorf("%s: month want %q, got %q", label, want.Month, month)
+	}
+	if w, g := append([]monthSpan{}, want.Works...), spans(got.Works); !reflect.DeepEqual(w, g) {
+		t.Errorf("%s: works want %v, got %v", label, w, g)
+	}
+	wantHolds := []guardrailMonths{}
+	for _, h := range want.Holds {
+		wantHolds = append(wantHolds, guardrailMonths{Name: h.Name, Months: append([]monthSpan{}, h.Months...)})
+	}
+	gotHolds := []guardrailMonths{}
+	for _, h := range got.Holds {
+		gotHolds = append(gotHolds, guardrailMonths{Name: h.Name, Months: spans(h.Months)})
+	}
+	if !reflect.DeepEqual(wantHolds, gotHolds) {
+		t.Errorf("%s: holds want %v, got %v", label, wantHolds, gotHolds)
+	}
+	for _, list := range []struct {
+		name string
+		want []guardrailMetric
+		got  []engine.GuardrailResult
+	}{
+		{"decidedBy", want.DecidedBy, got.DecidedBy},
+		{"atEarliest", want.AtEarliest, got.AtEarliest},
+	} {
+		if len(list.want) != len(list.got) {
+			t.Errorf("%s: %s want %d results, got %d", label, list.name, len(list.want), len(list.got))
+			continue
+		}
+		for i, w := range list.want {
+			compareGuardrail(t, fmt.Sprintf("%s %s %d", label, list.name, i), w, list.got[i])
+		}
+	}
 }
 
 // compareComparisons checks each pinned pair: its break-even months exactly,

@@ -33,6 +33,14 @@ type forecastOptions struct {
 		Choice   string `json:"choice"`
 		Option   string `json:"option"`
 	} `json:"flip"`
+	Earliest *struct {
+		Scenario   string   `json:"scenario"`
+		Entry      string   `json:"entry"`
+		Field      string   `json:"field"`
+		From       string   `json:"from"`
+		To         string   `json:"to"`
+		Guardrails []string `json:"guardrails"`
+	} `json:"earliest"`
 }
 
 func forecastFn(_ js.Value, args []js.Value) any {
@@ -59,6 +67,10 @@ func forecastFn(_ js.Value, args []js.Value) any {
 	}
 	if opts.Flip != nil {
 		in.Flip = &app.Flip{Scenario: opts.Flip.Scenario, Choice: opts.Flip.Choice, Option: opts.Flip.Option}
+	}
+	if e := opts.Earliest; e != nil {
+		in.Earliest = &app.Earliest{Scenario: e.Scenario, Entry: e.Entry, Field: e.Field,
+			From: e.From, To: e.To, Guardrails: e.Guardrails}
 	}
 	f, err := app.RunForecast(in)
 	if err != nil {

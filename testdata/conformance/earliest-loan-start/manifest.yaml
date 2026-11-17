@@ -1,0 +1,68 @@
+description: >
+  The earliest month a loan can start with the chosen guardrails holding. The
+  car's threshold payoff sweeps cash down in a month that depends on when the
+  loan began, so the cushion holds for some starts, fails for later ones and
+  holds again: the answer lists each stretch of working months, and each
+  guardrail's own months. Starting too late leaves the car owed past the
+  debt-free deadline. The deciding guardrail is the one that breaks with the
+  loan a month earlier than the answer. A range whose first month works has
+  nothing deciding it; a range in which no month works shows why. Expected
+  answers were derived by writing each candidate month into the plan by hand
+  and running the forecast.
+normative: true
+optimize: false
+tolerance: 0.01
+earliest:
+  - ask: {scenario: buy the car, entry: common.loans.0, field: startDate,
+          from: "2026-01", to: "2028-08", guardrails: [Cushion, Car gone by 2028-06]}
+    configured: "2027-01"
+    month: "2026-03"
+    works:
+      - {from: "2026-03", to: "2026-08"}
+      - {from: "2027-05", to: "2027-06"}
+      - {from: "2028-01", to: "2028-05"}
+    holds:
+      - name: Cushion
+        months:
+          - {from: "2026-03", to: "2026-08"}
+          - {from: "2027-05", to: "2027-06"}
+          - {from: "2028-01", to: "2028-08"}
+      - name: Car gone by 2028-06
+        months:
+          - {from: "2026-01", to: "2028-05"}
+    decidedBy:
+      - {name: Cushion, kind: cashFloor, result: breaks,
+         firstBreachDate: "2028-04", tightestDate: "2028-04", margin: -7.75}
+    atEarliest:
+      - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2028-04", margin: 4.09}
+      - {name: Car gone by 2028-06, kind: debtFree, result: holds, tightestDate: "2028-04", marginMonths: 2}
+  - ask: {scenario: buy the car, entry: common.loans.0, field: startDate,
+          from: "2027-07", to: "2028-12", guardrails: [Car gone by 2028-06]}
+    configured: "2027-01"
+    month: "2027-07"
+    works:
+      - {from: "2027-07", to: "2028-05"}
+    holds:
+      - name: Car gone by 2028-06
+        months:
+          - {from: "2027-07", to: "2028-05"}
+    atEarliest:
+      - {name: Car gone by 2028-06, kind: debtFree, result: holds, tightestDate: "2028-02", marginMonths: 4}
+  - ask: {scenario: buy the car, entry: common.loans.0, field: startDate,
+          from: "2027-12", to: "2027-12", guardrails: [Cushion, Car gone by 2028-06]}
+    configured: "2027-01"
+    works: []
+    holds:
+      - {name: Cushion, months: []}
+      - name: Car gone by 2028-06
+        months:
+          - {from: "2027-12", to: "2027-12"}
+  - ask: {scenario: buy the car, entry: common.loans.0, field: startDate,
+          from: "2028-06", to: "2028-08", guardrails: [Cushion, Car gone by 2028-06]}
+    configured: "2027-01"
+    works: []
+    holds:
+      - name: Cushion
+        months:
+          - {from: "2028-06", to: "2028-08"}
+      - {name: Car gone by 2028-06, months: []}

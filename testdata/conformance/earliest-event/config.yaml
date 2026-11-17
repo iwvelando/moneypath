@@ -1,0 +1,44 @@
+version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2027-12
+  startingCash: 5000.00
+recommendations:
+  emergencyFundMonths: 0
+guardrails:
+  - name: Cushion
+    kind: cashFloor
+    amount: 4000.00
+  - name: Never overdrawn
+    kind: cashFloor
+    amount: 0.00
+common:
+  events:
+    - name: Salary
+      amount: 3000.00
+      endDate: 2027-12
+    - name: Living
+      amount: -2500.00
+choices:
+  - name: Work
+    options:
+      - name: Full time
+      - name: Part time
+        change:
+          events:
+            - name: Salary
+              set:
+                amount: 2800.00
+                endDate: 2027-06
+scenarios:
+  - name: full time
+    select:
+      Work: Full time
+    events:
+      - name: New roof
+        amount: -6000.00
+        startDate: 2026-06
+        endDate: 2026-06
+  - name: part time
+    select:
+      Work: Part time

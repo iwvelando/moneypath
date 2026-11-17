@@ -19,6 +19,9 @@ type ForecastInput struct {
 	Optimize   bool
 	// Flip also compares one scenario with its flipped path; nil = no flip.
 	Flip *Flip
+	// Earliest also asks for the earliest month an entry can take (spec
+	// chapter 04 §11); nil = no question.
+	Earliest *Earliest
 }
 
 type Forecast struct {
@@ -31,6 +34,9 @@ type Forecast struct {
 	ConfigYAML string
 	// Flip is set when the input asked for one. Nothing else here reflects it.
 	Flip *FlipResult
+	// Earliest is set when the input asked for one. Nothing else here
+	// reflects it.
+	Earliest *EarliestResult
 }
 
 // RunForecast parses, validates, and simulates a v2 config.
@@ -64,6 +70,11 @@ func RunForecast(in ForecastInput) (*Forecast, error) {
 			return nil, err
 		}
 	}
+	if in.Earliest != nil {
+		if f.Earliest, err = runEarliest(in, f); err != nil {
+			return nil, err
+		}
+	}
 	return f, nil
 }
 
@@ -94,6 +105,7 @@ type resultsJSON struct {
 	Metrics     []metricJSON     `json:"metrics"`
 	Comparisons []comparisonJSON `json:"comparisons"`
 	Flip        *flipJSON        `json:"flip,omitempty"`
+	Earliest    *earliestJSON    `json:"earliest,omitempty"`
 	Warnings    []string         `json:"warnings"`
 	ConfigYaml  string           `json:"configYaml"`
 }
@@ -121,6 +133,66 @@ type flipJSON struct {
 	Total    flipSeriesJSON `json:"total"`
 	// Guardrails are the flipped path's own; absent when the plan has none.
 	Guardrails []guardrailJSON `json:"guardrails,omitempty"`
+}
+
+// earliestJSON answers an earliest-month question (spec chapter 02, Results
+// JSON, earliest).
+type earliestJSON struct {
+	Scenario   int                   `json:"scenario"`
+	Entry      string                `json:"entry"`
+	Name       string                `json:"name"`
+	Field      string                `json:"field"`
+	From       string                `json:"from"`
+	To         string                `json:"to"`
+	Guardrails []string              `json:"guardrails"`
+	Configured string                `json:"configured"`
+	Month      string                `json:"month,omitempty"`
+	Works      []monthSpanJSON       `json:"works"`
+	Holds      []guardrailMonthsJSON `json:"holds"`
+	DecidedBy  []guardrailJSON       `json:"decidedBy,omitempty"`
+	AtEarliest []guardrailJSON       `json:"atEarliest,omitempty"`
+}
+
+type monthSpanJSON struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+}
+
+type guardrailMonthsJSON struct {
+	Name   string          `json:"name"`
+	Months []monthSpanJSON `json:"months"`
+}
+
+func spansJSON(spans []MonthSpan) []monthSpanJSON {
+	out := make([]monthSpanJSON, len(spans))
+	for i, s := range spans {
+		out[i] = monthSpanJSON{From: s.From.String(), To: s.To.String()}
+	}
+	return out
+}
+
+func earliestOf(e *EarliestResult) *earliestJSON {
+	out := &earliestJSON{
+		Scenario:   e.ScenarioIndex,
+		Entry:      e.Entry,
+		Name:       e.Name,
+		Field:      e.Field,
+		From:       e.From,
+		To:         e.To,
+		Guardrails: e.Guardrails,
+		Configured: e.Configured.String(),
+		Works:      spansJSON(e.Works),
+		Holds:      make([]guardrailMonthsJSON, len(e.Holds)),
+		DecidedBy:  guardrailsJSON(e.DecidedBy),
+		AtEarliest: guardrailsJSON(e.AtEarliest),
+	}
+	if e.Found {
+		out.Month = e.Month.String()
+	}
+	for i, h := range e.Holds {
+		out.Holds[i] = guardrailMonthsJSON{Name: h.Name, Months: spansJSON(h.Months)}
+	}
+	return out
 }
 
 type flipSeriesJSON struct {
@@ -366,6 +438,9 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 			}
 		}
 		out.Flip = entry
+	}
+	if f.Earliest != nil {
+		out.Earliest = earliestOf(f.Earliest)
 	}
 	return json.Marshal(out)
 }

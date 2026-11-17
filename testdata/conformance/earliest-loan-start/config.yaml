@@ -1,0 +1,31 @@
+version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2028-12
+  startingCash: 2000.00
+recommendations:
+  emergencyFundMonths: 0
+guardrails:
+  - name: Cushion
+    kind: cashFloor
+    amount: 700.00
+  - name: Car gone by 2028-06
+    kind: debtFree
+    startDate: 2028-06
+    loans: [Car]
+common:
+  events:
+    - name: Salary
+      amount: 1200.00
+    - name: Rent
+      amount: -900.00
+  loans:
+    - name: Car
+      principal: 9000.00
+      downPayment: 1000.00
+      interestRate: 6
+      term: 36
+      startDate: 2027-01
+      earlyPayoffThreshold: 500.00
+scenarios:
+  - name: buy the car
