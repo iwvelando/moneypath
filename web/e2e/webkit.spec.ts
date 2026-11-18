@@ -365,3 +365,51 @@ test('an iPhone picks the loans and investments a guardrail checks', async ({ pa
   const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
   expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
 });
+
+// Safari does not focus a button it taps, so Show more is pressed with focus
+// somewhere else; the help must stay open, and Escape must still close it.
+test('a help expands by tap and by keyboard, and reopens on its brief', async ({ page }) => {
+  await openApp(page);
+  const help = page.getByRole('button', { name: 'Help: Cash interest rate', exact: true });
+  const tip = help.locator('xpath=..');
+  const more = tip.locator('.helptip__more-text');
+  const toggle = tip.locator('.helptip__more');
+
+  await help.tap();
+  await expect(help).toHaveAttribute('aria-expanded', 'true');
+  await expect(toggle).toHaveText('Show more');
+  await expect(more).toBeHidden();
+  await toggle.tap();
+  await expect(help).toHaveAttribute('aria-expanded', 'true');
+  await expect(toggle).toHaveText('Show less');
+  await expect(more).toBeVisible();
+  await expect(more).toBeInViewport();
+  expect(await overflow(page), 'expanded').toBeLessThanOrEqual(0);
+  await page.keyboard.press('Escape');
+  await expect(help).toHaveAttribute('aria-expanded', 'false');
+
+  await help.tap();
+  await expect(toggle).toHaveText('Show more');
+  await expect(more).toBeHidden();
+  await page.getByText('The window the forecast covers', { exact: false }).tap();
+  await expect(help).toHaveAttribute('aria-expanded', 'false');
+
+  await help.focus();
+  await help.press('Enter');
+  await expect(help).toHaveAttribute('aria-expanded', 'true');
+  await toggle.focus();
+  await toggle.press(' ');
+  await expect(toggle).toHaveText('Show less');
+  await expect(toggle).toBeFocused();
+  await expect(more).toBeVisible();
+  await toggle.press('Escape');
+  await expect(help).toHaveAttribute('aria-expanded', 'false');
+  await expect(help).toBeFocused();
+  await help.press('Enter');
+  await expect(toggle).toHaveText('Show more');
+  await expect(more).toBeHidden();
+  // Moving on from Show more leaves the help as it is.
+  await toggle.focus();
+  await toggle.blur();
+  await expect(help).toHaveAttribute('aria-expanded', 'true');
+});

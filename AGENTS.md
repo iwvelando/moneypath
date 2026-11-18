@@ -31,6 +31,15 @@ Anything a user can read — error and warning strings, UI copy, field help:
   the spec freely; output may not.
 - **No notation the reader has to decode.** Write "at least 0 and less than 100",
   not "[0, 100)". Assume a personal-finance enthusiast, not a mathematician.
+- **Help opens on one short line.** A field's help is the reader's guide to what the
+  simulation assumes, so it states every assumption and limit, in two tiers. The
+  brief, at most 20 words, says what the field does, with its default or range when
+  that fits. The rest goes behind "Show more" as `tiered(brief, more)`, at most 80
+  words: exact limits, edge cases, interactions with other fields, and assumptions
+  such as tax or compounding. A help that is complete in one line stays one line.
+  Help lives in `HELP` (`web/src/config/help.ts`), where `help.test.ts` holds every
+  entry to these limits. Add to a help with `withMore`, never by joining strings, and
+  read one in a test with `helpText`, which joins both tiers.
 
 ## Errors, warnings and messages
 

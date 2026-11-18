@@ -1,7 +1,7 @@
 import { useId } from 'preact/hooks';
 import { EditorCard, EditorFields, useEditorCards, type EditorCardState } from './EditorCard';
 import { guardrailSummary } from './summaries';
-import { HELP } from '../../config/help';
+import { HELP, type Help } from '../../config/help';
 import {
   cloneGuardrail,
   emptyGuardrail,
@@ -57,7 +57,7 @@ export function guardrailNames(config: ConfigModel): string[] {
  * Something a loaded plan gave a guardrail whose kind does not use it. It
  * stays on screen with the engine's warning until the reader takes it away.
  */
-function Unused({ field, label, help, text, onRemove }: { field: string; label: string; help: string; text: string; onRemove: () => void }) {
+function Unused({ field, label, help, text, onRemove }: { field: string; label: string; help: Help; text: string; onRemove: () => void }) {
   const path = usePath(field);
   const helpId = `${useId()}-help`;
   const notes = useProblemsAt(path).map(noteOf);
@@ -65,7 +65,7 @@ function Unused({ field, label, help, text, onRemove }: { field: string; label: 
     <div class="field field--wide" data-path={path}>
       <div class="field__label">
         <span>{label}</span>
-        <HelpTip id={helpId} label={label} text={help} />
+        <HelpTip id={helpId} label={label} help={help} />
       </div>
       <p class="field__static">{text}</p>
       <Notes notes={notes} />
@@ -93,7 +93,7 @@ function UnusedNames({ field, label, names, onRemove }: { field: string; label: 
 interface NameChecklistProps {
   field: 'loans' | 'investments';
   label: string;
-  help: string;
+  help: Help;
   /** Said under the boxes; the rule itself is the engine's. */
   hint: string;
   /** What the guardrail lists, as written; null when it lists nothing. */
@@ -133,7 +133,7 @@ function NameChecklist({ field, label, help, hint, listed, available, none, clea
     >
       <legend class="field__label">
         <span id={labelId}>{label}</span>
-        <HelpTip id={helpId} label={label} text={help} />
+        <HelpTip id={helpId} label={label} help={help} />
       </legend>
       {names.length === 0 ? (
         <p class="field__static">{none}</p>
