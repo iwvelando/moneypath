@@ -33,9 +33,10 @@ func FlipName(fl Flip) string {
 }
 
 // runFlip simulates the flipped path of in.Flip beside the finished forecast
-// f. The plan is parsed afresh and reduced to that one scenario with its
-// selection replaced, so the path is validated, resolved and optimized exactly
-// as a scenario written that way would be, and f is left untouched.
+// f. The plan is parsed afresh with that scenario's selection replaced and
+// every other scenario set aside, so the path is validated, resolved and
+// optimized exactly as a scenario written that way would be, and f is left
+// untouched.
 func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 	fl := *in.Flip
 
@@ -101,15 +102,20 @@ func runFlip(in ForecastInput, f *Forecast) (*FlipResult, error) {
 		}
 		flipped.Select[i].Option = fl.Option
 	}
-	flipped.Name = name
-	cfg.Scenarios = []*config.Scenario{flipped}
 
 	invalid := func(err error) error {
 		return fmt.Errorf("With “%s” for the choice “%s”, this path cannot be run. %w", fl.Option, fl.Choice, err)
 	}
+	// The whole plan is validated, so names that only another scenario has
+	// still count (spec chapter 03, Guardrails). The flipped scenario keeps
+	// its own name until then: its display name may be another's.
 	if _, err := config.Validate(cfg, in.Now); err != nil {
 		return nil, invalid(err)
 	}
+	for _, sc := range cfg.Scenarios {
+		sc.ResolvedActive = sc == flipped
+	}
+	flipped.Name = name
 	res, err := engine.Run(cfg, engine.Options{Optimize: in.Optimize})
 	if err != nil {
 		return nil, invalid(err)
