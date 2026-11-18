@@ -171,6 +171,8 @@ choices:
         investments:
           - {name: Index fund, startingValue: 100}
 scenarios:
+  - name: other
+    select: {Savings: None}
   - name: mine
     select: {Savings: None}
     investments:
@@ -180,7 +182,8 @@ scenarios:
 	if err == nil {
 		t.Fatal("no error")
 	}
-	for _, want := range []string{"With “Fund” for the choice “Savings”, this path cannot be run.", "“Index fund” names more than one investment"} {
+	// The message names the scenario that was flipped, not one before it.
+	for _, want := range []string{"With “Fund” for the choice “Savings”, this path cannot be run.", "Scenario “mine”: “Index fund” names more than one investment"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error = %q, want it to contain %q", err, want)
 		}
@@ -236,6 +239,37 @@ scenarios:
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("flipped path guardrails = %v, want %v", got, want)
+	}
+}
+
+// A flip of a scenario that is not the plan's first is that scenario's path
+// alone: the scenarios beside it are not run with it, with or without the
+// optimizer.
+func TestFlipOfALaterScenario(t *testing.T) {
+	later := flipPlan + `
+  - name: gym
+    select: {Home: Stay, Gym: Keep}
+`
+	alone := flipPlan[:strings.Index(flipPlan, "scenarios:")] + `scenarios:
+  - name: gym
+    select: {Home: Stay, Gym: Keep}
+`
+	for _, optimize := range []bool{false, true} {
+		fl := Flip{Scenario: "gym", Choice: "Home", Option: "Move"}
+		f, err := flipOf(t, later, optimize, fl)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if f.Flip.Flipped.Name != "gym (Home: Move)" {
+			t.Errorf("optimize=%v: flipped path = %q", optimize, f.Flip.Flipped.Name)
+		}
+		want, err := flipOf(t, alone, optimize, fl)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(f.Flip.Flipped, want.Flip.Flipped) || !reflect.DeepEqual(f.Flip.Comparison, want.Flip.Comparison) {
+			t.Errorf("optimize=%v: the scenario before it changed the flip", optimize)
+		}
 	}
 }
 
