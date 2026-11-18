@@ -47,6 +47,20 @@ export async function uploadChoices(page: Page): Promise<void> {
   await expect(page.getByRole('heading', { name: 'Housing', exact: true })).toBeVisible();
 }
 
+/** The plan the earliest-loan-start fixture pins, whose answers were derived by hand. */
+export const EARLIEST_LOAN_PLAN = '../testdata/conformance/earliest-loan-start/config.yaml';
+
+/** Load a plan file into the editor through Upload Config, and run it. */
+export async function uploadAndRun(page: Page, path: string): Promise<void> {
+  await page.getByLabel('Upload a moneypath config file').setInputFiles({
+    name: 'plan.yaml',
+    mimeType: 'application/yaml',
+    buffer: readFileSync(path),
+  });
+  await expect(page.locator('#section-guardrails')).toBeVisible();
+  await runForecast(page);
+}
+
 /**
  * A plan file fed straight to the built engine, outside the browser and past
  * the editor: what the app should show for the same file. Returns the engine's

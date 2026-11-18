@@ -27,6 +27,23 @@ describe('decoding a forecast', () => {
     expect(decodeForecast(JSON.stringify({ ...base, flip })).flip).toEqual(flip);
     expect(decodeForecast(JSON.stringify(base)).flip).toBeNull();
   });
+
+  it('keeps the earliest month the engine reported, and reads a result without one as having none', () => {
+    const earliest = {
+      scenario: 0,
+      entry: 'common.loans.0',
+      name: 'Car',
+      field: 'startDate',
+      from: '2026-01',
+      to: '2026-06',
+      guardrails: ['Cushion'],
+      configured: '2026-04',
+      works: [],
+      holds: [{ name: 'Cushion', months: [] }],
+    };
+    expect(decodeForecast(JSON.stringify({ ...base, earliest })).earliest).toEqual(earliest);
+    expect(decodeForecast(JSON.stringify(base)).earliest).toBeNull();
+  });
 });
 
 describe('decoding problems', () => {

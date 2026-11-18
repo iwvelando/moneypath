@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { parse } from 'yaml';
-import { CHOICES_EXAMPLE, openApp, problems, runForecast, uploadChoices } from './helpers';
+import { CHOICES_EXAMPLE, EARLIEST_LOAN_PLAN, openApp, problems, runForecast, uploadAndRun, uploadChoices } from './helpers';
 
 async function downloadConfig(page: Page): Promise<Record<string, unknown>> {
   const download = page.waitForEvent('download');
@@ -216,5 +216,36 @@ test('an optimizer held to a guardrail reports against it, and a renamed guardra
   const scenarios = written['scenarios'] as { events: { optimize?: Record<string, unknown> }[] }[];
   expect(Object.entries(scenarios[0]!.events[2]!.optimize!).at(-1)).toEqual(['guardrail', 'Cushion of 5000']);
   expect(scenarios[1]!.events[2]!.optimize).not.toHaveProperty('guardrail');
+  expect(found).toEqual([]);
+});
+
+test('the earliest month a loan can start reads as the fixture pins it, and a refusal sits beside the button', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await uploadAndRun(page, EARLIEST_LOAN_PLAN);
+
+  const panel = page.locator('.earliest');
+  await panel.getByRole('combobox', { name: 'Move' }).selectOption({ label: 'Car: when it starts' });
+  await expect(panel.getByRole('textbox', { name: 'From' })).toHaveValue('2026-01');
+  await expect(panel.getByRole('textbox', { name: 'To' })).toHaveValue('2028-12');
+  await panel.getByRole('button', { name: 'Find the earliest month' }).click();
+
+  const answer = panel.locator('.earliest__answer');
+  await expect(answer).toContainText('Earliest month: 2026-03. Your plan has 2027-01.');
+  await expect(answer).toContainText('A month earlier, in 2026-02:');
+  await expect(answer.locator('.earliest__decided')).toContainText('Cushion Breaks in 2028-04 Tightest 2028-04, $7.75 short');
+  await expect(answer).toContainText(
+    'Works in 2026-03 to 2026-08, 2027-05 to 2027-06 and 2028-01 to 2028-05. The months between do not.',
+  );
+  await expect(answer.locator('.earliest__holds')).toContainText(
+    'Cushion holds 2026-03 to 2026-08, 2027-05 to 2027-06 and 2028-01 to 2028-12',
+  );
+  await expect(answer.locator('.earliest__holds')).toContainText('Car gone by 2028-06 holds 2026-01 to 2028-05');
+
+  // With nothing to hold, the engine refuses, beside the button.
+  for (const name of ['Cushion', 'Car gone by 2028-06']) await panel.getByRole('checkbox', { name }).uncheck();
+  await panel.getByRole('button', { name: 'Find the earliest month' }).click();
+  await expect(panel.locator('.earliest__ask [role="alert"]')).toHaveText('Choose at least one guardrail that must hold.');
+  await expect(panel.locator('.earliest__answer')).toHaveCount(0);
   expect(found).toEqual([]);
 });

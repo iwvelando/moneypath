@@ -590,3 +590,74 @@ What follows from the rule, each deliberate:
 - A lasts on accounts that start empty breaks at the window's first month; a later
   `startDate` judges it from when they have been funded.
 - Inactive scenarios are not simulated, so they report nothing.
+
+## 11. Earliest month
+
+A question asked of one active scenario's path (chapter 02, Results JSON, `earliest`):
+the earliest month, within a range, in which one entry can be placed with every chosen
+guardrail holding. Like the guardrails it reads (§10), it adds nothing to the plan or
+to the reported forecast. It names:
+
+- the **entry**: an event of an `events` list or a loan of a `loans` list, on the
+  scenario's path (chapter 03, Choices): one of the scenario's own entries, one added by
+  an option the scenario selects, or a baseline entry that no option it selects removes;
+- the **field** that moves: an event's `startDate` or `endDate`, or a loan's
+  `startDate`;
+- the **range** `from`–`to`, inclusive at both ends, inside `start`–`end` (§1);
+- the **chosen guardrails**: one or more of the plan's guardrails (§10).
+
+**The plan it is asked of** is the plan as run: with the optimizer (§7), the adjusted
+config, whose chosen values stay in place. No candidate is optimized again. An entry
+that is itself an optimizer target is timed like any other.
+
+**The candidate path for month `m`** is the scenario, resolved as chapter 03 resolves
+it, with `m` written into the entry's field on that path and nothing else changed:
+
+- An event's `startDate` moves its start and leaves its end; its `endDate` moves its end
+  and leaves its start. A **one-off** event, one whose resolved start and end are the
+  same month, moves as a whole: both become `m`, whichever field is asked.
+- A loan's `startDate` moves the loan: its down payment, payments, escrow and insurance
+  follow the new start (§3). Its `earlyPayoffDate` and the dates of its
+  `extraPrincipalPayments` stay as written.
+- A baseline entry that a selected option changes takes `m` in place of the month it
+  has on the path, whether or not the change sets that field.
+
+A month that makes the path invalid by the rules of chapter 03 (an event that would
+start after it ends) is not a candidate. The question is then refused, naming the
+first such month in the range and what is wrong with it, and nothing is answered.
+What chapter 03 only warns about (a loan whose early payoff month is not after its
+first payment) does not refuse it.
+
+**A month works** when every chosen guardrail **holds** (§10) on its candidate path. A
+chosen guardrail that cannot apply to the path (its window has no month inside the
+plan, or it is a `lasts` naming no account the path has) refuses the question, because
+no placement of the entry changes either.
+
+**The scan.** Every month from `from` to `to` is tried, in order. Nothing is bisected:
+moving an entry later need not help or hurt steadily, because a threshold payoff (§3.5)
+fires in a month that depends on everything before it, so working months can come and
+go across the range. The answer:
+
+- **month** — the first month of the range that works; none when no month does.
+- **configured** — the month the entry's field has on the path as run.
+- **works** — every stretch of consecutive working months, in ascending order, each
+  from its first month to its last. Empty when no month works.
+- **holds** — for each chosen guardrail, in the plan's order, its stretches of months in
+  which it holds on its own. When no month works, these say why: a guardrail that never
+  holds, or guardrails whose months never meet.
+- **decidedBy** — when the earliest month is later than `from`: the result (§10) on the
+  path of the month before it of each chosen guardrail that breaks there, in the plan's
+  order, with its first breach. That month does not work, so at least one breaks. None
+  when the earliest month is `from` or no month works.
+- **atEarliest** — every chosen guardrail's result on the earliest month's path. None
+  when no month works.
+
+What follows from the rule, each deliberate:
+
+- A range of one month answers whether that month works.
+- The answer can be `from` itself, and then nothing in the range decides it.
+- A month that works can be followed by one that does not, and `works` shows both.
+- `decidedBy` describes the month just before the answer only. Earlier months fail
+  too, possibly for other guardrails, and `holds` shows which.
+- The answer describes the path the question was asked of. Other scenarios sharing a
+  baseline entry are not moved, and the reported forecast is not changed.

@@ -1,0 +1,105 @@
+description: >
+  The earliest month an event can start or end with the chosen guardrails
+  holding. Salary ending is the earliest month income can stop; with the
+  cushion as well, the new roof breaks it in every month, so no month works and
+  the cushion's empty months say why. The roof is a one-off and moves as a
+  whole, whichever of its months is asked; its range can start in a month that
+  already works, including one met to the cent, and a range of one month
+  answers whether that month works. On the part-time path an option changes the
+  baseline salary, and the candidate month replaces the month the change gives
+  it. Expected answers were derived by writing each candidate month into the
+  plan by hand and running the forecast.
+normative: true
+optimize: false
+tolerance: 0.01
+earliest:
+  - ask: {scenario: full time, entry: common.events.0, field: endDate,
+          from: "2026-01", to: "2027-12", guardrails: [Never overdrawn]}
+    configured: "2027-12"
+    month: "2027-09"
+    works:
+      - {from: "2027-09", to: "2027-12"}
+    holds:
+      - name: Never overdrawn
+        months:
+          - {from: "2027-09", to: "2027-12"}
+    decidedBy:
+      - {name: Never overdrawn, kind: cashFloor, result: breaks,
+         firstBreachDate: "2027-12", tightestDate: "2027-12", margin: -1000.00}
+    atEarliest:
+      - {name: Never overdrawn, kind: cashFloor, result: holds, tightestDate: "2026-06", margin: 2000.00}
+  - ask: {scenario: full time, entry: common.events.0, field: endDate,
+          from: "2026-01", to: "2027-12", guardrails: [Cushion, Never overdrawn]}
+    configured: "2027-12"
+    works: []
+    holds:
+      - {name: Cushion, months: []}
+      - name: Never overdrawn
+        months:
+          - {from: "2027-09", to: "2027-12"}
+  - ask: {scenario: full time, entry: scenarios.0.events.0, field: startDate,
+          from: "2026-01", to: "2027-12", guardrails: [Cushion, Never overdrawn]}
+    configured: "2026-06"
+    month: "2026-10"
+    works:
+      - {from: "2026-10", to: "2027-12"}
+    holds:
+      - name: Cushion
+        months:
+          - {from: "2026-10", to: "2027-12"}
+      - name: Never overdrawn
+        months:
+          - {from: "2026-02", to: "2027-12"}
+    decidedBy:
+      - {name: Cushion, kind: cashFloor, result: breaks,
+         firstBreachDate: "2026-09", tightestDate: "2026-09", margin: -500.00}
+    atEarliest:
+      - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2026-10", margin: 0.00}
+      - {name: Never overdrawn, kind: cashFloor, result: holds, tightestDate: "2026-10", margin: 4000.00}
+  - ask: {scenario: full time, entry: scenarios.0.events.0, field: endDate,
+          from: "2026-02", to: "2026-10", guardrails: [Never overdrawn]}
+    configured: "2026-06"
+    month: "2026-02"
+    works:
+      - {from: "2026-02", to: "2026-10"}
+    holds:
+      - name: Never overdrawn
+        months:
+          - {from: "2026-02", to: "2026-10"}
+    atEarliest:
+      - {name: Never overdrawn, kind: cashFloor, result: holds, tightestDate: "2026-02", margin: 0.00}
+  - ask: {scenario: full time, entry: scenarios.0.events.0, field: startDate,
+          from: "2026-10", to: "2026-10", guardrails: [Cushion, Never overdrawn]}
+    configured: "2026-06"
+    month: "2026-10"
+    works:
+      - {from: "2026-10", to: "2026-10"}
+    holds:
+      - name: Cushion
+        months:
+          - {from: "2026-10", to: "2026-10"}
+      - name: Never overdrawn
+        months:
+          - {from: "2026-10", to: "2026-10"}
+    atEarliest:
+      - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2026-10", margin: 0.00}
+      - {name: Never overdrawn, kind: cashFloor, result: holds, tightestDate: "2026-10", margin: 4000.00}
+  - ask: {scenario: part time, entry: common.events.0, field: endDate,
+          from: "2026-01", to: "2027-12", guardrails: [Cushion, Never overdrawn]}
+    configured: "2027-06"
+    month: "2027-10"
+    works:
+      - {from: "2027-10", to: "2027-12"}
+    holds:
+      - name: Cushion
+        months:
+          - {from: "2027-10", to: "2027-12"}
+      - name: Never overdrawn
+        months:
+          - {from: "2027-08", to: "2027-12"}
+    decidedBy:
+      - {name: Cushion, kind: cashFloor, result: breaks,
+         firstBreachDate: "2027-12", tightestDate: "2027-12", margin: -200.00}
+    atEarliest:
+      - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2026-01", margin: 1300.00}
+      - {name: Never overdrawn, kind: cashFloor, result: holds, tightestDate: "2026-01", margin: 5300.00}

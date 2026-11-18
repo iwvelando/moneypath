@@ -130,6 +130,49 @@ export interface FlipComparison {
   guardrails?: GuardrailResult[] | null;
 }
 
+/**
+ * The earliest month one entry of a scenario's path can take with every
+ * chosen guardrail holding. `entry` is the entry's place in the plan as
+ * written (`common.loans.0`); `field` is `startDate`, or `endDate` for an
+ * event; `from` and `to` bound the range, inclusive.
+ */
+export interface EarliestRequest {
+  scenario: string;
+  entry: string;
+  field: 'startDate' | 'endDate';
+  from: string;
+  to: string;
+  guardrails: string[];
+}
+
+/** Consecutive months, inclusive at both ends. */
+export interface MonthSpan {
+  from: string;
+  to: string;
+}
+
+/**
+ * The engine's answer to an earliest-month question. `month` is absent when
+ * no month works; `decidedBy` holds the chosen guardrails that break a month
+ * before it, and is absent when it is the range's first month.
+ */
+export interface EarliestAnswer {
+  scenario: number;
+  entry: string;
+  name: string;
+  field: string;
+  from: string;
+  to: string;
+  /** The chosen guardrails, in the plan's order. */
+  guardrails: string[];
+  configured: string;
+  month?: string;
+  works: MonthSpan[];
+  holds: { name: string; months: MonthSpan[] }[];
+  decidedBy?: GuardrailResult[] | null;
+  atEarliest?: GuardrailResult[] | null;
+}
+
 export interface ScenarioValue {
   liquid?: number | null;
   total?: number | null;
@@ -151,6 +194,8 @@ export interface ForecastResults {
   comparisons?: ScenarioComparison[] | null;
   /** Present only when the run was asked for a flip. */
   flip?: FlipComparison | null;
+  /** Present only when the run was asked an earliest-month question. */
+  earliest?: EarliestAnswer | null;
   warnings?: string[] | null;
   configYaml: string;
 }
@@ -161,6 +206,8 @@ export interface ForecastOptions {
   now?: string;
   /** Also compare one scenario with its flipped path. */
   flip?: FlipRequest;
+  /** Also ask for the earliest month an entry can take. */
+  earliest?: EarliestRequest;
 }
 
 /**

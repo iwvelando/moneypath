@@ -23,6 +23,8 @@ expectedMetrics: […]     # optional: per-scenario key-figure, emergency-fund a
                          # forecast's emergency-fund target (chapter 04 §7).
 expectedComparisons: […] # optional: differences and break-even months for named
                          # ordered pairs (chapter 04 §9); see below.
+earliest: […]            # optional: earliest-month questions and their answers
+                         # (chapter 04 §11); see below.
 ```
 
 An `expectedMetrics` entry may also pin the scenario's guardrail results (chapter 04
@@ -60,6 +62,28 @@ expectedComparisons:
 Beyond what the entry states, every month's difference must equal the difference of that
 pair's `expected.csv` columns, within the case's `tolerance` for each of the two cells.
 `expected.csv` itself carries no comparison columns.
+
+An `earliest` entry asks one question of the case's plan, run as the manifest says,
+and pins its whole answer (chapter 02, Results JSON, `earliest`). `month` is absent when
+no month works. `configured`, `month`, `works` and `holds` are compared exactly, and
+`decidedBy` and `atEarliest` (absent where the answer has none) by the rule for
+`guardrails` above. The guardrails are given in the plan's order.
+
+```yaml
+earliest:
+  - ask: {scenario: buy the car, entry: common.loans.0, field: startDate,
+          from: "2026-01", to: "2028-08", guardrails: [Cushion, Car gone by 2028-06]}
+    configured: "2027-01"
+    month: "2026-03"
+    works: [{from: "2026-03", to: "2026-08"}, {from: "2027-05", to: "2027-06"}, …]
+    holds:
+      - {name: Cushion, months: [{from: "2026-03", to: "2026-08"}, …]}
+      - {name: Car gone by 2028-06, months: [{from: "2026-01", to: "2028-05"}]}
+    decidedBy:
+      - {name: Cushion, kind: cashFloor, result: breaks,
+         firstBreachDate: "2028-04", tightestDate: "2028-04", margin: -7.75}
+    atEarliest: […]
+```
 
 A case passes when every numeric cell matches within `tolerance` (compare parsed values,
 not strings), and all dates, headers, and note strings match

@@ -3,6 +3,7 @@ import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { App } from './App';
 import { addMonths } from './config/month';
+import { fromConfigDocument } from './config/serialize';
 import { starterConfig } from './config/starter';
 import {
   emptyChoice,
@@ -473,6 +474,52 @@ describe('the app', () => {
     await settle(500);
     expect(savedScenarios()).toHaveLength(config.scenarios.length + 1);
     expect(container.querySelector('.flip')?.textContent).toContain('Added to your plan.');
+  });
+
+  it('answers the earliest month an entry can take, through the engine, and changes nothing', async () => {
+    // A one-off roof against a cushion: the plan the earliest-event fixture
+    // pins, without its choice.
+    const config = fromConfigDocument({
+      version: 2,
+      simulation: { startDate: '2026-01', endDate: '2027-12', startingCash: 5000 },
+      recommendations: { emergencyFundMonths: 0 },
+      guardrails: [
+        { name: 'Cushion', kind: 'cashFloor', amount: 4000 },
+        { name: 'Never overdrawn', kind: 'cashFloor', amount: 0 },
+      ],
+      common: {
+        events: [
+          { name: 'Salary', amount: 3000, endDate: '2027-12' },
+          { name: 'Living', amount: -2500 },
+        ],
+      },
+      scenarios: [
+        { name: 'full time', events: [{ name: 'New roof', amount: -6000, startDate: '2026-06', endDate: '2026-06' }] },
+      ],
+    });
+    seedPlan(config);
+    await act(async () => {
+      render(<App />, container);
+    });
+    await settle();
+    await act(async () => {
+      button('Run Forecast').click();
+    });
+    await settle(500);
+
+    const panel = () => container.querySelector<HTMLElement>('.earliest')!;
+    expect(panel()).not.toBeNull();
+    const before = window.localStorage.getItem(KEYS.editorState);
+    await act(async () => {
+      button('Find the earliest month').click();
+    });
+    await settle(500);
+    const said = panel().textContent!.replace(/\s+/g, ' ');
+    expect(said).toContain('Earliest month: 2026-10.');
+    expect(said).toContain('Your plan has 2026-06.');
+    expect(said).toContain('A month earlier, in 2026-09:');
+    expect(said).toContain('Cushion Breaks in 2026-09');
+    expect(window.localStorage.getItem(KEYS.editorState)).toBe(before);
   });
 
   it('flips one choice from the results and keeps the path as a scenario when asked', async () => {
