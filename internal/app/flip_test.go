@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/iwvelando/moneypath/config"
+	"github.com/iwvelando/moneypath/engine"
 )
 
 // Two decisions and one scenario with a target of its own, so a flip has to
@@ -183,6 +184,79 @@ scenarios:
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("error = %q, want it to contain %q", err, want)
 		}
+	}
+}
+
+// The flipped path is validated as the plan is: a guardrail may name an entry
+// from any scenario's own entries, so another scenario's investments and loans
+// still count, and its guardrail is judged only on the paths that have them.
+func TestFlipKeepsNamesFromOtherScenarios(t *testing.T) {
+	doc := `
+version: 2
+simulation: {startDate: 2025-01, endDate: 2025-06, startingCash: 1000}
+guardrails:
+  - {name: Brokerage lasts, kind: lasts, investments: [Brokerage]}
+  - {name: Car paid off, kind: debtFree, startDate: 2025-06, loans: [Car loan]}
+choices:
+  - name: Car
+    options:
+      - {name: Keep}
+      - name: Buy
+        events:
+          - {name: Down payment, amount: -500, startDate: 2025-02, endDate: 2025-02}
+scenarios:
+  - name: keep
+    select: {Car: Keep}
+  - name: invest
+    select: {Car: Keep}
+    investments:
+      - {name: Brokerage, startingValue: 100}
+  - name: borrow
+    active: false
+    select: {Car: Keep}
+    loans:
+      - {name: Car loan, principal: 1000, interestRate: 5, term: 12, startDate: 2025-01}
+`
+	f, err := flipOf(t, doc, false, Flip{Scenario: "keep", Choice: "Car", Option: "Buy"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if f.Flip.Name != "keep (Car: Buy)" || f.Flip.Flipped.Name != "keep (Car: Buy)" {
+		t.Errorf("flipped path name = %q, result name = %q", f.Flip.Name, f.Flip.Flipped.Name)
+	}
+	if len(f.Result.Scenarios) != 2 {
+		t.Errorf("the run has %d scenarios, want the plan's 2 active ones", len(f.Result.Scenarios))
+	}
+	// The flipped path has neither entry, so a lasts does not judge it and a
+	// debtFree finds nothing owed.
+	want := []engine.GuardrailOutcome{engine.GuardrailDoesNotApply, engine.GuardrailHolds}
+	got := make([]engine.GuardrailOutcome, len(f.Flip.Flipped.Guardrails))
+	for i, g := range f.Flip.Flipped.Guardrails {
+		got[i] = g.Result
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("flipped path guardrails = %v, want %v", got, want)
+	}
+}
+
+// The flipped path's display name may already belong to a scenario of the
+// plan; the flip is still the same path, not a clash of names.
+func TestFlipNameMayMatchAnotherScenario(t *testing.T) {
+	doc := flipPlan + `
+  - name: "stay (Home: Move)"
+    active: false
+    select: {Home: Stay, Gym: Keep}
+`
+	f, err := flipOf(t, doc, false, Flip{Scenario: "stay", Choice: "Home", Option: "Move"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	plain, err := flipOf(t, flipPlan, false, Flip{Scenario: "stay", Choice: "Home", Option: "Move"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(f.Flip.Comparison, plain.Flip.Comparison) {
+		t.Errorf("the other scenario changed the flip")
 	}
 }
 
