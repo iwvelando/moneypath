@@ -64,7 +64,11 @@ The app covers, at a coarse grain:
   schedules, never calculated payments or forecast returns. Loan terms, insurance, early
   payoff, and investment tax settings are grouped within the forms. Every field carries
   a help affordance explaining its semantics; where a field has meaning defined in
-  chapter 03, the help says what that chapter says. A field asks a phone for the
+  chapter 03, the help says what that chapter says. A help opens on a brief of at most
+  20 words saying what the field does. The rest, every assumption and limit the
+  simulation applies, waits behind "Show more" in at most 80 words, and folds away
+  again whenever the help closes. An open help lies over the form and moves no control
+  beside it. A field asks a phone for the
   keyboard its value needs: the full one where a number may be negative, and for a
   month the number pad, with the field supplying the dash that pad lacks.
 - **Guardrails** (chapter 03, "Guardrails") — a section of the plan's guardrails, after

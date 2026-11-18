@@ -1,5 +1,6 @@
 import { createContext, type ComponentChildren } from 'preact';
 import { useContext, useEffect, useId, useRef, useState } from 'preact/hooks';
+import type { Help } from '../config/help';
 import { HelpTip } from './HelpTip';
 import { formatMonthInput, monthIsError, monthMessage } from '../config/month';
 import { sanitizeNumberInput } from '../util/number';
@@ -18,7 +19,7 @@ function ChangedMark() {
 
 interface FieldShellProps {
   label: string;
-  help: string;
+  help: Help;
   controlId: string;
   helpId: string;
   /** What to say under the control, errors first. */
@@ -49,7 +50,7 @@ export function FieldShell({
     >
       <div class="field__label">
         <label for={controlId}>{label}</label>
-        <HelpTip id={helpId} label={label} text={help} />
+        <HelpTip id={helpId} label={label} help={help} />
         {changed ? <ChangedMark /> : null}
       </div>
       {children}
@@ -79,7 +80,7 @@ function useFieldNotes(field: string | undefined, own: Note | null, helpId: stri
 
 interface TextFieldProps {
   label: string;
-  help: string;
+  help: Help;
   value: string;
   onInput: (value: string) => void;
   placeholder?: string;
@@ -130,7 +131,7 @@ export function TextField({ label, help, value, onInput, placeholder, required, 
 
 interface NumberFieldProps {
   label: string;
-  help: string;
+  help: Help;
   value: number | null;
   onChange: (value: number | null) => void;
   /** Arrow-key step; a modifier multiplies it by `modifierMultiplier`. */
@@ -272,7 +273,7 @@ export function NumberField({
 
 interface MonthFieldProps {
   label: string;
-  help: string;
+  help: Help;
   value: string;
   onChange: (value: string) => void;
   required?: boolean;
@@ -339,7 +340,7 @@ export function MonthField({ label, help, value, onChange, required, placeholder
 
 interface CheckFieldProps {
   label: string;
-  help: string;
+  help: Help;
   checked: boolean;
   onChange: (checked: boolean) => void;
   /** The field's key in its entry of the config document. */
@@ -365,7 +366,7 @@ export function CheckField({ label, help, checked, onChange, field }: CheckField
           onChange={(event) => onChange((event.currentTarget as HTMLInputElement).checked)}
         />
         <label for={controlId}>{label}</label>
-        <HelpTip id={helpId} label={label} text={help} />
+        <HelpTip id={helpId} label={label} help={help} />
         {changed ? <ChangedMark /> : null}
       </div>
       <Notes id={messageId} notes={notes} />
@@ -377,7 +378,7 @@ export function CheckField({ label, help, checked, onChange, field }: CheckField
 
 interface SelectFieldProps<T extends string> {
   label: string;
-  help: string;
+  help: Help;
   /** '' when nothing is picked, which only a field with a `placeholder` can show. */
   value: T | '';
   options: readonly { value: T; label: string; disabled?: boolean }[];

@@ -1,6 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'preact/hooks';
 import type { EarliestSubject, EarliestTarget } from '../config/earliest';
 import { HelpTip } from '../components/HelpTip';
+import { HELP } from '../config/help';
 import { MonthField } from '../components/fields';
 import { addMonths } from '../config/month';
 import { EngineError, type EarliestAnswer, type EarliestRequest, type ForecastResults, type MonthSpan } from '../engine/types';
@@ -138,7 +139,7 @@ export function Earliest({ results, scenario, subject, guardrails, run }: Earlie
               <HelpTip
                 id={`${base}-target-help`}
                 label="Move"
-                text="The month to move. An event’s start or end moves on its own; a one-off event moves as a whole; a loan’s start moves its whole schedule. Everything else stays as your plan has it."
+                help={HELP.earliestTarget}
               />
             </div>
             <select
@@ -160,14 +161,14 @@ export function Earliest({ results, scenario, subject, guardrails, run }: Earlie
           </div>
           <MonthField
             label="From"
-            help="The first month to try. Every month from here to the last one is tried in turn."
+            help={HELP.earliestFrom}
             value={range.from}
             onChange={(from) => setRange({ ...range, from })}
             required
           />
           <MonthField
             label="To"
-            help="The last month to try."
+            help={HELP.earliestTo}
             value={range.to}
             onChange={(to) => setRange({ ...range, to })}
             required
@@ -178,7 +179,7 @@ export function Earliest({ results, scenario, subject, guardrails, run }: Earlie
               <HelpTip
                 id={`${base}-guardrails-help`}
                 label="Must hold"
-                text="A month works when every guardrail ticked here holds in it. A guardrail that does not apply to this scenario starts unticked."
+                help={HELP.earliestGuardrails}
               />
             </legend>
             <ul class="check-grid name-checklist__list">

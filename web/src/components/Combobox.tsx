@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef, useState } from 'preact/hooks';
+import type { Help } from '../config/help';
 import { FieldShell } from './fields';
 
 export interface ComboboxOption {
@@ -12,7 +13,7 @@ export interface ComboboxOption {
 
 interface ComboboxProps {
   label: string;
-  help: string;
+  help: Help;
   placeholder: string;
   /** Said in the list when the typed letters match nothing. */
   emptyMessage: string;

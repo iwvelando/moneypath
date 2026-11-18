@@ -1026,6 +1026,40 @@ select.input {
   line-height: 1.45;
 }
 
+/* Show more sits at the end of the brief, and the more opens below it, so the
+   toggle stays where it was pressed. */
+.helptip__more {
+  appearance: none;
+  position: relative;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  white-space: nowrap;
+  text-decoration: underline;
+  text-decoration-color: color-mix(in srgb, currentColor 40%, transparent);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.helptip__more:hover {
+  text-decoration-color: currentColor;
+}
+
+/* A larger target for a finger, without moving the text around it. */
+.helptip__more::after {
+  content: '';
+  position: absolute;
+  inset: -10px -6px;
+}
+
+.helptip__more-text:not([hidden]) {
+  display: block;
+  margin-top: 6px;
+}
+
 .helptip__text.is-collapsed {
   position: absolute !important;
   width: 1px;

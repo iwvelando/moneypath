@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { openApp, overflow, runForecast, uploadChoices } from './helpers';
 
 // Runs in the `phone` project (360 px wide). Every view and state is visited
@@ -405,15 +405,72 @@ test('every help panel opens inside the viewport', async ({ page }) => {
     if (!(await button.isVisible())) continue;
     const name = await button.getAttribute('aria-label');
     await button.click();
-    const box = await button.evaluate((el) => {
-      const rect = el.parentElement!.querySelector('.helptip__text')!.getBoundingClientRect();
-      return { left: rect.left, right: rect.right, viewport: document.documentElement.clientWidth };
-    });
-    expect(box.left, `${name} left edge`).toBeGreaterThanOrEqual(0);
-    expect(box.right, `${name} right edge`).toBeLessThanOrEqual(box.viewport);
-    expect(await overflow(page), name ?? '').toBeLessThanOrEqual(0);
+    const inside = async (state: string) => {
+      const box = await button.evaluate((el) => {
+        const rect = el.parentElement!.querySelector('.helptip__text')!.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, viewport: document.documentElement.clientWidth };
+      });
+      expect(box.left, `${name} ${state} left edge`).toBeGreaterThanOrEqual(0);
+      expect(box.right, `${name} ${state} right edge`).toBeLessThanOrEqual(box.viewport);
+      expect(await overflow(page), `${name} ${state}`).toBeLessThanOrEqual(0);
+    };
+    await inside('brief');
+    const more = button.locator('xpath=..').getByRole('button', { name: 'Show more', exact: true });
+    if ((await more.count()) > 0) {
+      await more.click();
+      await expect(button.locator('xpath=..').locator('.helptip__more-text')).toBeVisible();
+      await inside('expanded');
+    }
     await button.click();
   }
+});
+
+/** Where every visible control in a section is on the page, to the pixel. */
+async function controlBoxes(page: Page, section: string): Promise<string[]> {
+  return page.locator(section).evaluate((root) =>
+    Array.from(root.querySelectorAll<HTMLElement>('input, select, button, label'))
+      .filter((el) => !el.closest('.helptip__text') && el.getClientRects().length > 0)
+      .map((el) => {
+        const r = el.getBoundingClientRect();
+        return `${el.tagName} ${el.getAttribute('aria-label') ?? el.textContent?.trim()} ${r.x + window.scrollX},${r.y + window.scrollY} ${r.width}x${r.height}`;
+      }),
+  );
+}
+
+// A help is read beside the control it explains, so opening or expanding it
+// lays over the form rather than pushing anything aside.
+test('a help opens on its brief, expands, and moves nothing beside it', async ({ page }, testInfo) => {
+  const phone = testInfo.project.name === 'phone';
+  await openApp(page);
+  const section = '#section-simulation';
+  await page.locator(section).scrollIntoViewIfNeeded();
+  const before = await controlBoxes(page, section);
+  const help = page.getByRole('button', { name: 'Help: Cash interest rate', exact: true });
+  const tip = help.locator('xpath=..');
+  const press = async (target: Locator) => (phone ? target.tap() : target.click());
+
+  await press(help);
+  await expect(help).toHaveAttribute('aria-expanded', 'true');
+  await expect(tip.locator('.helptip__text')).toContainText('The yearly interest rate your cash earns');
+  const more = tip.getByRole('button', { name: 'Show more', exact: true });
+  await expect(more).toHaveAttribute('aria-expanded', 'false');
+  await expect(tip.locator('.helptip__more-text')).toBeHidden();
+  expect(await controlBoxes(page, section), 'opened').toEqual(before);
+
+  await press(more);
+  const less = tip.getByRole('button', { name: 'Show less', exact: true });
+  await expect(less).toHaveAttribute('aria-expanded', 'true');
+  await expect(tip.locator('.helptip__more-text')).toBeVisible();
+  await expect(tip.locator('.helptip__more-text')).toContainText('Only a positive balance earns interest');
+  await expect(tip.locator('.helptip__more-text')).toBeInViewport();
+  expect(await controlBoxes(page, section), 'expanded').toEqual(before);
+  expect(await overflow(page), 'expanded').toBeLessThanOrEqual(0);
+
+  await press(help);
+  await expect(help).toHaveAttribute('aria-expanded', 'false');
+  await press(help);
+  await expect(tip.getByRole('button', { name: 'Show more', exact: true })).toBeVisible();
+  await expect(tip.locator('.helptip__more-text')).toBeHidden();
 });
 
 test('the comparison overlays every scenario and reads a month for each', async ({ page }, testInfo) => {
