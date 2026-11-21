@@ -168,6 +168,44 @@ scenarios: [{name: plan, select: {Growth: Fixed}}]
 	}
 }
 
+// An entry an option changes is checked again as changed, and a growth of
+// inflation there follows the plan's rate, whether the change sets it or
+// leaves the baseline's in place.
+func TestAChangedEntryFollowsTheInflationRate(t *testing.T) {
+	cfg, problems := Load([]byte(`version: 2
+simulation: {startDate: 2026-06, endDate: 2036-05, startingCash: 0, inflationRate: 3}
+common:
+  events:
+    - {name: Rent, amount: -2000, growth: inflation}
+    - {name: Pay, amount: 3000}
+  loans:
+    - {name: Home, principal: 100000, interestRate: 5, term: 360, startDate: 2026-06, escrow: 300, escrowGrowth: inflation}
+choices:
+  - name: Move
+    options:
+      - name: Bigger place
+        change:
+          events:
+            - {name: Rent, set: {amount: -2500}}
+            - {name: Pay, set: {growth: inflation}}
+          loans:
+            - {name: Home, set: {escrow: 400}}
+scenarios: [{name: plan, select: {Move: Bigger place}}]
+`), ym("2026-01"))
+	if cfg == nil || len(problems) != 0 {
+		t.Fatalf("problems: %v", problems)
+	}
+	shared := cfg.Scenarios[0].ResolvedShared
+	for _, ev := range shared.Events {
+		if ev.Growth.Rate() != 3 {
+			t.Errorf("%s: growth %+v, want the plan's 3", ev.Name, ev.Growth)
+		}
+	}
+	if got := shared.Loans[0].EscrowGrowth.Rate(); got != 3 {
+		t.Errorf("escrow: growth rate %v, want the plan's 3", got)
+	}
+}
+
 // The factor is an integer power counted in plan years from the start, by
 // repeated multiplication, and exactly 1 in the first year and for no growth
 // (spec chapter 04 §2.1).
