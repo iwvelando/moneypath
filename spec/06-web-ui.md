@@ -52,7 +52,8 @@ These are the properties that must survive any redesign:
 
 The app covers, at a coarse grain:
 
-- A **config editor** — simulation settings (including the interest rate cash earns),
+- A **config editor** — simulation settings (including the interest rate cash earns
+  and the plan's inflation rate),
   the baseline (the config's `common` events / loans / investments), choices with their
   options, and scenarios with their selections, their own events / loans / investments
   and per-event optimizer blocks. Existing entries appear as compact
@@ -71,6 +72,20 @@ The app covers, at a coarse grain:
   beside it. A field asks a phone for the
   keyboard its value needs: the full one where a number may be negative, and for a
   month the number pad, with the field supplying the dash that pad lacks.
+- **Growth** (chapter 03, "Growth") — every event amount (cash-flow events, extra
+  principal payments, contributions and withdrawals by amount), a loan's escrow and a
+  guardrail's floor has a "Growth" dropdown: "Stays the same" (the default, written by
+  leaving the key out), "With inflation", or "At its own rate", which adds a "Yearly
+  growth" field. A blank yearly rate is reported under that field and holds the run,
+  since the plan has no way to carry it. The engine's problems with a growth appear
+  under the rate when there is one and under the dropdown otherwise. A percentage
+  withdrawal and a debt-free guardrail show the dropdown only when the plan already
+  gives them a growth, so its warning has a place. A growth the editor cannot offer is
+  shown as written with its error. A collapsed entry that grows says how ("With
+  inflation", "4% a year"). The help for these fields and for the inflation rate
+  states the assumptions: amounts in the start month's prices, a yearly step on the
+  plan's anniversaries, and fixed amounts staying the same in nominal dollars; the
+  help for each interest and return rate says it is nominal.
 - **Guardrails** (chapter 03, "Guardrails") — a section of the plan's guardrails, after
   the simulation settings, each an entry like any other. A new guardrail is a cash
   floor with nothing else entered; its fields are its name, its kind ("Cash floor",

@@ -19,6 +19,7 @@ import {
   type ConfigModel,
   type EntryKind,
   type EventKind,
+  type GrowthModel,
   type OptionModel,
   type ScenarioModel,
   type TargetRef,
@@ -37,7 +38,7 @@ function count(n: number, noun: string): string {
 /* the fields an option can change                                      */
 /* ------------------------------------------------------------------ */
 
-export type SetFieldFormat = 'money' | 'percent' | 'months' | 'month' | 'flag' | 'list';
+export type SetFieldFormat = 'money' | 'percent' | 'months' | 'month' | 'flag' | 'list' | 'growth';
 
 export interface SetField {
   key: string;
@@ -52,6 +53,7 @@ export interface SetField {
 export const SET_FIELDS: Record<EntryKind, readonly SetField[]> = {
   events: [
     { key: 'amount', label: 'Amount', format: 'money' },
+    { key: 'growth', label: 'Growth', format: 'growth' },
     { key: 'frequency', label: 'Frequency', format: 'months' },
     { key: 'startDate', label: 'Start month', format: 'month' },
     { key: 'endDate', label: 'End month', format: 'month' },
@@ -63,6 +65,7 @@ export const SET_FIELDS: Record<EntryKind, readonly SetField[]> = {
     { key: 'term', label: 'Term', format: 'months' },
     { key: 'startDate', label: 'First payment', format: 'month' },
     { key: 'escrow', label: 'Escrow', format: 'money' },
+    { key: 'escrowGrowth', label: 'Escrow growth', format: 'growth' },
     { key: 'mortgageInsurance', label: 'Mortgage insurance', format: 'money' },
     { key: 'mortgageInsuranceCutoff', label: 'MI cutoff', format: 'percent' },
     { key: 'earlyPayoffThreshold', label: 'Early payoff threshold', format: 'money' },
@@ -90,6 +93,20 @@ export const SET_FIELDS: Record<EntryKind, readonly SetField[]> = {
 };
 
 type Fields = Record<string, unknown>;
+
+/** A growth in words, as the growth control names it. */
+export function growthLabel(growth: GrowthModel | undefined): string {
+  switch (growth?.mode ?? 'fixed') {
+    case 'fixed':
+      return 'Stays the same';
+    case 'inflation':
+      return 'With inflation';
+    case 'rate':
+      return growth?.rate === null || growth?.rate === undefined ? 'Own rate, not set' : `${String(growth.rate)}% a year`;
+    default:
+      return String(growth?.mode);
+  }
+}
 
 /** The baseline entry as it stands on a path whose option changes `set`. */
 export function effectiveEntry<T extends object>(base: T, set: Partial<T>): T {
@@ -124,6 +141,7 @@ function display(field: SetField, value: unknown): string {
     const length = Array.isArray(value) ? value.length : 0;
     return length === 0 ? 'None' : length === 1 ? '1 entry' : `${length} entries`;
   }
+  if (field.format === 'growth') return growthLabel(value as GrowthModel);
   if (value === null || value === undefined || value === '') return 'Not set';
   if (field.format === 'money') return formatMoney(value as number);
   if (field.format === 'percent') return `${String(value)}%`;

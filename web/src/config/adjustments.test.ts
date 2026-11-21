@@ -8,6 +8,7 @@ function event(id: string, extra: Partial<EventModel> = {}): EventModel {
     id,
     name: id,
     amount: null,
+    growth: { mode: 'fixed', rate: null },
     percentage: null,
     frequency: null,
     startDate: '',
@@ -39,7 +40,7 @@ function scenario(name: string, events: EventModel[], active = true): ScenarioMo
 
 function config(scenarios: ScenarioModel[]): ConfigModel {
   return {
-    simulation: { startDate: '2025-01', endDate: '2026-12', startingCash: 5000, cashInterestRate: null, emergencyFundMonths: 3 },
+    simulation: { startDate: '2025-01', endDate: '2026-12', startingCash: 5000, cashInterestRate: null, inflationRate: null, emergencyFundMonths: 3 },
     guardrails: [],
     common: { events: [], loans: [], investments: [] },
     choices: [],

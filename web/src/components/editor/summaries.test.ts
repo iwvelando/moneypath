@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { emptyEvent, emptyInvestment, emptyLoan } from '../../config/types';
-import { eventSummary, investmentSummary, loanSummary } from './summaries';
+import { emptyEvent, emptyGuardrail, emptyInvestment, emptyLoan } from '../../config/types';
+import { eventSummary, guardrailSummary, investmentSummary, loanSummary } from './summaries';
 
-const simulation = { startDate: '2026-01', endDate: '2030-12', startingCash: 0, cashInterestRate: null, emergencyFundMonths: null };
+const simulation = { startDate: '2026-01', endDate: '2030-12', startingCash: 0, cashInterestRate: null, inflationRate: null, emergencyFundMonths: null };
 
 describe('editor summaries reflect entered values and documented defaults', () => {
   it('shows signed cash flow, default monthly cadence, and inherited dates', () => {
@@ -44,5 +44,27 @@ describe('editor summaries reflect entered values and documented defaults', () =
     expect(summary.detail).toContain('1 withdrawal');
     expect(summary.detail).toContain('Tax settings');
     expect(summary.detail).toContain('Contributions from outside the plan');
+  });
+});
+
+describe('growth in a summary', () => {
+  const simulation = { startDate: '2026-06', endDate: '2036-05', startingCash: 0, cashInterestRate: null, inflationRate: 3, emergencyFundMonths: null };
+
+  it('says when an event grows, and says nothing when it stays the same', () => {
+    const rent = { ...emptyEvent(), amount: -2000 };
+    expect(eventSummary(rent, 'cashflow', simulation).primary).toBe('-$2,000.00 · Monthly');
+    expect(eventSummary({ ...rent, growth: { mode: 'inflation', rate: null } }, 'cashflow', simulation).primary).toBe(
+      '-$2,000.00 · Monthly · With inflation',
+    );
+    expect(eventSummary({ ...rent, growth: { mode: 'rate', rate: 4 } }, 'cashflow', simulation).primary).toBe(
+      '-$2,000.00 · Monthly · 4% a year',
+    );
+  });
+
+  it('says when a floor or an escrow grows', () => {
+    const floor = { ...emptyGuardrail(), amount: 20000, growth: { mode: 'inflation', rate: null } };
+    expect(guardrailSummary(floor).primary).toBe('Cash never below $20,000.00 · With inflation');
+    const loan = { ...emptyLoan(), escrow: 300, escrowGrowth: { mode: 'rate', rate: 2 } };
+    expect(loanSummary(loan).detail).toContain('Escrow 2% a year');
   });
 });

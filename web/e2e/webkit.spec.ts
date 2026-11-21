@@ -366,6 +366,42 @@ test('an iPhone picks the loans and investments a guardrail checks', async ({ pa
   expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
 });
 
+test('an iPhone sets an amount to grow at its own rate', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await page.getByRole('button', { name: 'Edit Living expenses' }).tap();
+  const card = page.locator('.editor-card').filter({ has: page.getByRole('button', { name: 'Collapse Living expenses' }) });
+  // A native dropdown: a tap opens it, and picking leaves focus where Safari
+  // puts it, without the app moving it.
+  const growth = card.getByRole('combobox', { name: 'Growth', exact: true });
+  await growth.tap();
+  await growth.selectOption({ label: 'At its own rate' });
+  await expect(growth).toHaveValue('rate');
+  const rate = card.getByRole('textbox', { name: 'Yearly growth', exact: true });
+  await expect(rate).toBeVisible();
+  await expect(rate).not.toBeFocused();
+  // A rate can shrink an amount, so the field asks for the full keyboard.
+  await expect(rate).toHaveAttribute('inputmode', 'text');
+  await rate.tap();
+  await expect(rate).toBeFocused();
+  await rate.fill('-2.5');
+  await card.getByRole('textbox', { name: 'Name', exact: true }).tap();
+  await expect(rate).toHaveValue('-2.5');
+  await expect(card.locator('.editor-card__summary')).toHaveText('-$3,400.00 · Monthly · -2.5% a year');
+  expect(await overflow(page), 'growth control').toBeLessThanOrEqual(0);
+
+  await growth.tap();
+  await growth.selectOption({ label: 'With inflation' });
+  await expect(rate).toHaveCount(0);
+  await expect(card.locator('[data-path="common.events.1.growth"]')).toContainText(
+    'Warning: This follows the plan’s inflation rate, which is 0, so it stays the same.',
+  );
+  await runForecast(page);
+  expect(await overflow(page), 'results').toBeLessThanOrEqual(0);
+  const selectNoise = /^Refused to apply a stylesheet because its hash, its nonce, or 'unsafe-inline'/;
+  expect(found.filter((message) => !selectNoise.test(message))).toEqual([]);
+});
+
 // Safari does not focus a button it taps, so Show more is pressed with focus
 // somewhere else; the help must stay open, and Escape must still close it.
 test('a help expands by tap and by keyboard, and reopens on its brief', async ({ page }) => {

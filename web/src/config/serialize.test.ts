@@ -293,3 +293,98 @@ describe('guardrails', () => {
     expect(toConfigDocument(config)['guardrails']).toEqual([{ name: 'Cushion', kind: 'cashFloor', amount: 0 }]);
   });
 });
+
+describe('growth', () => {
+  const written = {
+    version: 2,
+    simulation: { startDate: '2026-06', endDate: '2036-05', startingCash: 0, cashInterestRate: 4, inflationRate: 3 },
+    guardrails: [{ name: 'Cushion', kind: 'cashFloor', amount: 20000, growth: 'inflation' }],
+    common: {
+      events: [
+        { name: 'Salary', amount: 5000, growth: 4 },
+        { name: 'Rent', amount: -2000, growth: 'inflation' },
+        { name: 'Phone', amount: -80 },
+        { name: 'Shrinking', amount: -100, growth: -10 },
+      ],
+      loans: [
+        {
+          name: 'Home',
+          principal: 100000,
+          interestRate: 4,
+          term: 360,
+          startDate: '2026-06',
+          escrow: 300,
+          escrowGrowth: 'inflation',
+          extraPrincipalPayments: [{ amount: 100, growth: 2 }],
+        },
+      ],
+      investments: [
+        {
+          name: '401k',
+          contributions: [{ amount: 500, growth: 3 }],
+          withdrawals: [{ amount: 1000, growth: 'inflation', startDate: '2040-01' }],
+        },
+      ],
+    },
+    choices: [
+      {
+        name: 'Growth',
+        options: [
+          { name: 'As written' },
+          {
+            name: 'Fixed',
+            change: {
+              events: [{ name: 'Rent', set: { growth: null } }, { name: 'Salary', set: { growth: 2 } }],
+              loans: [{ name: 'Home', set: { escrowGrowth: 'inflation' } }],
+            },
+          },
+        ],
+      },
+    ],
+    scenarios: [{ name: 'a', active: true, select: { Growth: 'As written' } }],
+  };
+
+  it('reads every growth and writes it back as written, in canonical order', () => {
+    const read = fromConfigDocument(written);
+    expect(read.simulation.inflationRate).toBe(3);
+    expect(read.common.events.map((e) => e.growth)).toEqual([
+      { mode: 'rate', rate: 4 },
+      { mode: 'inflation', rate: null },
+      { mode: 'fixed', rate: null },
+      { mode: 'rate', rate: -10 },
+    ]);
+    const doc = toConfigDocument(read);
+    expect(doc).toEqual(written);
+    expect(Object.keys(doc['simulation'] as object)).toEqual([
+      'startDate',
+      'endDate',
+      'startingCash',
+      'cashInterestRate',
+      'inflationRate',
+    ]);
+    const common = doc['common'] as { events: object[]; loans: object[] };
+    expect(Object.keys(common.events[0]!)).toEqual(['name', 'amount', 'growth']);
+    expect(Object.keys(common.loans[0]!).slice(5, 7)).toEqual(['escrow', 'escrowGrowth']);
+    expect(Object.keys((doc['guardrails'] as object[])[0]!)).toEqual(['name', 'kind', 'amount', 'growth']);
+  });
+
+  it('writes fixed by leaving growth out, and reads the word fixed as fixed', () => {
+    const read = fromConfigDocument({ ...written, common: { events: [{ name: 'Phone', amount: -80, growth: 'fixed' }] }, choices: undefined });
+    expect(read.common.events[0]!.growth).toEqual({ mode: 'fixed', rate: null });
+    expect(serializeEvent(read.common.events[0]!, 'cashflow')).toEqual({ name: 'Phone', amount: -80 });
+  });
+
+  it('keeps a growth it cannot use, for the engine to report', () => {
+    const read = fromConfigDocument({
+      ...written,
+      common: { events: [{ name: 'Typo', amount: 1, growth: 'inflaton' }, { name: 'Quoted', amount: 1, growth: '3' }] },
+      choices: undefined,
+    });
+    expect(read.common.events.map((e) => serializeEvent(e, 'cashflow')['growth'])).toEqual(['inflaton', '3']);
+  });
+
+  it('leaves out an own rate not yet entered', () => {
+    const event = { ...emptyEvent(), amount: 1, growth: { mode: 'rate', rate: null } };
+    expect(serializeEvent(event, 'cashflow')).not.toHaveProperty('growth');
+  });
+});

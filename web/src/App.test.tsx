@@ -84,6 +84,7 @@ function seedPlanWithOptimizer(): void {
       id: 'optimized-event',
       name: 'Sabbatical spending',
       amount: -100,
+      growth: { mode: 'fixed', rate: null },
       percentage: null,
       frequency: null,
       startDate: '',
@@ -814,18 +815,22 @@ describe('the app', () => {
     const config = starterConfig();
     config.simulation.cashInterestRate = -1;
     config.simulation.emergencyFundMonths = -1;
+    config.simulation.inflationRate = -100;
     const car = config.common.loans[0]!;
-    car.extraPrincipalPayments = [{ ...emptyEvent(), amount: -5, frequency: 0 }];
+    car.extraPrincipalPayments = [{ ...emptyEvent(), amount: -5, frequency: 0, growth: { mode: 'rate', rate: -100 } }];
+    car.escrowGrowth = { mode: 'nope', rate: null };
     car.mortgageInsuranceCutoff = 101;
     config.common.loans.push({ ...emptyLoan(), downPayment: -1, escrow: -1, earlyPayoffDate: 'soon' });
     const fund = config.common.investments[0]!;
     fund.taxRate = 100;
     fund.withdrawalTaxRate = -1;
     fund.startingValue = -1;
-    fund.contributions = [{ ...emptyEvent(), amount: 0 }];
-    fund.withdrawals = [{ ...emptyEvent() }];
+    fund.contributions = [{ ...emptyEvent(), amount: 0, growth: { mode: 'quickly', rate: null } }];
+    fund.withdrawals = [{ ...emptyEvent() }, { ...emptyEvent(), amount: 5, growth: { mode: 'rate', rate: -200 } }];
     config.common.investments.push({ ...emptyInvestment(), name: fund.name });
     config.common.events.push({ ...emptyEvent(), frequency: 1.5, startDate: '2030-01', endDate: '2029-01' });
+    config.common.events.push({ ...emptyEvent(), name: 'Grows', amount: -1, growth: { mode: 'rate', rate: -150 } });
+    config.common.events.push({ ...emptyEvent(), name: 'Blank rate', amount: -1, growth: { mode: 'rate', rate: null } });
     config.guardrails = [
       { ...emptyGuardrail(), amount: 100 },
       { ...emptyGuardrail(), name: 'Twice', amount: 100 },
@@ -839,12 +844,16 @@ describe('the app', () => {
       { ...emptyGuardrail(), name: 'Floorless' },
       { ...emptyGuardrail(), name: 'Dates', amount: 1, startDate: 'soon', endDate: '2030-13' },
       { ...emptyGuardrail(), name: 'Backwards', amount: 1, startDate: '2040-01', endDate: '2039-01' },
+      { ...emptyGuardrail(), name: 'Grows oddly', amount: 1, growth: { mode: 'inflaton', rate: null } },
+      { ...emptyGuardrail(), name: 'Shrinks away', kind: 'lasts', investments: [fund.name], amount: 1, growth: { mode: 'rate', rate: -100 } },
     ];
 
     const stay = emptyOption('Same');
     const move = emptyOption('Same');
     move.events = [{ ...emptyEvent(), name: 'Costs' }];
-    move.change.loans = [{ id: newId('cg'), targetId: car.id, targetName: car.name, set: { term: 0 } }];
+    move.change.loans = [{ id: newId('cg'), targetId: car.id, targetName: car.name, set: { term: 0, escrowGrowth: { mode: 'rate', rate: -100 } } }];
+    const grows = config.common.events.find((e) => e.name === 'Grows')!;
+    move.change.events = [{ id: newId('cg'), targetId: grows.id, targetName: grows.name, set: { growth: { mode: 'odd', rate: null } } }];
     const home = { ...emptyChoice(''), options: [stay, move] };
     config.choices = [home];
 

@@ -20,7 +20,7 @@ const simulation: SimulationModel = {
   startDate: '',
   endDate: '2030-12',
   startingCash: 0,
-  cashInterestRate: null, emergencyFundMonths: null,
+  cashInterestRate: null, inflationRate: null, emergencyFundMonths: null,
 };
 
 let container: HTMLDivElement;

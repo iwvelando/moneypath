@@ -20,6 +20,7 @@ import {
 } from '../../config/types';
 import { ChangedLabels, MonthField, NumberField, SelectField, TextField } from '../fields';
 import { At } from '../problems';
+import { GrowthField } from '../GrowthField';
 import { IconCalendar } from '../icons';
 
 /* ------------------------------------------------------------------ */
@@ -210,6 +211,10 @@ export function EventFields({
               onChange={(amount) => patch({ amount })}
             />
           )}
+          {/* A percentage already follows the balance; a growth the plan gives one stays for its warning. */}
+          {!usePercentage || event.growth.mode !== 'fixed' ? (
+            <GrowthField label="Growth" field="growth" value={event.growth} onChange={(growth) => patch({ growth })} />
+          ) : null}
         </div>
       </EditorFields>
       <EditorFields title="Schedule">

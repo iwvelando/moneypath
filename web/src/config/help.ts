@@ -52,10 +52,18 @@ export const HELP = {
   cashInterestRate: tiered(
     'Optional, default 0. The yearly interest rate your cash earns after tax, entered as an APR (4.5 means 4.5%).',
     'One twelfth is added every month to the cash you had at the end of the previous month, so it ' +
-      'compounds: 4.5 works out to about 4.59% over a year, the APY a bank would advertise. ' +
-      'Leave it at 0 to assume your cash sits in an account that pays nothing; enter a higher rate to ' +
-      'model keeping cash in something like a high-yield savings account. ' +
-      'Only a positive balance earns interest, and it must be at least 0.',
+      'compounds: 4.5 works out to about 4.59% a year, the APY a bank would advertise. ' +
+      'Leave it at 0 for an account that pays nothing, or enter a high-yield savings rate. ' +
+      'Only a positive balance earns interest, and it must be at least 0. ' +
+      'The rate is nominal: the plan’s inflation rate is applied separately, so do not subtract it.',
+  ),
+  inflationRate: tiered(
+    'Optional, default 0. How much prices rise each year, in percent: 3 means 3% higher a year later.',
+    'Only amounts set to grow with inflation follow it. Amounts are written in the start month’s prices ' +
+      'and step once a year, on the anniversaries of the start month; an amount that stays the same ' +
+      'keeps the dollars written. It is a yearly change, not an APR. Interest and return rates stay ' +
+      'nominal: the inflation rate is applied separately, so do not subtract it from them. ' +
+      'It must be more than -100.',
   ),
   emergencyFundMonths:
     'Months of average expenses to target for the emergency-fund recommendation. Default 6; 0 disables the recommendation.',
@@ -69,7 +77,14 @@ export const HELP = {
   ),
   guardrailAmount: tiered(
     'Required for a cash floor. Your cash must hold at least this much at every month-end the guardrail covers.',
-    'Cash is compared with it to the cent, in the start month too, after that month’s own income and spending. The same amount applies in every month. It may be negative, to mean “never more than this much overdrawn”.',
+    'Cash is compared with it to the cent, in the start month too, after that month’s own income and spending. The same amount applies in every month unless it is set to grow. It may be negative, to mean “never more than this much overdrawn”.',
+  ),
+  guardrailGrowth: tiered(
+    'How the floor changes each year: it stays the same, follows inflation, or grows at its own rate.',
+    'Write the amount in the start month’s prices. The floor steps once a year, on the anniversaries ' +
+      'of the plan’s start month, counted from the plan’s start even when the guardrail starts ' +
+      'checking later. A floor that stays the same holds the same dollars, so it is worth less as ' +
+      'prices rise. Growth rates are yearly changes, not APRs.',
   ),
   guardrailStartDate: tiered(
     'Optional. The first month checked. Defaults to the simulation start month.',
@@ -144,6 +159,19 @@ export const HELP = {
       'actually lands in your account. For example, a $1,000 grant at a 25% marginal tax rate ' +
       'should be entered as 750.',
   ),
+  growth: tiered(
+    'How the amount changes each year: it stays the same, follows inflation, or grows at its own rate.',
+    'Write the amount in the start month’s prices. A growing amount steps once a year, on the ' +
+      'anniversaries of the plan’s start month, counted from the plan’s start even when this entry ' +
+      'starts later. An amount that stays the same keeps the dollars written, so rising prices wear ' +
+      'it down. Growth rates are yearly changes, not APRs. Growth has no effect on a percentage withdrawal.',
+  ),
+  growthRate: tiered(
+    'The percent the amount changes each year: 4 means 4% more a year later. A negative rate shrinks it.',
+    'It is a yearly change, not an APR, and must be more than -100. The amount is written in the ' +
+      'start month’s prices and steps once a year, on the anniversaries of the plan’s start month, ' +
+      'counted from the plan’s start. At 0 it stays the same.',
+  ),
   eventAmountExtraPrincipal:
     'Must be greater than zero. Money paid toward the loan principal — it leaves your cash.',
   eventAmountContribution:
@@ -160,14 +188,22 @@ export const HELP = {
   loanPrincipal: 'Required. The original principal, before the down payment is applied.',
   loanDownPayment:
     'Optional, default 0. Paid at the loan start month; must be at least 0 and less than the principal.',
-  loanInterestRate:
-    'Required. The loan’s yearly rate (APR): 6.5 means 6.5% a year, charged one twelfth each month. Zero is allowed.',
+  loanInterestRate: tiered(
+    'Required. The loan’s yearly rate (APR): 6.5 means 6.5% a year, charged one twelfth each month.',
+    'Zero is allowed. The rate is nominal: the plan’s inflation rate is applied separately and never changes it.',
+  ),
   loanTerm: 'Required. Loan length in months; at least 1.',
   loanStartDate: tiered(
     'Required. Month of the first payment.',
     'Loans may start before the simulation window — payments dated before it simply never enter the ledger.',
   ),
   loanEscrow: 'Optional, default 0. Monthly escrow added to each payment; must be at least 0.',
+  escrowGrowth: tiered(
+    'How the escrow changes each year. Property tax and insurance usually rise with inflation.',
+    'Write the escrow in the start month’s prices. It steps once a year, on the anniversaries of the ' +
+      'plan’s start month, in every payment and in each December’s bill after a payoff that keeps the ' +
+      'property. Escrow that stays the same keeps the dollars written. Growth rates are yearly changes, not APRs.',
+  ),
   loanMortgageInsurance: tiered(
     'Optional, default 0. Monthly mortgage insurance added to payments while the remaining/original principal ratio exceeds the cutoff.',
     'With no cutoff set it applies for the whole life of the loan (which raises a warning).',
@@ -197,7 +233,7 @@ export const HELP = {
   ),
   investmentAnnualReturnRate: tiered(
     'Optional, default 0. The yearly return, entered like an APR. It may be negative.',
-    'One twelfth is applied each month, so it compounds to slightly more over a year (7 grows about 7.23% a year). To model an average annual return of exactly 7%, enter 6.78.',
+    'One twelfth is applied each month, so it compounds to slightly more over a year (7 grows about 7.23% a year). To model an average annual return of exactly 7%, enter 6.78. The rate is nominal: the plan’s inflation rate is applied separately, so do not subtract inflation from it.',
   ),
   investmentTaxRate: tiered(
     'Optional, default 0. Percent applied to positive monthly growth, modelling tax drag on gains.',

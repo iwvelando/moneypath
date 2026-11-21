@@ -511,6 +511,17 @@ export function Workspace({
             suffix="% / yr"
             onChange={(cashInterestRate) => patchSimulation({ cashInterestRate })}
           />
+          <NumberField
+            field="inflationRate"
+            label="Inflation rate"
+            help={HELP.inflationRate}
+            value={config.simulation.inflationRate}
+            step={0.25}
+            placeholder="0"
+            suffix="% / yr"
+            signed
+            onChange={(inflationRate) => patchSimulation({ inflationRate })}
+          />
           </At>
           <At path="recommendations">
           <NumberField

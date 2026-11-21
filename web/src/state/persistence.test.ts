@@ -169,6 +169,23 @@ describe('editor state persistence', () => {
     expect(outcome.config.simulation.startingCash).toBeNull();
   });
 
+  it('restores entries saved before growth existed as fixed, and the inflation rate as blank', () => {
+    const draft = sparseDraft() as { version: number; config: Record<string, unknown> };
+    draft.config['guardrails'] = [{ id: 'g0', name: 'Cushion', kind: 'cashFloor', amount: 500 }];
+    const outcome = decodeEditorState(JSON.stringify(draft));
+    expect(outcome.source).toBe('restored');
+    const { common, scenarios, guardrails, simulation } = outcome.config;
+    const fixed = { mode: 'fixed', rate: null };
+    expect(simulation.inflationRate).toBeNull();
+    expect(common.events[0]!.growth).toEqual(fixed);
+    expect(scenarios[0]!.events[0]!.growth).toEqual(fixed);
+    expect(scenarios[0]!.loans[0]!.escrowGrowth).toEqual(fixed);
+    expect(guardrails[0]!.growth).toEqual(fixed);
+    const doc = JSON.stringify(toConfigDocument(outcome.config));
+    expect(doc).not.toContain('rowth');
+    expect(doc).not.toContain('inflationRate');
+  });
+
   it('keeps everything the editor held, including what a config export would drop', () => {
     const { common, scenarios } = decodeEditorState(JSON.stringify(sparseDraft())).config;
     // Not a config round trip: an unticked "sell" keeps its price, and a

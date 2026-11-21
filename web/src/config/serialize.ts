@@ -15,6 +15,7 @@ import {
   type EntryKind,
   type EventKind,
   type EventModel,
+  type GrowthModel,
   type GuardrailModel,
   type InvestmentModel,
   type LoanModel,
@@ -25,6 +26,7 @@ import {
   type TargetRef,
   emptyChoice,
   emptyEvent,
+  emptyGrowth,
   emptyGuardrail,
   emptyInvestment,
   emptyLoan,
@@ -47,6 +49,32 @@ function put(target: JsonObject, key: string, value: Json | null | undefined): v
   if (value === null || value === undefined) return;
   if (typeof value === 'string' && value === '') return;
   target[key] = value;
+}
+
+/**
+ * A growth as the document writes it: left out when fixed, the word for
+ * inflation, the rate as a number, and anything else as written. A rate not
+ * yet entered is left out too; its field reports that, and holds the run.
+ */
+export function serializeGrowth(growth: GrowthModel): Json | null {
+  switch (growth.mode) {
+    case 'fixed':
+      return null;
+    case 'inflation':
+      return 'inflation';
+    case 'rate':
+      return growth.rate;
+    default:
+      return growth.mode;
+  }
+}
+
+/** A growth as written in a document; an absent one is fixed. */
+export function parseGrowth(value: unknown): GrowthModel {
+  if (value === undefined || value === null || value === 'fixed') return emptyGrowth();
+  if (value === 'inflation') return { mode: 'inflation', rate: null };
+  if (typeof value === 'number' && Number.isFinite(value)) return { mode: 'rate', rate: value };
+  return { mode: typeof value === 'string' ? value : JSON.stringify(value), rate: null };
 }
 
 function serializeOptimize(optimize: OptimizeModel): JsonObject {
@@ -72,6 +100,7 @@ export function serializeEvent(event: EventModel, kind: EventKind): JsonObject {
   } else {
     put(out, 'amount', event.amount);
   }
+  put(out, 'growth', serializeGrowth(event.growth));
   put(out, 'frequency', event.frequency);
   put(out, 'startDate', event.startDate.trim());
   put(out, 'endDate', event.endDate.trim());
@@ -90,6 +119,7 @@ export function serializeLoan(loan: LoanModel): JsonObject {
   put(out, 'term', loan.term);
   put(out, 'startDate', loan.startDate.trim());
   put(out, 'escrow', loan.escrow);
+  put(out, 'escrowGrowth', serializeGrowth(loan.escrowGrowth));
   put(out, 'mortgageInsurance', loan.mortgageInsurance);
   put(out, 'mortgageInsuranceCutoff', loan.mortgageInsuranceCutoff);
   put(out, 'earlyPayoffThreshold', loan.earlyPayoffThreshold);
@@ -131,6 +161,7 @@ export function serializeGuardrail(guardrail: GuardrailModel): JsonObject {
   put(out, 'name', guardrail.name.trim());
   put(out, 'kind', guardrail.kind.trim());
   put(out, 'amount', guardrail.amount);
+  put(out, 'growth', serializeGrowth(guardrail.growth));
   if (guardrail.investments !== null) out['investments'] = [...guardrail.investments];
   if (guardrail.loans !== null) out['loans'] = [...guardrail.loans];
   put(out, 'startDate', guardrail.startDate.trim());
@@ -151,6 +182,8 @@ function serializeSet(kind: EntryKind, set: object): JsonObject {
       out[field.key] = value === true;
     } else if (field.format === 'month') {
       out[field.key] = (value as string).trim() || null;
+    } else if (field.format === 'growth') {
+      out[field.key] = serializeGrowth(value as GrowthModel);
     } else {
       out[field.key] = (value as number | null) ?? null;
     }
@@ -210,6 +243,7 @@ export function toConfigDocument(model: ConfigModel): JsonObject {
   put(simulation, 'endDate', model.simulation.endDate.trim());
   put(simulation, 'startingCash', model.simulation.startingCash);
   put(simulation, 'cashInterestRate', model.simulation.cashInterestRate);
+  put(simulation, 'inflationRate', model.simulation.inflationRate);
 
   const doc: JsonObject = { version: CONFIG_VERSION, simulation };
 
@@ -322,6 +356,7 @@ export function parseEvent(value: unknown, kind: EventKind): EventModel {
   if (!isObject(value)) return event;
   event.name = readString(value['name']);
   event.amount = readNumber(value['amount']);
+  event.growth = parseGrowth(value['growth']);
   event.percentage = kind === 'withdrawal' ? readNumber(value['percentage']) : null;
   event.frequency = readNumber(value['frequency']);
   event.startDate = readString(value['startDate']);
@@ -340,6 +375,7 @@ export function parseLoan(value: unknown): LoanModel {
   loan.term = readNumber(value['term']);
   loan.startDate = readString(value['startDate']);
   loan.escrow = readNumber(value['escrow']);
+  loan.escrowGrowth = parseGrowth(value['escrowGrowth']);
   loan.mortgageInsurance = readNumber(value['mortgageInsurance']);
   loan.mortgageInsuranceCutoff = readNumber(value['mortgageInsuranceCutoff']);
   loan.earlyPayoffThreshold = readNumber(value['earlyPayoffThreshold']);
@@ -382,6 +418,7 @@ export function parseGuardrail(value: unknown): GuardrailModel {
   guardrail.name = readString(value['name']);
   guardrail.kind = readString(value['kind']);
   guardrail.amount = readNumber(value['amount']);
+  guardrail.growth = parseGrowth(value['growth']);
   guardrail.investments = readNames(value['investments']);
   guardrail.loans = readNames(value['loans']);
   guardrail.startDate = readString(value['startDate']);
@@ -410,6 +447,8 @@ function parseSet(kind: EntryKind, value: unknown): Record<string, unknown> {
       out[field.key] = readBool(raw);
     } else if (field.format === 'month') {
       out[field.key] = readString(raw);
+    } else if (field.format === 'growth') {
+      out[field.key] = parseGrowth(raw);
     } else {
       out[field.key] = readNumber(raw);
     }
@@ -492,6 +531,7 @@ export function fromConfigDocument(value: unknown): ConfigModel {
       endDate: readString(simulation['endDate']),
       startingCash: readNumber(simulation['startingCash']),
       cashInterestRate: readNumber(simulation['cashInterestRate']),
+      inflationRate: readNumber(simulation['inflationRate']),
       emergencyFundMonths: readNumber(recommendations['emergencyFundMonths']),
     },
     guardrails: readArray(doc['guardrails']).map(parseGuardrail),

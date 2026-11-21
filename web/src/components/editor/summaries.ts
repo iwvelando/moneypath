@@ -1,6 +1,13 @@
 import type { EventKind, EventModel, GuardrailModel, InvestmentModel, LoanModel, SimulationModel } from '../../config/types';
 import { monthIsError } from '../../config/month';
 import { formatMoney } from '../../util/format';
+import { growthLabel } from '../../config/choices';
+import type { GrowthModel } from '../../config/types';
+
+/** " · With inflation" or " · 4% a year" for an amount that grows; nothing for one that stays the same. */
+function grows(growth: GrowthModel): string {
+  return growth.mode === 'fixed' ? '' : ` · ${growthLabel(growth)}`;
+}
 
 export interface EditorSummary {
   primary: string;
@@ -27,14 +34,16 @@ export function eventSummary(event: EventModel, kind: EventKind, simulation: Sim
   const cadence = once ? 'Once' : (event.frequency ?? 1) === 1 ? 'Monthly' : `Every ${event.frequency} months`;
   return {
     attention: eventHasFieldErrors(event),
-    primary: `${amount} · ${cadence}`,
+    primary: `${amount} · ${cadence}${grows(event.growth)}`,
     detail: once ? start : `${start || 'Simulation start'} through ${end || 'simulation end'}`,
   };
 }
 
 export function loanSummary(loan: LoanModel): EditorSummary {
   const extras = [
-    loan.escrow !== null && loan.escrow !== 0 ? 'Escrow' : '',
+    loan.escrow !== null && loan.escrow !== 0
+      ? loan.escrowGrowth.mode === 'fixed' ? 'Escrow' : `Escrow ${growthLabel(loan.escrowGrowth).toLowerCase()}`
+      : '',
     loan.mortgageInsurance !== null && loan.mortgageInsurance !== 0 ? 'Mortgage insurance' : '',
     loan.earlyPayoffDate || loan.earlyPayoffThreshold !== null ? 'Early payoff' : '',
     loan.sellProperty ? 'Property sale' : '',
@@ -71,7 +80,7 @@ export function guardrailSummary(guardrail: GuardrailModel): EditorSummary {
   let primary: string;
   switch (guardrail.kind) {
     case 'cashFloor':
-      primary = guardrail.amount === null ? 'Cash floor not set' : `Cash never below ${formatMoney(guardrail.amount)}`;
+      primary = guardrail.amount === null ? 'Cash floor not set' : `Cash never below ${formatMoney(guardrail.amount)}${grows(guardrail.growth)}`;
       break;
     case 'debtFree':
       primary = `Nothing owed on ${guardrail.loans === null ? 'any loan' : listed(guardrail.loans)}`;
@@ -81,7 +90,7 @@ export function guardrailSummary(guardrail: GuardrailModel): EditorSummary {
         ? 'Investments not picked'
         : guardrail.amount === null
           ? `${listed(guardrail.investments)} never emptied`
-          : `${listed(guardrail.investments)} never below ${formatMoney(guardrail.amount)}`;
+          : `${listed(guardrail.investments)} never below ${formatMoney(guardrail.amount)}${grows(guardrail.growth)}`;
       break;
     default:
       primary = guardrail.kind.trim() || 'Kind not set';

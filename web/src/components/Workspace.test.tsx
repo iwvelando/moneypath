@@ -26,7 +26,7 @@ function event(name: string): EventModel {
 
 function makeConfig(commonEvents: EventModel[], scenarios: ScenarioModel[]): ConfigModel {
   return {
-    simulation: { startDate: '', endDate: '2030-12', startingCash: 0, cashInterestRate: null, emergencyFundMonths: null },
+    simulation: { startDate: '', endDate: '2030-12', startingCash: 0, cashInterestRate: null, inflationRate: null, emergencyFundMonths: null },
     guardrails: [],
     common: { events: commonEvents, loans: [], investments: [] },
     choices: [],
@@ -813,3 +813,110 @@ describe('run errors', () => {
   });
 });
 
+
+describe('growth', () => {
+  function select(path: string): HTMLSelectElement {
+    const found = container.querySelector<HTMLSelectElement>(`[data-path="${path}"] select`);
+    if (!found) throw new Error(`no growth control at ${path}`);
+    return found;
+  }
+
+  async function pick(element: HTMLSelectElement, value: string): Promise<void> {
+    await act(async () => {
+      element.value = value;
+      element.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  }
+
+  async function type(input: HTMLInputElement, text: string): Promise<void> {
+    await act(async () => {
+      input.value = text;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+  }
+
+  it('sets the plan’s inflation rate in the Simulation section', async () => {
+    await mount(makeConfig([], [emptyScenario('plan a')]));
+    const input = container.querySelector<HTMLInputElement>('[data-path="simulation.inflationRate"] input')!;
+    expect(input.closest('#section-simulation')).not.toBeNull();
+    expect(input.value).toBe('');
+    expect(container.querySelector('button[aria-label="Help: Inflation rate"]')).not.toBeNull();
+    await type(input, '3');
+    expect(latest.simulation.inflationRate).toBe(3);
+  });
+
+  it('lets an event stay the same, follow inflation or grow at its own rate', async () => {
+    await mount(makeConfig([{ ...event('Rent'), amount: -2000 }], [emptyScenario('plan a')]));
+    await click('Expand all');
+    const growth = select('common.events.0.growth');
+    expect(growth.value).toBe('fixed');
+    await pick(growth, 'inflation');
+    expect(latest.common.events[0]!.growth).toEqual({ mode: 'inflation', rate: null });
+    await pick(growth, 'rate');
+    const rate = container.querySelector<HTMLInputElement>('[data-path="common.events.0.growth"] input')!;
+    await type(rate, '4');
+    expect(latest.common.events[0]!.growth).toEqual({ mode: 'rate', rate: 4 });
+  });
+
+  it('grows a loan’s escrow, extra payments, contributions and amount withdrawals', async () => {
+    const config = makeConfig([], [emptyScenario('plan a')]);
+    config.common.loans = [{ ...emptyLoan(), name: 'Home', escrow: 300, extraPrincipalPayments: [{ ...emptyEvent(), amount: 100 }] }];
+    config.common.investments = [
+      {
+        ...emptyInvestment(),
+        name: 'Fund',
+        contributions: [{ ...emptyEvent(), amount: 100 }],
+        withdrawals: [{ ...emptyEvent(), amount: 100 }],
+      },
+    ];
+    await mount(config);
+    for (const label of buttons('Expand all')) {
+      await act(async () => label.click());
+    }
+    for (const label of buttons('Expand all')) {
+      await act(async () => label.click());
+    }
+    await pick(select('common.loans.0.escrowGrowth'), 'inflation');
+    expect(latest.common.loans[0]!.escrowGrowth.mode).toBe('inflation');
+    await pick(select('common.loans.0.extraPrincipalPayments.0.growth'), 'inflation');
+    await pick(select('common.investments.0.contributions.0.growth'), 'inflation');
+    await pick(select('common.investments.0.withdrawals.0.growth'), 'inflation');
+    expect(latest.common.loans[0]!.extraPrincipalPayments[0]!.growth.mode).toBe('inflation');
+    expect(latest.common.investments[0]!.contributions[0]!.growth.mode).toBe('inflation');
+    expect(latest.common.investments[0]!.withdrawals[0]!.growth.mode).toBe('inflation');
+  });
+
+  it('offers no growth on a percentage withdrawal, unless the plan already gives it one', async () => {
+    const config = makeConfig([], [emptyScenario('plan a')]);
+    config.common.investments = [
+      {
+        ...emptyInvestment(),
+        name: 'Fund',
+        withdrawals: [{ ...emptyEvent(), percentage: 4 }, { ...emptyEvent(), percentage: 1, growth: { mode: 'inflation', rate: null } }],
+      },
+    ];
+    await mount(config);
+    for (let i = 0; i < 3; i++) {
+      for (const label of buttons('Expand all')) {
+        await act(async () => label.click());
+      }
+    }
+    expect(container.querySelector('[data-path="common.investments.0.withdrawals.0.growth"]')).toBeNull();
+    expect(select('common.investments.0.withdrawals.1.growth').value).toBe('inflation');
+  });
+
+  it('grows a cash floor and an investments-last amount, and keeps a debt-free’s growth only to show its warning', async () => {
+    const config = makeConfig([], [emptyScenario('plan a')]);
+    config.guardrails = [
+      { ...emptyGuardrail(), name: 'Cushion', amount: 100 },
+      { ...emptyGuardrail(), name: 'Clear', kind: 'debtFree', startDate: '2029-01' },
+      { ...emptyGuardrail(), name: 'Clear too', kind: 'debtFree', startDate: '2029-01', growth: { mode: 'rate', rate: 2 } },
+    ];
+    await mount(config);
+    await click('Expand all');
+    await pick(select('guardrails.0.growth'), 'inflation');
+    expect(latest.guardrails[0]!.growth.mode).toBe('inflation');
+    expect(container.querySelector('[data-path="guardrails.1.growth"]')).toBeNull();
+    expect(container.querySelector('[data-path="guardrails.2.growth"]')).not.toBeNull();
+  });
+});

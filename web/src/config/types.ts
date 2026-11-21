@@ -25,10 +25,25 @@ export interface OptimizeModel {
   guardrail: string;
 }
 
+/** How an amount changes over the plan's years (spec/03, Growth). */
+export type GrowthMode = 'fixed' | 'inflation' | 'rate';
+
+/**
+ * A growth as the editor holds it. `mode` is kept as written when it is none
+ * of the three, so a value the engine refuses stays on screen with its error.
+ * `rate` is the yearly percent for `rate`; it is kept while another mode is
+ * picked, so picking `rate` again brings it back.
+ */
+export interface GrowthModel {
+  mode: GrowthMode | (string & {});
+  rate: number | null;
+}
+
 export interface EventModel {
   id: string;
   name: string;
   amount: number | null;
+  growth: GrowthModel;
   /** Only meaningful for investment withdrawals. */
   percentage: number | null;
   frequency: number | null;
@@ -47,6 +62,7 @@ export interface LoanModel {
   term: number | null;
   startDate: string;
   escrow: number | null;
+  escrowGrowth: GrowthModel;
   mortgageInsurance: number | null;
   mortgageInsuranceCutoff: number | null;
   earlyPayoffThreshold: number | null;
@@ -78,7 +94,7 @@ export type EntryKind = 'events' | 'loans' | 'investments';
  * changed, whatever its value: an empty value takes the field away on that
  * path. A key that is absent follows the baseline.
  */
-export type EventSet = Partial<Pick<EventModel, 'amount' | 'frequency' | 'startDate' | 'endDate'>>;
+export type EventSet = Partial<Pick<EventModel, 'amount' | 'growth' | 'frequency' | 'startDate' | 'endDate'>>;
 export type LoanSet = Partial<Omit<LoanModel, 'id' | 'name'>>;
 export type InvestmentSet = Partial<Omit<InvestmentModel, 'id' | 'name'>>;
 
@@ -138,6 +154,7 @@ export interface SimulationModel {
   endDate: string;
   startingCash: number | null;
   cashInterestRate: number | null;
+  inflationRate: number | null;
   emergencyFundMonths: number | null;
 }
 
@@ -162,6 +179,7 @@ export interface GuardrailModel {
   name: string;
   kind: GuardrailKind | (string & {});
   amount: number | null;
+  growth: GrowthModel;
   investments: string[] | null;
   loans: string[] | null;
   startDate: string;
@@ -192,6 +210,11 @@ export function newId(prefix = 'i'): string {
   return `${prefix}${counter.toString(36)}${Math.random().toString(36).slice(2, 8)}`;
 }
 
+/** Fixed: the amount stays as written, which is what leaving growth out means. */
+export function emptyGrowth(): GrowthModel {
+  return { mode: 'fixed', rate: null };
+}
+
 /** A blank optimizer block, for backfilling one a saved draft only partly has. */
 export function emptyOptimize(): OptimizeModel {
   return {
@@ -208,7 +231,14 @@ export function emptyOptimize(): OptimizeModel {
 
 /** A blank simulation block: every setting unset, which the engine reads as its default. */
 export function emptySimulation(): SimulationModel {
-  return { startDate: '', endDate: '', startingCash: null, cashInterestRate: null, emergencyFundMonths: null };
+  return {
+    startDate: '',
+    endDate: '',
+    startingCash: null,
+    cashInterestRate: null,
+    inflationRate: null,
+    emergencyFundMonths: null,
+  };
 }
 
 /** A new guardrail is a cash floor with nothing entered yet. */
@@ -218,6 +248,7 @@ export function emptyGuardrail(): GuardrailModel {
     name: '',
     kind: 'cashFloor',
     amount: null,
+    growth: emptyGrowth(),
     investments: null,
     loans: null,
     startDate: '',
@@ -229,6 +260,7 @@ export function cloneGuardrail(guardrail: GuardrailModel): GuardrailModel {
   return {
     ...guardrail,
     id: newId('gr'),
+    growth: { ...guardrail.growth },
     investments: guardrail.investments ? [...guardrail.investments] : null,
     loans: guardrail.loans ? [...guardrail.loans] : null,
   };
@@ -239,6 +271,7 @@ export function emptyEvent(): EventModel {
     id: newId('ev'),
     name: '',
     amount: null,
+    growth: emptyGrowth(),
     percentage: null,
     frequency: null,
     startDate: '',
@@ -257,6 +290,7 @@ export function emptyLoan(): LoanModel {
     term: null,
     startDate: '',
     escrow: null,
+    escrowGrowth: emptyGrowth(),
     mortgageInsurance: null,
     mortgageInsuranceCutoff: null,
     earlyPayoffThreshold: null,
@@ -322,6 +356,7 @@ export function cloneEvent(event: EventModel): EventModel {
   return {
     ...event,
     id: newId('ev'),
+    growth: { ...event.growth },
     optimize: event.optimize ? { ...event.optimize } : null,
   };
 }
@@ -330,6 +365,7 @@ export function cloneLoan(loan: LoanModel): LoanModel {
   return {
     ...loan,
     id: newId('ln'),
+    escrowGrowth: { ...loan.escrowGrowth },
     extraPrincipalPayments: loan.extraPrincipalPayments.map(cloneEvent),
   };
 }

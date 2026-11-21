@@ -6,6 +6,7 @@ import { HELP } from '../../config/help';
 import { cloneLoan, emptyLoan, type LoanModel, type SimulationModel } from '../../config/types';
 import { CheckField, MonthField, NumberField, TextField } from '../fields';
 import { At } from '../problems';
+import { GrowthField } from '../GrowthField';
 import { IconPercent } from '../icons';
 import { EventList } from './EventList';
 
@@ -77,6 +78,14 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
             placeholder="0"
             suffix="/ mo"
             onChange={(escrow) => patch({ escrow })}
+          />
+          <GrowthField
+            label="Escrow growth"
+            help={HELP.escrowGrowth}
+            rateLabel="Escrow yearly growth"
+            field="escrowGrowth"
+            value={loan.escrowGrowth}
+            onChange={(escrowGrowth) => patch({ escrowGrowth })}
           />
           <NumberField field="mortgageInsurance"
             label="Mortgage insurance"
