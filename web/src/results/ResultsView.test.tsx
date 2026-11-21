@@ -506,4 +506,28 @@ describe('reading in today’s dollars', () => {
     choose(0);
     expect(tableText()).toContain('$25,001.00');
   });
+
+  it('keeps a month’s events open across readings, and closes them for a new run', () => {
+    // February has an event, in both readings.
+    const withNote = (rows: ForecastResults['rows']): ForecastResults['rows'] =>
+      rows.map((row, i) =>
+        i === 1 ? { ...row, values: row.values.map((v) => v && { ...v, notes: ['Bonus +500.00'] }) } : row,
+      );
+    const today = withToday.todaysDollars!;
+    const run: ForecastResults = {
+      ...withToday,
+      rows: withNote(withToday.rows),
+      todaysDollars: { ...today, rows: withNote(today.rows) },
+    };
+    const disclosure = () => host.querySelector<HTMLButtonElement>('button[aria-controls$="-2026-02-events"]')!;
+    act(() => render(<Harness results={run} now="2026-01" />, host));
+    act(() => disclosure().click());
+    expect(disclosure().getAttribute('aria-expanded')).toBe('true');
+    choose(1);
+    expect(tableText()).toContain('$24,923.00');
+    expect(disclosure().getAttribute('aria-expanded')).toBe('true');
+    // The same plan run again is a new run: it starts closed.
+    act(() => render(<Harness results={{ ...run }} now="2026-01" />, host));
+    expect(disclosure().getAttribute('aria-expanded')).toBe('false');
+  });
 });
