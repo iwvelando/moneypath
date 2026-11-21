@@ -1,0 +1,36 @@
+version: 2
+simulation: {startDate: 2026-06, endDate: 2036-05, startingCash: 1000}
+guardrails:
+  - {name: Cushion, kind: cashFloor, amount: 5000, growth: inflation}
+  - {name: Debt gone, kind: debtFree, startDate: 2030-01, growth: 3}
+  - {name: Savings last, kind: lasts, investments: [Savings], growth: inflation}
+  - {name: Savings hold, kind: lasts, investments: [Savings], amount: 1000, growth: inflation}
+  - {name: Steady, kind: cashFloor, amount: 0, growth: 2}
+common:
+  events:
+    - {name: Rent, amount: -2000, growth: inflation}
+    - {name: Salary, amount: 5000, growth: 4}
+  loans:
+    - {name: Car, principal: 20000, interestRate: 5, term: 60, startDate: 2026-06, escrowGrowth: inflation}
+    - {name: Mortgage, principal: 100000, interestRate: 4, term: 360, startDate: 2026-06, escrow: 300, escrowGrowth: inflation}
+    - {name: Boat, principal: 10000, interestRate: 4, term: 60, startDate: 2026-06, escrow: 0, escrowGrowth: 2}
+  investments:
+    - name: Savings
+      startingValue: 50000
+      withdrawals:
+        - {percentage: 4, growth: 3, startDate: 2035-01}
+        - {percentage: 1, growth: fixed, startDate: 2035-01}
+choices:
+  - name: Housing
+    options:
+      - name: Keep
+      - name: Move
+        events:
+          - {name: Moving costs, amount: -3000, growth: inflation, startDate: 2027-06, endDate: 2027-06}
+        change:
+          events:
+            - name: Salary
+              set: {growth: inflation}
+scenarios:
+  - name: plan
+    select: {Housing: Keep}

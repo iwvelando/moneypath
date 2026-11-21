@@ -282,7 +282,7 @@ func guardrailFeasibility(g *config.Guardrail, start config.Month, path *Scenari
 	r := EvaluateGuardrail(g, start, path)
 	e := evalResult{feasible: r.Result == GuardrailHolds, guardrail: &r}
 	if balance, ok := guardrailBalance(g, start, path); ok && r.HasTightest {
-		e.floor, e.minCash, e.headroom = guardrailFloor(g), balance(r.Tightest), r.Margin
+		e.floor, e.minCash, e.headroom = guardrailFloor(g, start, r.Tightest), balance(r.Tightest), r.Margin
 	}
 	return e
 }

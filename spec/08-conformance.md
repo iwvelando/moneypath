@@ -121,6 +121,7 @@ side.
 |---|---|---|
 | Conformance | `TestConformance` (`conformance/`) | Each normative case reproduces `expected.csv` under its manifest rules. |
 | Problems | `TestProblems` (`conformance/`) | Each `testdata/problems` case raises exactly the problems its `expected.yaml` lists, natively and, when `node` is present, byte-identically from the wasm module. |
+| Growth that changes nothing | `TestGrowthThatChangesNothingLeavesEveryCaseAlone` (`conformance/`) | Every case without growth of its own gives exactly the same results and CSV with an inflation rate and `growth: 0` beside every amount and escrow, and with `growth: inflation` at a rate that is absent or 0 (chapter 03, Growth). |
 | Native ↔ WASM parity | `TestNativeWASMParity` (`conformance/`) | For every conformance config, native and WASM CSV are byte-identical. Runs the wasm module under Node; self-skips when `node` is absent. |
 | Static bundle | `TestStaticBundle` (`conformance/`) | The web build produces a standalone `dist/`: relative URLs throughout and a content-hashed engine (chapter 02). Self-skips when `web/dist` is not built. |
 | Distribution | `web/scripts/check-dist.mjs` (`make dist`) | `dist/` holds the real engine, the icons and link-preview card, the 404 page, and the license notices. |

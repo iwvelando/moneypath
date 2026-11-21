@@ -1,0 +1,53 @@
+description: >
+  Growth, in a plan starting mid-year with an inflation rate of 3 %. Every
+  amount that grows steps in June, on the plan's anniversaries, and holds as
+  written through its first year: a salary at its own 4 %, a rent and a roof
+  repair (a one-off in the plan's fourth year) with inflation, a phone bill
+  fixed, a subscription shrinking 10 % a year, a contribution at 4 % and a
+  withdrawal with inflation. A loan's escrow and its yearly extra payment
+  follow inflation: the refund at the payoff in 2028-10 is the escrow billed
+  that year, at both years' amounts, and every December after it bills twelve
+  times that December's escrow. A cash floor that tracks inflation has its
+  tightest month where its margin is least, not where cash is: in June 2027
+  on "grows" and June 2028 on "fixed", against January 2027 for the fixed
+  floor. The option that sets every growth back to fixed changes nothing in
+  the first year, so both scenarios have the same emergency-fund target. The
+  inactive scenario is not run.
+normative: true
+optimize: false
+tolerance: 0.01
+expectedMetrics:
+  - scenario: grows
+    keyFigures:
+      lowestCash: 24960.00
+      lowestCashDate: "2027-01"
+      endingCash: 84522.39
+      endingTotal: 127363.40
+    emergencyFund:
+      targetMonths: 6.00
+      averageMonthlyExpenses: 2996.6667
+      targetAmount: 17980.00
+      initialLiquid: 25000.00
+      fundedMonths: 8.3426
+      shortfall: 0.00
+      surplus: 7020.00
+    guardrails:
+      - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2027-06", margin: 4515.00}
+      - {name: Fixed cushion, kind: cashFloor, result: holds, tightestDate: "2027-01", margin: 4960.00}
+  - scenario: fixed
+    keyFigures:
+      lowestCash: 24960.00
+      lowestCashDate: "2027-01"
+      endingCash: 71440.00
+      endingTotal: 117710.63
+    emergencyFund:
+      targetMonths: 6.00
+      averageMonthlyExpenses: 2996.6667
+      targetAmount: 17980.00
+      initialLiquid: 25000.00
+      fundedMonths: 8.3426
+      shortfall: 0.00
+      surplus: 7020.00
+    guardrails:
+      - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2028-06", margin: 3882.00}
+      - {name: Fixed cushion, kind: cashFloor, result: holds, tightestDate: "2027-01", margin: 4960.00}

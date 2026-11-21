@@ -1,0 +1,4 @@
+version: 2
+simulation: {startDate: 2026-06, endDate: 2036-05, startingCash: 1000, inflationRate: lots}
+scenarios:
+  - name: plan

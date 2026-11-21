@@ -413,12 +413,12 @@ func applyChange[T any](c *checker, change *EntryChange[T], base *T, path string
 		return nil
 	}
 	set := join(path, "set")
-	sub := &checker{start: c.start, end: c.end, window: c.window}
+	sub := &checker{start: c.start, end: c.end, window: c.window, inflation: c.inflation}
 	check(sub, changed, set)
 
 	already := map[Problem]bool{}
 	if unchanged, problems := (&EntryChange[T]{Set: yaml.Node{Kind: yaml.MappingNode}}).apply(base, path); problems == nil {
-		baseline := &checker{start: c.start, end: c.end, window: c.window}
+		baseline := &checker{start: c.start, end: c.end, window: c.window, inflation: c.inflation}
 		check(baseline, unchanged, set)
 		for _, p := range baseline.problems {
 			already[p] = true

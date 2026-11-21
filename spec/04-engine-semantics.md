@@ -50,8 +50,9 @@ For each **active** scenario, independently:
   interest and growth — is part of the row recorded at `start`.
 - For each month `m` = `start`, `start+1`, … up to and including `end`:
 
-  1. **Events and cash interest**: `eventDelta` = sum of `amount` over every occurrence
-     (§2) at `m` among the resolved scenario and common events. `cashInterest` =
+  1. **Events and cash interest**: `eventDelta` = sum of `amount · G(m)` over every
+     occurrence (§2) at `m` among the resolved scenario and common events, where `G` is
+     the event's growth factor (§2.1). `cashInterest` =
      `max(0, cash) · r_cash`, where `cash` is the balance at the end of `m−1`: the one
      recorded there, or `startingCash` when `m = start` (see §1.1).
   2. **Investments** (§4): process every scenario and common investment for `m`,
@@ -112,6 +113,26 @@ exact month equality — an event whose stride jumps over `end` simply stops. Ev
 S > E (after defaulting) are invalid (validation error). Occurrences outside the
 simulated window contribute nothing.
 
+### 2.1 Growth
+
+Growth (chapter 03, Growth) does not change when an event occurs. It scales what occurs.
+
+- For a month `m`, `k = ⌊(m − start) / 12⌋` is the plan year `m` falls in, counting from
+  0 at `start` (§1), and rounding down, so a month before `start` falls in a year before
+  the first. Only a loan's schedule reaches such a month (§3.2).
+- The **growth factor** of an entry is `G(m) = (1 + g/100)^k`, where `g` is the entry's
+  own yearly rate, `simulation.inflationRate` (0 when unset) for `inflation`, and 0 for
+  `fixed`. `G(m) = 1` in every month of the plan's first year, and exactly 1 in every
+  month when `g` is 0.
+- An occurrence of an event in month `m` moves `amount · G(m)`. So an event steps on the
+  plan's anniversaries, whenever it starts, and a one-off event dated in the plan's
+  sixth year moves `amount · (1 + g/100)^5`.
+- `G` is an integer power, computed by multiplying `k` times (and taking the reciprocal
+  for a negative `k`), so that every build computes the same bits. A grown amount is not
+  rounded, like interest and investment growth; comparisons that decide behavior round
+  as the preamble says, and the CSV rounds when it renders.
+- Growth emits no notes (§6).
+
 ## 3. Loans
 
 ### 3.1 Amortization basics
@@ -128,12 +149,14 @@ Each loan is expanded (before the simulation loop) into a sparse `YYYY-MM → pa
 schedule from its `startDate`, stopping at `simulation.endDate` at the latest.
 Track `remaining` (principal outstanding after each month) and `escrowPaidThisYear`
 (sum of escrow amounts included in payments so far in the current calendar year; resets
-when a January is generated).
+when a January is generated). The **escrow** of a month `m` is `escrow · G(m)`, with `G`
+from the loan's `escrowGrowth` (§2.1); it is what each payment below includes, and what
+`escrowPaidThisYear` sums.
 
 **First month (loan startDate):**
 - `extra` = extra-principal occurrences (§2) at startDate, capped per §3.3.
 - `interest = F·r`; `principalPaid = min(M − interest + extra, F)`.
-- `payment = interest + principalPaid + escrow + downPayment + MI(§3.4)`.
+- `payment = interest + principalPaid + escrow(m) + downPayment + MI(§3.4)`.
 - `remaining = F − principalPaid`.
 - Apply the **end check** below with `monthIndex = 1` — a one-month term or a large
   first extra payment ends the loan immediately.
@@ -142,7 +165,7 @@ when a January is generated).
 - If the month equals `earlyPayoffDate` → §3.5 payoff, then stop.
 - `interest = remaining·r`; `extra` per §3.3;
   `principalPaid = min(M − interest + extra, remaining)`.
-- `payment = interest + principalPaid + escrow + MI(§3.4)`.
+- `payment = interest + principalPaid + escrow(m) + MI(§3.4)`.
 - `remaining −= principalPaid`.
 - **End check**: if `round2(remaining) ≤ 0` **or** `monthIndex == term` (maturity):
   `remaining = 0`; this is the final regular payment — because `principalPaid` is
@@ -162,8 +185,8 @@ includes the start month.
 
 ### 3.3 Extra principal payments
 
-`extraPrincipalPayments` are events (amount > 0) evaluated per §2. The total extra for a
-month is capped at the loan's current `remaining` (before this month's principal) so a
+`extraPrincipalPayments` are events (amount > 0) evaluated per §2, each occurrence
+moving `amount · G(m)` (§2.1). The total extra for a month is capped at the loan's current `remaining` (before this month's principal) so a
 one-off overpayment can never push the balance negative; the `principalPaid` cap in §3.2
 further guarantees the final payment charges only what is owed.
 
@@ -241,16 +264,17 @@ return regimes.
 When a loan with `escrow` > 0 ends in month `m` — natural maturity, either early
 payoff, with or without a sale — the escrow account closes and its current-year accrual
 is **refunded**: subtract from the final payment the sum of escrow included in this
-loan's payments during `m`'s calendar year (payoff payments contain no escrow of their
+loan's payments during `m`'s calendar year, as each was billed (§3.2) (payoff payments contain no escrow of their
 own, so for them this is the January–`m−1` accrual; a natural-maturity payment does
 include escrow, and that month's escrow is part of the refund).
 
 When the asset is **kept** (any no-sale ending), the cost escrow represents (taxes,
-insurance) continues: for every December from `m` **inclusive** through
-`simulation.endDate`, add `12 · escrow` to that month's schedule entry. Together with
-the refund, every kept-property calendar year costs exactly `12 · escrow` no matter
-when the loan ends (an end month that is itself a December both refunds the year's
-accrual and bills that December's `12 · escrow`). When the asset is **sold**, nothing
+insurance) continues: for every December `d` from `m` **inclusive** through
+`simulation.endDate`, add `12 · escrow · G(d)` to that month's schedule entry, with `G`
+from `escrowGrowth` (§2.1). Together with the refund, every kept-property calendar year
+costs exactly twelve times its December's escrow no matter when the loan ends (an end
+month that is itself a December both refunds the year's accrual and bills that
+December's `12 · escrow · G(d)`). With fixed escrow that is `12 · escrow`. When the asset is **sold**, nothing
 continues — the refund still applies.
 
 Real-world closing mechanics (prorated property-tax settlement between buyer and
@@ -270,9 +294,11 @@ For month `m`, in this exact order:
    `afterTax = g − tax`; `value += afterTax`; `growthBalance += afterTax`. If
    `growthBalance` goes negative, shift the deficit to `basis` (reduce basis by the
    deficit, floor both at 0).
-2. **Contribution** `c` = Σ contribution occurrences (§2) at `m`:
+2. **Contribution** `c` = Σ `amount · G(m)` over contribution occurrences (§2, §2.1) at
+   `m`:
    `value += c`; `basis += c` (floor basis at 0).
-3. **Withdrawal** `w`: fixed = Σ amount occurrences at `m`; percentage-style adds
+3. **Withdrawal** `w`: fixed = Σ `amount · G(m)` over amount occurrences at `m` (§2.1);
+   percentage-style adds
    `value · percentage/100` per occurrence (percentage of the current balance, after
    growth and contribution).
    Clamp `w` to `[0, value]`. Take from growth first:
@@ -296,7 +322,9 @@ Skipped when the target `N` months is 0 (config default 6).
   payments billed at `m` (only positive payments; a cash-in sale month contributes 0)
   + `cashContributions(m)`.
 - `avg` = mean of `monthlyExpenses` over the first `min(12, monthsSimulated)` simulated
-  months, `start` included.
+  months, `start` included. Those months are the plan's first year, in which every
+  growth factor is 1 (§2.1), so growth never changes the recommendation: it is already
+  a statement in the start month's prices.
 - `targetAmount = avg · N`; `initialLiquid = startingCash`, the balance the plan starts
   with, before the start month's own activity;
   `fundedMonths = initialLiquid / avg` (0 if `avg == 0`);
@@ -339,7 +367,10 @@ Date-based early payoffs emit no note (the configured date is the user's own doi
 Activated by the `--optimize` flag / `optimize: true` option. Adjusts each event carrying
 an `optimize` block while holding its scenario to the target's **floor**: the guardrail
 the block names (chapter 03, Optimizer block), or, when it names none, the
-emergency-fund floor. When the optimized field is `amount` and the configured original
+emergency-fund floor. A target's `growth` stays as written: an `amount` search chooses
+the amount written, in the start month's prices, with its bounds in the same terms, and
+each candidate grows as the written amount would (§2.1). When the optimized field is
+`amount` and the configured original
 amount is negative, choose the **smallest feasible signed amount within the bounds**:
 the largest affordable expense, even if the original expense is already feasible.
 For all other targets, choose the value requiring the **smallest adjustment from the
@@ -376,7 +407,8 @@ forecast. Then read the target scenario's path:
 
 - **Held to a guardrail**: feasible iff the guardrail **holds** on that path (§10): its
   condition is met in every month of its window. For a `cashFloor` or a `lasts`,
-  `floor` is the guardrail's `amount` (0 for a `lasts` with none), `minCash` is the
+  `floor` is the guardrail's `floor(m)` at its tightest month (§10: its `amount`, grown
+  by its growth, and 0 for a `lasts` with none), `minCash` is the
   balance the guardrail reads at its tightest month (`liquid`, or the listed accounts'
   combined value), and `headroom` is its margin there (§10). A `debtFree` has no
   dollar floor; its cleared month and `marginMonths` stand in for the three.
@@ -526,8 +558,9 @@ no recorded month in it is **empty**.
 the recorded values of `m`, compared in whole cents (preamble):
 
 - **cashFloor** holds in `m` when `round2(liquid[m]) ≥ round2(floor(m))`, where
-  `floor(m)` is `amount` in every month. The floor is written per month so that a
-  floor which grows can define it later without changing this rule.
+  `floor(m) = amount · G(m)`, with `G` from the guardrail's `growth` (§2.1). `G` counts
+  from the plan's `start`, not from the window's first month, so `amount` is in the start
+  month's prices. With `growth` fixed, `floor(m)` is `amount` in every month.
 - **debtFree** holds in `m` when `round2(owed[m]) = 0`. `owed[m]` is the combined
   principal outstanding at the end of `m` (§3.2) on the path's loans with the listed
   names, or on every loan of the path when none are listed. A loan owes nothing before
@@ -536,8 +569,8 @@ the recorded values of `m`, compared in whole cents (preamble):
   payoff (§3.6) is a cost, not a debt. A listed name the path has no loan by owes
   nothing, and loans with the same name are summed. In a loan's own first month,
   `owed` is what remains after that month's payment, as in any other month.
-- **lasts** holds in `m` when `round2(value[m]) ≥ round2(amount)`, or
-  `round2(value[m]) > 0` when no `amount` is given. `value[m]` is the combined value
+- **lasts** holds in `m` when `round2(value[m]) ≥ round2(floor(m))`, with `floor(m)`
+  as for a cashFloor, or `round2(value[m]) > 0` when no `amount` is given. `value[m]` is the combined value
   at the end of `m` (§4, after any withdrawal that funds a loan payoff, §3.5) of the
   path's accounts with the listed names. These per-loan and per-account balances are
   recorded for evaluation only; the CSV does not carry them (chapter 05).
@@ -553,14 +586,15 @@ been built says so with `startDate`.
   has. It is never reported as holding.
 
 **Tightest month and margin** (cashFloor and lasts). The balance is `liquid` for a
-cashFloor and `value` for a lasts, and the floor is `amount`, or 0 for a lasts with no
-`amount`. The tightest month is the earliest month of the window with the least
-balance in whole cents, by the tie rule of lowest cash (§8): the first `m` in the
-window with `round2(balance[m]) = min round2(balance)` over the window. The **margin**
-is `balance[m] − floor(m)` there, unrounded like every reported number. It is negative
-when the guardrail breaks (zero or less for a lasts with no `amount`), and it is the
-lowest margin in the window, not the margin at the first breach. Neither is reported
-when the guardrail does not apply.
+cashFloor and `value` for a lasts, and the floor is `floor(m)`, or 0 for a lasts with no
+`amount`. The tightest month is the earliest month of the window with the least margin
+in whole cents, by the tie rule of lowest cash (§8): the first `m` in the window with
+`round2(balance[m]) − round2(floor(m)) = min (round2(balance) − round2(floor))` over the
+window. The **margin** is `balance[m] − floor(m)` there, unrounded like every reported
+number. It is negative when the guardrail breaks (zero or less for a lasts with no
+`amount`), and it is the lowest margin in the window, not the margin at the first
+breach. While the floor is the same in every month, the tightest month is the month of
+least balance. Neither is reported when the guardrail does not apply.
 
 **Cleared month and months to spare** (debtFree). The tightest month of a debtFree is
 the month the debt is **cleared**: the first month of the last stretch of months,
@@ -583,6 +617,9 @@ What follows from the rule, each deliberate:
   from that month.
 - The first breach can come before the tightest month, when cash falls below the floor
   and later falls further.
+- A floor that grows can break a path whose cash never falls: the floor rises past it.
+  Its tightest month is then where the floor is furthest above the balance, which need
+  not be the month of least balance.
 - A debtFree whose deadline is before `start` is judged from `start`, the window's
   first month, like any clipped window.
 - A debtFree with no loans to check (a path without the listed loans, or with no loans
@@ -654,6 +691,10 @@ go across the range. The answer:
 
 What follows from the rule, each deliberate:
 
+- An amount that grows (§2.1) counts its years from the plan's start, not from the
+  entry's, so an event moved into a later plan year moves a larger amount: a purchase
+  moved later costs more. A loan's principal and payment do not grow, so a loan moved
+  later costs the same, while its escrow follows the months it is billed in.
 - A range of one month answers whether that month works.
 - The answer can be `from` itself, and then nothing in the range decides it.
 - A month that works can be followed by one that does not, and `works` shows both.

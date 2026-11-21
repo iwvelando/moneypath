@@ -18,7 +18,8 @@ with choices.
   user enters is what actually lands in (or leaves) their account: income should be net
   of withholding. A $1,000 grant at a 25 % marginal rate is entered as `750.00`. The only
   tax the engine applies is on investment growth and withdrawals (`taxRate`,
-  `withdrawalTaxRate`), and any user-facing help for an amount field SHOULD say so.
+  `withdrawalTaxRate`), and the user-facing help for a cash-flow event's amount MUST say
+  so.
 - **Rates** are percentages (e.g. `6.5` means 6.5 % per year), never fractions.
 - **Annual rates are APRs.** `interestRate`, `annualReturnRate` and `cashInterestRate`
   are nominal yearly rates: the engine applies one twelfth each month (chapter 04
@@ -27,7 +28,13 @@ with choices.
   APY: `4.0` yields about 4.07 %, `7.0` about 7.23 %. A figure quoted as an APY (most
   savings accounts) or as an average annual return can be entered exactly as
   `1200 · ((1 + APY/100)^(1/12) − 1)`; for an APY of 7 that is `6.78`. User-facing help
-  for these fields SHOULD name the convention.
+  for these fields MUST name the convention, and MUST say that the rate is nominal: the
+  plan's inflation rate is applied separately, so it is not subtracted from the rate as
+  well.
+- **Growth and inflation rates are yearly changes, not APRs.** `inflationRate` and a
+  numeric `growth` or `escrowGrowth` (see Growth) are the percent by which a price or an
+  amount is higher a year later, as inflation and raises are quoted: `3.0` means 3 %
+  higher. Nothing about them is applied a twelfth at a time.
 - Unknown top-level or nested keys SHOULD produce a validation warning naming the key
   (catches typos), but MUST NOT be a hard error.
 - **Whole numbers** (`version`, `frequency`, `term`, `maxIterations`) take no fraction:
@@ -48,6 +55,8 @@ simulation:
                            # preceding startDate
   cashInterestRate: 4.0    # optional; default 0; APR earned on positive cash,
                            # compounded monthly — about 4.07 % a year (chapter 04 §1)
+  inflationRate: 3.0       # optional; default 0; percent a year, year over year — what
+                           # growth: inflation follows (see Growth)
 
 recommendations:      # optional block
   emergencyFundMonths: 6   # optional; default 6; 0 disables the recommendation
@@ -73,14 +82,20 @@ scenarios:            # required; at least one
 
 Validation (hard errors): missing/wrong `version`; missing `simulation.endDate`;
 `endDate` before `startDate`; no scenarios; a scenario without a name; duplicate scenario
-names; `cashInterestRate` below zero. `startingCash` MAY be zero or negative (debt) —
-absent is treated as `0.00` with a warning.
+names; `cashInterestRate` below zero; `inflationRate` that is not a number, or is −100 or
+less. `startingCash` MAY be zero or negative (debt) — absent is treated as `0.00` with a
+warning.
 
 `cashInterestRate` models where the cash is kept: the default `0` is the worst case (a
 non-interest-bearing account), and a higher rate models keeping most or all cash in, say,
 a high-yield savings account. It is one rate for the whole simulation, applies to every
 scenario, and is entered **after tax** like every other money figure (see Conventions).
 Only a positive balance earns it; the engine has no overdraft rate (chapter 04 §1).
+
+`inflationRate` is the one rate at which prices rise, for the whole plan and every
+scenario. It changes nothing on its own: only an amount whose growth is `inflation`
+follows it (see Growth). It may be negative, for falling prices. There is no inflation
+rate per scenario or per option.
 
 Validation (warnings, not errors): an event that starts at/after `simulation.endDate`, or
 ends after it; unknown keys; `startingCash` absent.
@@ -93,6 +108,7 @@ Used in `events` lists, and (same shape, minus `optimize`) for loan
 ```yaml
 - name: Social security   # optional but recommended; used in notes/warnings
   amount: 1000.00         # signed; + income, − expense (see per-context rules below)
+  growth: inflation       # optional; default fixed — see Growth
   frequency: 1            # optional; months between occurrences; default 1; must be ≥ 1
   startDate: 2050-01      # optional; default: simulation start month
   endDate: 2060-01        # optional; default: simulation end month
@@ -114,7 +130,62 @@ Per-context rules:
 - **Investment contributions**: `amount` must be > 0. `percentage` is not allowed.
 - **Investment withdrawals**: specify **either** `amount` (> 0) **or** `percentage`
   (> 0, percent of current balance), never both in one entry, and a single investment
-  MUST NOT mix amount-style and percentage-style withdrawal entries.
+  MUST NOT mix amount-style and percentage-style withdrawal entries. `growth` on a
+  percentage withdrawal is a warning: a percentage of the balance already scales, so it
+  has no effect.
+
+Every event takes `growth`, in each of these contexts: a cash-flow event, an extra
+principal payment, a contribution and a withdrawal by amount.
+
+## Growth
+
+`growth` on an event and on a guardrail, and `escrowGrowth` on a loan, say how an amount
+changes over the plan's years. Each takes one of:
+
+- `fixed` — the default, written by leaving the key out: the amount stays the same in
+  nominal dollars in every month.
+- `inflation` — the amount follows `simulation.inflationRate`.
+- a number — the amount's own yearly rate, in percent, year over year (Conventions): `4`
+  means 4 % more each year. It may be negative, for an amount that shrinks, and must be
+  more than −100. `0` behaves exactly as `fixed`.
+
+The amount written is the amount in the plan's first year, in the start month's prices.
+It changes once a year, on the plan's anniversaries — the start month's month in each
+later year — counted from the plan's start whenever the entry itself starts (chapter 04
+§2). So an amount written in today's prices keeps its value in today's dollars when it
+follows inflation, whenever it occurs. Growth adds no note to the results.
+
+What can grow: every event's `amount` (above), a loan's `escrow` (`escrowGrowth`) and a
+guardrail's `amount` (Guardrails). Nothing else does: not a loan's principal, payment,
+down payment or mortgage insurance, a sale price, a starting balance, a threshold or a
+percentage withdrawal.
+
+User-facing help for `inflationRate`, for every `growth` and `escrowGrowth`, MUST state
+what the simulation assumes: amounts are written in the start month's prices; an amount
+that grows steps once a year on the plan's anniversaries; a fixed amount stays the same
+in nominal dollars; and growth rates are yearly changes, not APRs.
+
+Validation, hard errors:
+
+- A `growth` or `escrowGrowth` other than `fixed`, `inflation` or a number, which
+  includes a quoted number, a list and a mapping. The words are matched exactly.
+- A number of −100 or less.
+- The same under an option's `change` → `set` (Choices).
+
+Warnings:
+
+- `inflation` when the plan's `inflationRate` is absent or 0: the amount stays the same.
+  The warning is placed at that `growth` or `escrowGrowth`.
+- `growth` where it has no effect: on a percentage withdrawal (Event), on a `debtFree`
+  guardrail or on a `lasts` with no `amount` (Guardrails), and `escrowGrowth` on a loan
+  with no escrow (Loan).
+
+Canonical form: `growth` is written after `amount`, in an event and in a guardrail;
+`escrowGrowth` after `escrow`; `inflationRate` after `cashInterestRate`. `fixed` is
+written by leaving the key out, and a number is written as a number.
+
+A moneypath build that predates growth warns about the unknown keys and computes every
+amount fixed. The format stays at version 2.
 
 ## Loan
 
@@ -126,6 +197,7 @@ Per-context rules:
   term: 360                   # required; months; ≥ 1
   startDate: 2018-01          # required; month of the first payment
   escrow: 500.00              # optional; monthly escrow added to each payment
+  escrowGrowth: inflation     # optional; default fixed — see Growth
   mortgageInsurance: 50.00    # optional; monthly MI added to payments while the
                               # remaining/original principal ratio exceeds the cutoff
   mortgageInsuranceCutoff: 78.0  # optional; percent; see chapter 04 §Loans
@@ -143,10 +215,11 @@ window simply never enter the ledger (the engine bills only simulated months).
 
 Validation: `principal > 0`; `term ≥ 1`; `interestRate ≥ 0`; `downPayment ≥ 0` and
 `< principal`; `escrow ≥ 0`; `mortgageInsurance ≥ 0`; cutoff in `[0, 100]`;
-`earlyPayoffThreshold ≥ 0`; `earlyPayoffDate`, when present, must parse and SHOULD be
-warned about if it is not after `startDate`. `sellProperty` without either early-payoff
+`earlyPayoffThreshold ≥ 0`; `escrowGrowth` as Growth says; `earlyPayoffDate`, when
+present, must parse and SHOULD be warned about if it is not after `startDate`. `sellProperty` without either early-payoff
 mechanism is a warning (it has no effect). `mortgageInsurance > 0` with no
 `mortgageInsuranceCutoff` means MI applies for the whole life of the loan (warning).
+`escrowGrowth` with no escrow (absent or 0) is a warning: there is nothing to grow.
 
 ## Investment
 
@@ -329,6 +402,7 @@ guardrails:                # optional; checked on every path
   - name: Keep a cushion   # required, unique among guardrails
     kind: cashFloor        # required: cashFloor | debtFree | lasts
     amount: 15000.00       # cashFloor: required; any number, negative allowed
+    growth: inflation      # optional; default fixed — see Growth
     startDate: 2027-01     # optional; first month checked (default: plan start)
     endDate: 2035-12       # optional; last month checked (default: plan end)
 
@@ -351,8 +425,8 @@ guardrails:                # optional; checked on every path
   checked.
 - `kind` says what is checked:
   - **`cashFloor`** — cash is at least `amount` in every month of the window. `amount`
-    is the same nominal amount in every month. It may be negative, which states
-    "never more than this overdrawn", as `startingCash` may be.
+    is the same nominal amount in every month, unless `growth` says otherwise. It may be
+    negative, which states "never more than this overdrawn", as `startingCash` may be.
   - **`debtFree`** — nothing is owed, from `startDate` through the end of the window,
     on the loans listed in `loans`, or on every loan of the path when `loans` is left
     out. `startDate` is required: it is the deadline. A loan taken out after the
@@ -360,6 +434,9 @@ guardrails:                # optional; checked on every path
   - **`lasts`** — the accounts listed in `investments`, taken together, are never
     emptied in any month of the window or, with `amount`, never hold less than
     `amount`. A path that has none of the listed accounts is not judged by it.
+- `growth` (see Growth) lets the `amount` of a `cashFloor` or a `lasts` change over the
+  plan's years, counted from the plan's start and not from the window's `startDate`, so
+  `amount` is in the start month's prices, as an event's is.
 - `investments` and `loans` take lists of entry names, for the kinds that use them:
   `investments` for a `lasts`, `loans` for a `debtFree`. Each name must be the name
   of an entry of that kind somewhere in the plan: in `common`, in an option's added
@@ -382,6 +459,7 @@ Validation, hard errors:
   `investments.<j>`), at its second listing for a repeat.
 - A `startDate` or `endDate` that does not parse, or an `endDate` before the
   `startDate` when both are given.
+- A `growth` as Growth refuses it.
 - The usual wrong-type rules.
 
 Warnings:
@@ -391,17 +469,19 @@ Warnings:
   drift out of range on its own, as an event's can. The warning is placed at
   `startDate` when the window starts after the simulation ends, and otherwise at
   `endDate`.
-- A key the kind does not use (`investments` or `loans` on a `cashFloor`, `amount` or
-  `investments` on a `debtFree`, `loans` on a `lasts`): it has no effect. The names in
-  a list the kind does not use are not checked against the plan.
+- A key the kind does not use (`investments` or `loans` on a `cashFloor`, `amount`,
+  `growth` or `investments` on a `debtFree`, `loans` on a `lasts`), and `growth` on a
+  `lasts` with no `amount`: it has no effect. The names in a list the kind does not use
+  are not checked against the plan.
+- `inflation` as the growth when the plan's inflation rate is absent or 0 (Growth).
 - Unknown keys, as everywhere.
 
 Problems are placed at `guardrails.<i>.<field>`, and their place in words is
 `Guardrail “<name>”`, numbered from 1 when the guardrail has no name.
 
 Canonical form: `guardrails` is written after `recommendations` and before `common`.
-A guardrail's keys are written `name`, `kind`, `amount`, `investments`, `loans`,
-`startDate`, `endDate`.
+A guardrail's keys are written `name`, `kind`, `amount`, `growth`, `investments`,
+`loans`, `startDate`, `endDate`.
 
 A moneypath build that predates guardrails warns about the unknown key and checks
 nothing. The format stays at version 2.
@@ -423,10 +503,11 @@ optimize:
 Validation: field must be one of the four (accept `startDate`/`start_date`/`start-date`
 case-insensitively, and likewise for `endDate`); the relevant bound pair is required with
 min < max (for `frequency`, min ≥ 1 and integer-valued); dates must parse with
-minDate ≤ maxDate. An `optimize` block on a `common` event or on an option's event is an
-error: the optimizer chooses a value against one scenario's floor and writes it into the
-plan, and those entries are shared by more than one scenario. A target goes in a
-scenario's own events. Optimizer semantics are in chapter 04 §Optimizer.
+minDate ≤ maxDate. A target with `growth` keeps it: an `amount` search chooses the amount
+written, in the start month's prices, and its bounds are in the same terms. An `optimize`
+block on a `common` event or on an option's event is an error: the optimizer chooses a
+value against one scenario's floor and writes it into the plan, and those entries are
+shared by more than one scenario. A target goes in a scenario's own events. Optimizer semantics are in chapter 04 §Optimizer.
 
 `guardrail` names one of the plan's guardrails (Guardrails, above) by its `name`. The
 target is then held to that guardrail instead of the emergency-fund floor. Absent or

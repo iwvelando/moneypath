@@ -1,0 +1,54 @@
+description: >
+  Growth that has no effect is a warning, never an error. An amount that
+  follows inflation when the plan sets no inflation rate stays the same, and
+  is warned about at its growth, wherever it is: on a guardrail, an event, a
+  loan's escrow, an option's event and an option's change. Growth on a
+  debt-free guardrail, on a lasts with no amount and on a percentage
+  withdrawal, and escrow growth on a loan with no escrow, have nothing to grow.
+  Writing fixed is the same as leaving growth out, on a percentage withdrawal
+  too.
+problems:
+  - level: warning
+    path: guardrails.0.growth
+    where: Guardrail “Cushion”
+    message: This follows the plan’s inflation rate, which is 0, so it stays the same.
+  - level: warning
+    path: guardrails.1.growth
+    where: Guardrail “Debt gone”
+    message: A debt-free guardrail does not use growth, so this has no effect.
+  - level: warning
+    path: guardrails.2.growth
+    where: Guardrail “Savings last”
+    message: Growth applies to the amount, and this guardrail has none, so this has no effect.
+  - level: warning
+    path: guardrails.3.growth
+    where: Guardrail “Savings hold”
+    message: This follows the plan’s inflation rate, which is 0, so it stays the same.
+  - level: warning
+    path: common.events.0.growth
+    where: Baseline, event “Rent”
+    message: This follows the plan’s inflation rate, which is 0, so it stays the same.
+  - level: warning
+    path: common.loans.0.escrowGrowth
+    where: Baseline, loan “Car”
+    message: There is no escrow to grow, so this has no effect.
+  - level: warning
+    path: common.loans.1.escrowGrowth
+    where: Baseline, loan “Mortgage”
+    message: This follows the plan’s inflation rate, which is 0, so it stays the same.
+  - level: warning
+    path: common.loans.2.escrowGrowth
+    where: Baseline, loan “Boat”
+    message: There is no escrow to grow, so this has no effect.
+  - level: warning
+    path: common.investments.0.withdrawals.0.growth
+    where: Baseline, investment “Savings”, withdrawal 1
+    message: A percentage withdrawal already follows the balance, so growth has no effect.
+  - level: warning
+    path: choices.0.options.1.events.0.growth
+    where: Choice “Housing”, option “Move”, event “Moving costs”
+    message: This follows the plan’s inflation rate, which is 0, so it stays the same.
+  - level: warning
+    path: choices.0.options.1.change.events.0.set.growth
+    where: Choice “Housing”, option “Move”, changed event “Salary”
+    message: This follows the plan’s inflation rate, which is 0, so it stays the same.

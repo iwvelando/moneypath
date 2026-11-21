@@ -1,0 +1,8 @@
+description: >
+  The plan's inflation rate is a number. A value of the wrong kind is placed
+  at its field, and the plan is refused.
+problems:
+  - level: error
+    path: simulation.inflationRate
+    where: Simulation
+    message: This must be a number.

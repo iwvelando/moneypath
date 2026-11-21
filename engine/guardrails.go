@@ -71,17 +71,19 @@ func EvaluateGuardrail(g *config.Guardrail, start config.Month, path *ScenarioRe
 	if !ok {
 		return out
 	}
-	floorTest(&out, first, last, guardrailFloor(g), balance, g.Kind == config.GuardrailLasts && g.Amount == nil)
+	floor := func(m config.Month) float64 { return guardrailFloor(g, start, m) }
+	floorTest(&out, first, last, floor, balance, g.Kind == config.GuardrailLasts && g.Amount == nil)
 	return out
 }
 
-// guardrailFloor is the amount a cashFloor's or a lasts' balance is held
-// to: its amount, or 0 for a lasts with none (spec chapter 04 §10).
-func guardrailFloor(g *config.Guardrail) float64 {
+// guardrailFloor is floor(m), the amount a cashFloor's or a lasts' balance is
+// held to in month m of a plan that starts at start: its amount grown by its
+// growth, or 0 for a lasts with none (spec chapter 04 §10).
+func guardrailFloor(g *config.Guardrail, start, m config.Month) float64 {
 	if g.Amount == nil {
 		return 0
 	}
-	return *g.Amount
+	return *g.Amount * g.Growth.Factor(start, m)
 }
 
 // guardrailBalance is the balance a cashFloor or a lasts reads in month m:
@@ -115,21 +117,22 @@ func guardrailBalance(g *config.Guardrail, start config.Month, path *ScenarioRes
 
 // floorTest reads a balance that must stay at or above a floor in every month
 // from first through last, in whole cents, or strictly above it when strict
-// is set; the tightest month is the earliest of the least balance (spec
-// chapter 04 §10).
-func floorTest(out *GuardrailResult, first, last config.Month, floor float64, balance func(config.Month) float64, strict bool) {
+// is set; the tightest month is the earliest of the least margin in whole
+// cents (spec chapter 04 §10).
+func floorTest(out *GuardrailResult, first, last config.Month, floor, balance func(config.Month) float64, strict bool) {
+	margin := func(m config.Month) float64 { return round2(balance(m)) - round2(floor(m)) }
 	tightest := first
 	breached := false
 	for m := first; m <= last; m++ {
-		b := balance(m)
-		fails := round2(b) < round2(floor)
+		b, f := round2(balance(m)), round2(floor(m))
+		fails := b < f
 		if strict {
-			fails = round2(b) <= round2(floor)
+			fails = b <= f
 		}
 		if !breached && fails {
 			out.FirstBreach, breached = m, true
 		}
-		if round2(b) < round2(balance(tightest)) {
+		if round2(margin(m)) < round2(margin(tightest)) {
 			tightest = m
 		}
 	}
@@ -138,7 +141,7 @@ func floorTest(out *GuardrailResult, first, last config.Month, floor float64, ba
 		out.Result = GuardrailBreaks
 	}
 	out.HasTightest, out.Tightest = true, tightest
-	out.Margin = balance(tightest) - floor
+	out.Margin = balance(tightest) - floor(tightest)
 }
 
 // debtFreeTest reads what a debtFree's loans owe from first through last, and

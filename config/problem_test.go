@@ -51,6 +51,41 @@ func TestProblemsNameTheirField(t *testing.T) {
 		{"absent starting cash",
 			"version: 2\nsimulation: {endDate: 2030-01}\nscenarios: [{name: a}]\n",
 			"simulation.startingCash", "Simulation", "starts with 0.00", LevelWarning},
+		{"inflation rate",
+			"version: 2\nsimulation: {endDate: 2030-01, startingCash: 0, inflationRate: -100}\nscenarios: [{name: a}]\n",
+			"simulation.inflationRate", "Simulation", "The inflation rate must be more than -100.", LevelError},
+		{"growth that is not one",
+			sim + "scenarios: [{name: a, events: [{name: Rent, amount: -1, growth: inflaton}]}]\n",
+			"scenarios.0.events.0.growth", "Scenario “a”, event “Rent”",
+			"Growth must be fixed, inflation or a yearly rate in percent, such as 3.", LevelError},
+		{"growth too far below 0",
+			sim + "common: {investments: [{name: i, contributions: [{amount: 1, growth: -100}]}]}\nscenarios: [{name: a}]\n",
+			"common.investments.0.contributions.0.growth", "Baseline, investment “i”, contribution 1",
+			"The yearly growth must be more than -100.", LevelError},
+		{"escrow growth that is not one",
+			sim + "scenarios: [{name: a, loans: [{name: Home, principal: 10, interestRate: 1, term: 12, startDate: 2025-01, escrow: 1, escrowGrowth: [1]}]}]\n",
+			"scenarios.0.loans.0.escrowGrowth", "Scenario “a”, loan “Home”",
+			"Escrow growth must be fixed, inflation or a yearly rate in percent, such as 3.", LevelError},
+		{"inflation with no inflation rate",
+			sim + "guardrails: [{name: Cushion, kind: cashFloor, amount: 1, growth: inflation}]\nscenarios: [{name: a}]\n",
+			"guardrails.0.growth", "Guardrail “Cushion”",
+			"This follows the plan’s inflation rate, which is 0, so it stays the same.", LevelWarning},
+		{"inflation at a rate of 0",
+			"version: 2\nsimulation: {endDate: 2030-01, startingCash: 0, inflationRate: 0}\nscenarios: [{name: a, events: [{name: Rent, amount: -1, growth: inflation}]}]\n",
+			"scenarios.0.events.0.growth", "Scenario “a”, event “Rent”",
+			"which is 0", LevelWarning},
+		{"escrow growth without escrow",
+			sim + "scenarios: [{name: a, loans: [{name: Home, principal: 10, interestRate: 1, term: 12, startDate: 2025-01, escrowGrowth: 3}]}]\n",
+			"scenarios.0.loans.0.escrowGrowth", "Scenario “a”, loan “Home”",
+			"There is no escrow to grow, so this has no effect.", LevelWarning},
+		{"growth on a percentage withdrawal",
+			sim + "scenarios: [{name: a, investments: [{name: i, withdrawals: [{percentage: 4, growth: inflation}]}]}]\n",
+			"scenarios.0.investments.0.withdrawals.0.growth", "Scenario “a”, investment “i”, withdrawal 1",
+			"A percentage withdrawal already follows the balance, so growth has no effect.", LevelWarning},
+		{"growth on a debt-free guardrail",
+			sim + "guardrails: [{name: Clear, kind: debtFree, startDate: 2029-01, growth: 2}]\nscenarios: [{name: a}]\n",
+			"guardrails.0.growth", "Guardrail “Clear”",
+			"A debt-free guardrail does not use growth, so this has no effect.", LevelWarning},
 		{"emergency fund months",
 			sim + "recommendations: {emergencyFundMonths: -1}\nscenarios: [{name: a}]\n",
 			"recommendations.emergencyFundMonths", "Simulation", "at least 0", LevelError},
@@ -261,13 +296,14 @@ var (
 // in what a reader sees. A key the user typed themselves is quoted back.
 func TestProblemTextIsPlain(t *testing.T) {
 	docs := []string{
-		"version: 2\nsimulation: {startDate: 2031-01, endDate: 2030-01, cashInterestRate: -1}\n" +
+		"version: 2\nsimulation: {startDate: 2031-01, endDate: 2030-01, cashInterestRate: -1, inflationRate: -101}\n" +
+			"guardrails: [{name: G, kind: debtFree, startDate: 2030-01, growth: 1}, {name: H, kind: cashFloor, amount: 1, growth: inflation}, {name: I, kind: lasts, investments: [Fund], growth: 1}]\n" +
 			"recommendations: {emergencyFundMonths: -1}\n" +
 			"common:\n" +
-			"  events: [{name: Pay, percentage: 3, startDate: 2029-01, endDate: 2028-01, optimize: {field: amount}}, {amount: 1, startDate: 2041-01, endDate: 2042-01}]\n" +
+			"  events: [{name: Pay, percentage: 3, startDate: 2029-01, endDate: 2028-01, optimize: {field: amount}}, {amount: 1, startDate: 2041-01, endDate: 2042-01}, {amount: 1, growth: -100}, {amount: 1, growth: {a: 1}}]\n" +
 			"  loans: [{principal: 0}, {name: Car, principal: 10, downPayment: 20, interestRate: -1, term: 0, escrow: -1, mortgageInsurance: -1, mortgageInsuranceCutoff: 101, earlyPayoffThreshold: -1, startDate: 2025-13, earlyPayoffDate: nope, sellProperty: true, extraPrincipalPayments: [{amount: 0, percentage: 1, optimize: {field: amount}}]}," +
-			" {name: Home, principal: 10, interestRate: 1, term: 12, startDate: 2026-01, earlyPayoffDate: 2025-06, mortgageInsurance: 5}]\n" +
-			"  investments: [{startingValue: 1}, {name: Fund, startingValue: -1, taxRate: 100, withdrawalTaxRate: -1, contributions: [{amount: 0, percentage: 1, optimize: {field: amount}}], withdrawals: [{amount: 1, percentage: 1}, {amount: -1}, {percentage: -1, optimize: {field: amount}}]}, {name: Fund}]\n" +
+			" {name: Home, principal: 10, interestRate: 1, term: 12, startDate: 2026-01, earlyPayoffDate: 2025-06, mortgageInsurance: 5, escrowGrowth: fast}, {name: Boat, principal: 10, interestRate: 1, term: 12, startDate: 2026-01, escrowGrowth: 1}]\n" +
+			"  investments: [{startingValue: 1}, {name: Fund, startingValue: -1, taxRate: 100, withdrawalTaxRate: -1, contributions: [{amount: 0, percentage: 1, optimize: {field: amount}}], withdrawals: [{amount: 1, percentage: 1}, {amount: -1}, {percentage: -1, optimize: {field: amount}}, {percentage: 1, growth: 2}]}, {name: Fund}]\n" +
 			"scenarios:\n" +
 			"  - {name: a, events: [" +
 			"{amount: 1, optimize: {field: colour}}, " +
