@@ -1,10 +1,11 @@
 import { render } from 'preact';
+import { useState } from 'preact/hooks';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { Adjustment, AdjustmentStatus } from '../config/adjustments';
 import { fromConfigDocument } from '../config/serialize';
 import type { ConfigModel } from '../config/types';
-import type { ForecastResults, OptimizationSummary } from '../engine/types';
+import type { ForecastResults, OptimizationSummary, Reading } from '../engine/types';
 import { ResultsView } from './ResultsView';
 
 let host: HTMLDivElement;
@@ -398,5 +399,111 @@ describe('the earliest month from a scenario', () => {
     expect(heading()).toBeNull();
     showScenarios(['only']);
     expect(heading()).toBeNull();
+  });
+});
+
+describe('reading in today’s dollars', () => {
+  const nominal: ForecastResults = {
+    version: 'test',
+    scenarios: ['plan'],
+    rows: ['2026-01', '2026-02'].map((date, i) => ({
+      date,
+      values: [{ liquid: 25000 + i, total: 30000 + i, notes: [] }],
+    })),
+    csv: 'the one csv',
+    metrics: [
+      {
+        keyFigures: { lowestCash: 25000, lowestCashDate: '2026-01', endingCash: 25001, endingTotal: 30001 },
+        guardrails: [
+          { name: 'Cushion', kind: 'cashFloor', result: 'holds', tightestDate: '2026-02', margin: 1001 },
+        ],
+      },
+    ],
+    comparisons: [],
+    warnings: [],
+    configYaml: '',
+  };
+  const withToday: ForecastResults = {
+    ...nominal,
+    todaysDollars: {
+      today: '2026-01',
+      rows: ['2026-01', '2026-02'].map((date, i) => ({
+        date,
+        values: [{ liquid: 25000 - i * 77, total: 30000 - i * 88, notes: [] }],
+      })),
+      metrics: [
+        {
+          keyFigures: { lowestCash: 24923, lowestCashDate: '2026-02', endingCash: 24923, endingTotal: 29912 },
+          guardrails: [
+            { name: 'Cushion', kind: 'cashFloor', result: 'holds', tightestDate: '2026-02', margin: 998.5 },
+          ],
+        },
+      ],
+      comparisons: [],
+    },
+  };
+
+  function Harness({ results, now, onDownloadCsv }: { results: ForecastResults; now: string; onDownloadCsv?: () => void }) {
+    const [reading, setReading] = useState<Reading>('nominal');
+    return (
+      <ResultsView
+        results={results}
+        durationMs={1}
+        optimizerRan={false}
+        onDownloadCsv={onDownloadCsv ?? (() => {})}
+        statusOf={(_: Adjustment) => 'missing'}
+        onApply={() => {}}
+        reading={reading}
+        onReadingChange={setReading}
+        now={now}
+      />
+    );
+  }
+
+  const radios = () => [...host.querySelectorAll<HTMLInputElement>('.results__reading input[type="radio"]')];
+  const labels = () => [...host.querySelectorAll('.results__reading label')].map((l) => l.textContent?.trim());
+  const tableText = () => host.querySelector('.results-table')?.textContent ?? '';
+  const guardrailText = () => host.querySelector('.guardrails')?.textContent ?? host.textContent ?? '';
+
+  function choose(index: number): void {
+    act(() => {
+      radios()[index]!.click();
+    });
+  }
+
+  it('is not offered when the plan has no inflation rate', () => {
+    act(() => render(<Harness results={nominal} now="2026-01" />, host));
+    expect(host.querySelector('.results__reading')).toBeNull();
+  });
+
+  it('starts on nominal and names the start month when it is not the current one', () => {
+    act(() => render(<Harness results={withToday} now="2026-11" />, host));
+    expect(labels()).toEqual(['Nominal', 'Today’s dollars (January 2026)']);
+    expect(radios().map((r) => r.checked)).toEqual([true, false]);
+    expect(host.querySelector('.results__reading legend')?.textContent).toBe('Show amounts');
+  });
+
+  it('calls the start month today when it is the current one', () => {
+    act(() => render(<Harness results={withToday} now="2026-01" />, host));
+    expect(labels()).toEqual(['Nominal', 'Today’s dollars']);
+  });
+
+  it('shows the engine’s today’s-dollars figures when chosen, and nominal ones again after', () => {
+    const downloads: string[] = [];
+    act(() => render(<Harness results={withToday} now="2026-01" onDownloadCsv={() => downloads.push('csv')} />, host));
+    expect(tableText()).toContain('$25,001.00');
+    expect(guardrailText()).toContain('$1,001.00');
+    choose(1);
+    expect(radios().map((r) => r.checked)).toEqual([false, true]);
+    expect(tableText()).toContain('$24,923.00');
+    expect(tableText()).not.toContain('$25,001.00');
+    expect(guardrailText()).toContain('$998.50');
+    // One download, whatever the reading.
+    act(() => {
+      [...host.querySelectorAll('button')].find((b) => b.textContent?.trim() === 'Download CSV')!.click();
+    });
+    expect(downloads).toEqual(['csv']);
+    choose(0);
+    expect(tableText()).toContain('$25,001.00');
   });
 });

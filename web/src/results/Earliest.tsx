@@ -4,25 +4,37 @@ import { HelpTip } from '../components/HelpTip';
 import { HELP } from '../config/help';
 import { MonthField } from '../components/fields';
 import { addMonths } from '../config/month';
-import { EngineError, type EarliestAnswer, type EarliestRequest, type ForecastResults, type MonthSpan } from '../engine/types';
+import {
+  EngineError,
+  type EarliestAnswer,
+  type EarliestRequest,
+  type ForecastResults,
+  type MonthSpan,
+  type Reading,
+  type Readings,
+} from '../engine/types';
 import { GuardrailList } from './Guardrails';
+import { pick } from './reading';
 
 interface EarliestProps {
+  /** The run's results, in nominal dollars. */
   results: ForecastResults;
+  /** How to read the amounts; nominal by default. */
+  reading?: Reading;
   /** The scenario's position in the results. */
   scenario: number;
   subject: EarliestSubject;
   /** The names of the plan's guardrails, in its order. */
   guardrails: readonly string[];
   /** Asks the engine, against the plan these results came from. */
-  run: (request: EarliestRequest) => Promise<EarliestAnswer>;
+  run: (request: EarliestRequest) => Promise<Readings<EarliestAnswer>>;
 }
 
 type Outcome =
   | { state: 'idle' }
   | { state: 'running' }
   | { state: 'failed'; message: string }
-  | { state: 'done'; answer: EarliestAnswer };
+  | { state: 'done'; answer: Readings<EarliestAnswer> };
 
 function span({ from, to }: MonthSpan): string {
   return from === to ? from : `${from} to ${to}`;
@@ -52,7 +64,7 @@ function rangeFor(target: EarliestTarget | undefined, first: string, last: strin
  * chosen guardrails holding, as the engine works it out on the plan these
  * results came from. Asking changes nothing in the plan.
  */
-export function Earliest({ results, scenario, subject, guardrails, run }: EarliestProps) {
+export function Earliest({ results, reading = 'nominal', scenario, subject, guardrails, run }: EarliestProps) {
   const base = useId();
   const first = results.rows[0]?.date ?? '';
   const last = results.rows[results.rows.length - 1]?.date ?? '';
@@ -217,7 +229,7 @@ export function Earliest({ results, scenario, subject, guardrails, run }: Earlie
           ) : null}
         </div>
 
-        {outcome.state === 'done' ? <Answer answer={outcome.answer} /> : null}
+        {outcome.state === 'done' ? <Answer answer={pick(outcome.answer, reading)} /> : null}
       </div>
     </section>
   );

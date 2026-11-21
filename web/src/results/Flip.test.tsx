@@ -2,7 +2,14 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { FlipSubject } from '../config/choices';
-import { EngineError, type FlipComparison, type FlipRequest, type ForecastResults } from '../engine/types';
+import {
+  EngineError,
+  type FlipComparison,
+  type FlipRequest,
+  type ForecastResults,
+  type Reading,
+  type Readings,
+} from '../engine/types';
 import { Flip } from './Flip';
 
 let host: HTMLDivElement;
@@ -66,9 +73,15 @@ function answer(request: FlipRequest): FlipComparison {
 type Run = (request: FlipRequest) => Promise<FlipComparison>;
 type Keep = (scenarioId: string, choiceId: string, optionId: string, name: string) => string | null;
 
+/** The engine's answer in nominal dollars only, as for a plan without an inflation rate. */
+const nominalOnly =
+  (run: Run) =>
+  (request: FlipRequest): Promise<Readings<FlipComparison>> =>
+    run(request).then((nominal) => ({ nominal, today: null }));
+
 function show(run: Run, onKeep: Keep = () => null, data: ForecastResults = results): void {
   act(() => {
-    render(<Flip results={data} scenario={0} subject={subject} run={run} onKeep={onKeep} />, host);
+    render(<Flip results={data} scenario={0} subject={subject} run={nominalOnly(run)} onKeep={onKeep} />, host);
   });
 }
 
@@ -183,5 +196,52 @@ describe('flipping one choice of a scenario', () => {
     show(run, () => null, { ...results });
     expect(picker(1).value).toBe('');
     expect(text()).not.toContain('moves ahead');
+  });
+});
+
+describe('a flip read in today’s dollars', () => {
+  const metric = (margin: number) => ({
+    guardrails: [{ name: 'Cushion', kind: 'cashFloor', result: 'holds' as const, tightestDate: '2026-02', margin }],
+  });
+  const data: ForecastResults = {
+    ...results,
+    metrics: [metric(500), {}],
+    todaysDollars: { today: '2026-01', rows: results.rows, metrics: [metric(480), {}], comparisons: [] },
+  };
+  const readings = (request: FlipRequest): Readings<FlipComparison> => {
+    const nominal = { ...answer(request), guardrails: metric(700).guardrails };
+    return {
+      nominal,
+      today: {
+        ...nominal,
+        cash: { ...nominal.cash, difference: [0, -390, 240] },
+        guardrails: metric(650).guardrails,
+      },
+    };
+  };
+
+  function showIn(reading: Reading, run: (request: FlipRequest) => Promise<Readings<FlipComparison>>): void {
+    act(() => {
+      render(
+        <Flip results={data} reading={reading} scenario={0} subject={subject} run={run} onKeep={() => null} />,
+        host,
+      );
+    });
+  }
+
+  it('shows the answer in the reading chosen, without asking again or starting over', async () => {
+    const run = vi.fn(async (request: FlipRequest) => readings(request));
+    showIn('nominal', run);
+    await pick(1, 'op-move');
+    expect(text()).toContain('$500.00');
+    expect(text()).toContain('$700.00');
+    showIn('today', run);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(picker(1).value).toBe('op-move');
+    expect(text()).toContain('$480.00');
+    expect(text()).toContain('$650.00');
+    expect(text()).not.toContain('$700.00');
+    // The months are the engine's, the same in both.
+    expect(text()).toContain('2026-03: stay (Home: Move) moves ahead');
   });
 });

@@ -46,6 +46,30 @@ describe('decoding a forecast', () => {
   });
 });
 
+describe('decoding today’s dollars', () => {
+  const todaysDollars = {
+    today: '2026-01',
+    rows: [{ date: '2026-01', values: [{ liquid: 1, total: 2, notes: [] }] }],
+    metrics: [{}, {}],
+    comparisons: [],
+    flip: { scenario: 0 },
+  };
+
+  it('keeps the today’s dollars the engine reported', () => {
+    expect(decodeForecast(JSON.stringify({ ...base, todaysDollars })).todaysDollars).toEqual(todaysDollars);
+  });
+
+  it('reads a result without them, or with a set it cannot read, as having none', () => {
+    expect(decodeForecast(JSON.stringify(base)).todaysDollars).toBeNull();
+    expect(decodeForecast(JSON.stringify({ ...base, todaysDollars: { today: '2026-01' } })).todaysDollars).toBeNull();
+  });
+
+  it('reads missing comparisons in them as none', () => {
+    const { comparisons: _, ...rest } = todaysDollars;
+    expect(decodeForecast(JSON.stringify({ ...base, todaysDollars: rest })).todaysDollars?.comparisons).toEqual([]);
+  });
+});
+
 describe('decoding problems', () => {
   it('keeps each problem the engine reported', () => {
     const problems = [

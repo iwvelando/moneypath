@@ -184,6 +184,30 @@ export interface ResultRow {
   values: (ScenarioValue | null)[];
 }
 
+/**
+ * The run read in today's dollars: the plan's start month's prices, present
+ * only when the plan has an inflation rate. Every month, result and note
+ * repeats the nominal results; only the amounts are converted, by the engine.
+ */
+export interface TodaysDollars {
+  /** `YYYY-MM`, the month whose prices these amounts are in. */
+  today: string;
+  rows: ResultRow[];
+  metrics: ScenarioMetrics[];
+  comparisons?: ScenarioComparison[] | null;
+  flip?: FlipComparison | null;
+  earliest?: EarliestAnswer | null;
+}
+
+/** How amounts are read: as they will be paid, or in today's dollars. */
+export type Reading = 'nominal' | 'today';
+
+/** One answer in both readings; `today` is null when the plan has no inflation rate. */
+export interface Readings<T> {
+  nominal: T;
+  today: T | null;
+}
+
 export interface ForecastResults {
   version: string;
   scenarios: string[];
@@ -196,6 +220,8 @@ export interface ForecastResults {
   flip?: FlipComparison | null;
   /** Present only when the run was asked an earliest-month question. */
   earliest?: EarliestAnswer | null;
+  /** Present only when the plan's inflation rate is set and not 0. */
+  todaysDollars?: TodaysDollars | null;
   warnings?: string[] | null;
   configYaml: string;
 }

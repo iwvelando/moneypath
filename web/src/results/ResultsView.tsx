@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'preact/hooks';
+import { useEffect, useId, useMemo, useState } from 'preact/hooks';
 import type { Adjustment, AdjustmentStatus } from '../config/adjustments';
 import { flipSubject } from '../config/choices';
 import { earliestSubject } from '../config/earliest';
@@ -10,6 +10,8 @@ import type {
   FlipRequest,
   ForecastResults,
   OptimizationSummary,
+  Reading,
+  Readings,
   ScenarioMetrics,
 } from '../engine/types';
 import { formatDuration, formatMoney, formatMonths } from '../util/format';
@@ -21,6 +23,7 @@ import { Flip } from './Flip';
 import { GuardrailList, RunGuardrails, debtFreeClause } from './Guardrails';
 import { MonthlyTable, type MonthlyRow } from './MonthlyTable';
 import { EmergencyFundGauge } from './Gauge';
+import { inReading, readingLabel } from './reading';
 import { OverlaySparkline, Sparkline } from './Sparkline';
 
 /**
@@ -49,12 +52,17 @@ interface ResultsViewProps {
   earliest?: EarliestAccess;
   /** The guardrails of the plan these results came from, to word each result by what it checked. */
   guardrails?: readonly GuardrailModel[];
+  /** How amounts are read; today's dollars only when the results carry them. */
+  reading?: Reading;
+  onReadingChange?: (reading: Reading) => void;
+  /** `YYYY-MM`, the month the run took as the current one. */
+  now?: string;
 }
 
 export interface FlipAccess {
   /** The plan these results came from. */
   plan: ConfigModel;
-  run: (request: FlipRequest) => Promise<FlipComparison>;
+  run: (request: FlipRequest) => Promise<Readings<FlipComparison>>;
   /** Adds the path, or returns an explanation displayed beside Keep. */
   onKeep: (scenarioId: string, choiceId: string, optionId: string, name: string) => string | null;
 }
@@ -62,7 +70,7 @@ export interface FlipAccess {
 export interface EarliestAccess {
   /** The plan these results came from. */
   plan: ConfigModel;
-  run: (request: EarliestRequest) => Promise<EarliestAnswer>;
+  run: (request: EarliestRequest) => Promise<Readings<EarliestAnswer>>;
 }
 
 interface SummaryPanelProps {
@@ -217,7 +225,14 @@ export function ResultsView({
   flip,
   earliest,
   guardrails = [],
+  reading = 'nominal',
+  onReadingChange,
+  now = '',
 }: ResultsViewProps) {
+  const readingName = useId();
+  // Every amount below comes from the reading; months and results are the same in both.
+  const shown = useMemo(() => inReading(results, reading), [results, reading]);
+  const today = results.todaysDollars ?? null;
   // A scenario's position, or the comparison of all of them.
   const [selected, setSelected] = useState<number | 'compare'>(0);
   const canCompare = results.scenarios.length > 1;
@@ -286,10 +301,10 @@ export function ResultsView({
   // One Total series per scenario, for the sparkline in each tab.
   const scenarioTotals = useMemo(
     () =>
-      results.scenarios.map((_, i) =>
-        results.rows.map((row) => row.values[i]?.total ?? null),
+      shown.scenarios.map((_, i) =>
+        shown.rows.map((row) => row.values[i]?.total ?? null),
       ),
-    [results.scenarios, results.rows],
+    [shown.scenarios, shown.rows],
   );
 
   const { dates, liquid, total, rows } = useMemo(() => {
@@ -297,7 +312,7 @@ export function ResultsView({
     const l: (number | null)[] = [];
     const t: (number | null)[] = [];
     const r: MonthlyRow[] = [];
-    for (const row of results.rows) {
+    for (const row of shown.rows) {
       const value = row.values[index] ?? null;
       d.push(row.date);
       l.push(value?.liquid ?? null);
@@ -310,7 +325,7 @@ export function ResultsView({
       });
     }
     return { dates: d, liquid: l, total: t, rows: r };
-  }, [results.rows, index]);
+  }, [shown.rows, index]);
 
   return (
     <RunGuardrails.Provider value={guardrails}>
@@ -357,6 +372,23 @@ export function ResultsView({
               Ran in {formatDuration(durationMs)}
               {optimizerRan ? ' · optimizer on' : ''}
             </span>
+            {today ? (
+              <fieldset class="segmented results__reading">
+                <legend class="visually-hidden">Show amounts</legend>
+                {(['nominal', 'today'] as const).map((option) => (
+                  <label key={option} class={reading === option ? 'is-active' : undefined}>
+                    <input
+                      type="radio"
+                      name={readingName}
+                      value={option}
+                      checked={reading === option}
+                      onChange={() => onReadingChange?.(option)}
+                    />
+                    {option === 'nominal' ? 'Nominal' : readingLabel(today.today, now)}
+                  </label>
+                ))}
+              </fieldset>
+            ) : null}
             <button type="button" class="btn btn--primary" onClick={onDownloadCsv}>
               Download CSV
             </button>
@@ -366,8 +398,8 @@ export function ResultsView({
         <div id="scenario-panel" role="tabpanel" aria-labelledby={tabId(current)} tabIndex={0}>
           {comparing ? (
             <>
-              <Comparison results={results} onOpenScenario={openScenario} />
-              <Difference results={results} />
+              <Comparison results={shown} onOpenScenario={openScenario} />
+              <Difference results={shown} />
             </>
           ) : (
             <>
@@ -379,7 +411,7 @@ export function ResultsView({
               <Chart dates={dates} liquid={liquid} total={total} scenarioName={scenarioName} />
             </div>
             <SummaryPanel
-              metrics={results.metrics[index]}
+              metrics={shown.metrics[index]}
               scenarioName={scenarioName}
               statusOf={statusOf}
               onApply={onApply}
@@ -387,12 +419,20 @@ export function ResultsView({
           </div>
 
           {flip && flipOf ? (
-            <Flip results={results} scenario={index} subject={flipOf} run={flip.run} onKeep={flip.onKeep} />
+            <Flip
+              results={results}
+              reading={reading}
+              scenario={index}
+              subject={flipOf}
+              run={flip.run}
+              onKeep={flip.onKeep}
+            />
           ) : null}
 
           {earliest && earliestOf ? (
             <Earliest
               results={results}
+              reading={reading}
               scenario={index}
               subject={earliestOf}
               guardrails={guardrailNames}
@@ -404,7 +444,7 @@ export function ResultsView({
             <h3>Month by month</h3>
             <p>The numbers behind your path.</p>
           </div>
-          <MonthlyTable key={scenarioName} rows={rows} scenarioName={scenarioName} />
+          <MonthlyTable key={scenarioName} rows={rows} run={results} scenarioName={scenarioName} />
             </>
           )}
         </div>

@@ -4,7 +4,7 @@
  * `{"error": "..."}` with a human-readable message.
  */
 
-import { EngineError, type ForecastResults, type Problem } from './types';
+import { EngineError, type ForecastResults, type Problem, type TodaysDollars } from './types';
 
 function parseJson(raw: string, what: string): unknown {
   try {
@@ -40,9 +40,18 @@ export function decodeForecast(raw: string): ForecastResults {
     comparisons: Array.isArray(results.comparisons) ? results.comparisons : [],
     flip: results.flip ?? null,
     earliest: results.earliest ?? null,
+    todaysDollars: decodeTodaysDollars(results.todaysDollars),
     warnings: Array.isArray(results.warnings) ? results.warnings : [],
     configYaml: results.configYaml ?? '',
   };
+}
+
+/** The today's-dollars set, or null when there is none to read. */
+function decodeTodaysDollars(raw: unknown): TodaysDollars | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const set = raw as Partial<TodaysDollars>;
+  if (typeof set.today !== 'string' || !Array.isArray(set.rows) || !Array.isArray(set.metrics)) return null;
+  return { ...set, today: set.today, rows: set.rows, metrics: set.metrics, comparisons: set.comparisons ?? [] };
 }
 
 /** Everything the engine found wrong with a plan; empty for a sound one. */

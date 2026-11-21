@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { openApp, overflow, runForecast, uploadChoices } from './helpers';
+import { openApp, overflow, runForecast, uploadAndRun, uploadChoices } from './helpers';
 
 // Runs in the `phone` project (360 px wide). Every view and state is visited
 // before measuring, because an overflow only counts if a reader can reach it.
@@ -1055,4 +1055,17 @@ test('guardrails, their results and the flip panel never scroll sideways', async
   await flip.getByRole('combobox', { name: 'Instead of Stay' }).selectOption({ label: 'Go freelance' });
   await flip.locator('.guardrails-table').scrollIntoViewIfNeeded();
   expect(await overflow(page), 'guardrails in the flip panel').toBeLessThanOrEqual(0);
+});
+
+// The reading control joins the results header, which wraps on a phone.
+test('the choice of today’s dollars fits a narrow phone in both readings', async ({ page }) => {
+  await openApp(page);
+  await uploadAndRun(page, '../testdata/conformance/growth/config.yaml');
+  const readings = page.getByRole('group', { name: 'Show amounts' });
+  await expect(readings).toBeInViewport();
+  expect(await overflow(page), 'nominal').toBeLessThanOrEqual(0);
+  await readings.locator('label', { hasText: 'Today’s dollars' }).click();
+  await page.locator('.results-table').scrollIntoViewIfNeeded();
+  expect(await overflow(page), 'today’s dollars').toBeLessThanOrEqual(0);
+  await expect(page.getByRole('button', { name: 'Download CSV' })).toBeVisible();
 });

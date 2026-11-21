@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { parse } from 'yaml';
-import { openApp, problems, runForecast, uploadAndRun } from './helpers';
+import { engineForecast, openApp, problems, runForecast, uploadAndRun } from './helpers';
 
 /** The growth fixture, whose numbers an independent model was checked against. */
 const GROWTH_PLAN = '../testdata/conformance/growth/config.yaml';
@@ -69,4 +69,40 @@ test('growth set in the editor on an event and a guardrail reaches the forecast 
     growth: 'inflation',
   });
   expect(found).toEqual([]);
+});
+
+test('results read in today’s dollars switch the amounts, stay chosen for the next run, and leave one download', async ({ page }) => {
+  const found = problems(page);
+  await openApp(page);
+  await uploadAndRun(page, GROWTH_PLAN);
+  const readings = page.getByRole('group', { name: 'Show amounts' });
+  const nominal = readings.getByRole('radio', { name: 'Nominal' });
+  // The plan starts in 2026-06, named unless that is the current month.
+  const today = readings.getByRole('radio', { name: /^Today’s dollars( \(June 2026\))?$/ });
+  await expect(nominal).toBeChecked();
+  const cushion = page.locator('.guardrails__list').first();
+  await expect(cushion).toContainText('Cushion Holds Tightest 2027-06, $4,515.00 to spare');
+
+  await readings.locator('label', { hasText: 'Today’s dollars' }).click();
+  await expect(today).toBeChecked();
+  await expect(cushion).toContainText('Cushion Holds Tightest 2027-06, $4,383.50 to spare');
+  await expect(page.locator('.results-table')).toContainText('$24,978.40');
+
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Download CSV' }).click();
+  const csv = readFileSync(await (await download).path(), 'utf8');
+  expect(csv).toBe(engineForecast(GROWTH_PLAN)['csv']);
+  expect(csv.split('\n')[0]).toContain('"liquid in 2026-06 dollars (grows)","total in 2026-06 dollars (grows)"');
+
+  await page.getByRole('tab', { name: 'Planning Workspace' }).click();
+  await runForecast(page);
+  await expect(today).toBeChecked();
+  await expect(cushion).toContainText('$4,383.50 to spare');
+  expect(found).toEqual([]);
+});
+
+test('a plan without an inflation rate offers no reading in today’s dollars', async ({ page }) => {
+  await openApp(page);
+  await runForecast(page);
+  await expect(page.locator('.results__reading')).toHaveCount(0);
 });

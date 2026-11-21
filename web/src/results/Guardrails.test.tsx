@@ -139,7 +139,7 @@ describe('guardrails in the flip panel', () => {
 
   async function pickAndShow(data: ForecastResults, answer: FlipComparison): Promise<void> {
     act(() => {
-      render(<Flip results={data} scenario={0} subject={subject} run={async () => answer} onKeep={() => null} />, host);
+      render(<Flip results={data} scenario={0} subject={subject} run={async () => ({ nominal: answer, today: null })} onKeep={() => null} />, host);
     });
     await act(async () => {
       const select = host.querySelectorAll('select')[1]!;

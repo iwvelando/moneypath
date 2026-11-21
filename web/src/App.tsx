@@ -24,6 +24,8 @@ import {
   type FlipRequest,
   type ForecastResults,
   type Problem,
+  type Reading,
+  type Readings,
 } from './engine/types';
 import { ResultsView } from './results/ResultsView';
 import {
@@ -50,6 +52,9 @@ export function App() {
   const [busyLabel, setBusyLabel] = useState<string | null>(null);
   const [runError, setRunError] = useState<string | null>(null);
   const [results, setResults] = useState<ForecastResults | null>(null);
+  // Nominal or today's dollars: the reader's choice, kept across runs while
+  // the page is open and never saved with the plan.
+  const [reading, setReading] = useState<Reading>('nominal');
   const [durationMs, setDurationMs] = useState(0);
   const [ranWithOptimizer, setRanWithOptimizer] = useState(false);
   const [lastRunInput, setLastRunInput] = useState<string | null>(null);
@@ -287,7 +292,7 @@ export function App() {
   // The flip is of the plan the results came from, run the way they were, so
   // it stays true to them even after the editor has moved on.
   const runFlip = useCallback(
-    async (request: FlipRequest): Promise<FlipComparison> => {
+    async (request: FlipRequest): Promise<Readings<FlipComparison>> => {
       if (!engine || lastRunInput === null) throw new EngineError('The engine is not available.');
       const forecast = await engine.forecast(lastRunInput, {
         optimize: ranWithOptimizer,
@@ -295,7 +300,7 @@ export function App() {
         flip: request,
       });
       if (!forecast.flip) throw new EngineError('The engine did not report the comparison.');
-      return forecast.flip;
+      return { nominal: forecast.flip, today: forecast.todaysDollars?.flip ?? null };
     },
     [engine, lastRunInput, ranWithOptimizer],
   );
@@ -304,7 +309,7 @@ export function App() {
 
   // Asked, like a flip, of the plan the results came from, run the way they were.
   const runEarliest = useCallback(
-    async (request: EarliestRequest): Promise<EarliestAnswer> => {
+    async (request: EarliestRequest): Promise<Readings<EarliestAnswer>> => {
       if (!engine || lastRunInput === null) throw new EngineError('The engine is not available.');
       const forecast = await engine.forecast(lastRunInput, {
         optimize: ranWithOptimizer,
@@ -312,7 +317,7 @@ export function App() {
         earliest: request,
       });
       if (!forecast.earliest) throw new EngineError('The engine did not report the earliest month.');
-      return forecast.earliest;
+      return { nominal: forecast.earliest, today: forecast.todaysDollars?.earliest ?? null };
     },
     [engine, lastRunInput, ranWithOptimizer],
   );
@@ -574,6 +579,9 @@ export function App() {
                 }
                 earliest={ranConfig.current ? { plan: ranConfig.current, run: runEarliest } : undefined}
                 guardrails={ranConfig.current?.guardrails}
+                reading={reading}
+                onReadingChange={setReading}
+                now={ranNow.current}
               />
             </>
           ) : null}
