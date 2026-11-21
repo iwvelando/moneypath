@@ -12,7 +12,10 @@ description: >
   on "grows" and June 2028 on "fixed", against January 2027 for the fixed
   floor. The option that sets every growth back to fixed changes nothing in
   the first year, so both scenarios have the same emergency-fund target. The
-  inactive scenario is not run.
+  inactive scenario is not run. With the inflation rate set, each scenario's
+  columns gain liquid and total in 2026-06 dollars, and every guardrail keeps
+  its months, its margin converted at its tightest month. In today's dollars cash is lowest in 2028-01 on "grows"
+  and 2028-09 on "fixed", not in 2027-01.
 normative: true
 optimize: false
 tolerance: 0.01
@@ -34,6 +37,15 @@ expectedMetrics:
     guardrails:
       - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2027-06", margin: 4515.00}
       - {name: Fixed cushion, kind: cashFloor, result: holds, tightestDate: "2027-01", margin: 4960.00}
+    todaysDollars:
+      keyFigures:
+        lowestCash: 24271.0777
+        lowestCashDate: "2028-01"
+        endingCash: 71840.1173
+        endingTotal: 108252.9919
+      guardrails:
+        - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2027-06", margin: 4383.4951}
+        - {name: Fixed cushion, kind: cashFloor, result: holds, tightestDate: "2027-01", margin: 4875.2096}
   - scenario: fixed
     keyFigures:
       lowestCash: 24960.00
@@ -51,3 +63,12 @@ expectedMetrics:
     guardrails:
       - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2028-06", margin: 3882.00}
       - {name: Fixed cushion, kind: cashFloor, result: holds, tightestDate: "2027-01", margin: 4960.00}
+    todaysDollars:
+      keyFigures:
+        lowestCash: 23541.1070
+        lowestCashDate: "2028-09"
+        endingCash: 60720.6917
+        endingTotal: 100048.5844
+      guardrails:
+        - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2028-06", margin: 3659.1573}
+        - {name: Fixed cushion, kind: cashFloor, result: holds, tightestDate: "2027-01", margin: 4875.2096}

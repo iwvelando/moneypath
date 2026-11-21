@@ -59,10 +59,10 @@ export const HELP = {
   ),
   inflationRate: tiered(
     'Optional, default 0. How much prices rise each year, in percent: 3 means 3% higher a year later.',
-    'Only amounts set to grow with inflation follow it. Amounts are written in the start month’s prices ' +
-      'and step once a year, on the anniversaries of the start month; an amount that stays the same ' +
-      'keeps the dollars written. It is a yearly change, not an APR. Interest and return rates stay ' +
-      'nominal: the inflation rate is applied separately, so do not subtract it from them. ' +
+    'Only amounts set to grow with inflation follow it. Amounts are in the start month’s prices and ' +
+      'step once a year, on its anniversaries; an amount that stays the same keeps the dollars written. ' +
+      'It is a yearly change, not an APR. Interest and return rates stay nominal, so do not subtract ' +
+      'inflation from them. Any rate but 0 also lets you read results in today’s dollars. ' +
       'It must be more than -100.',
   ),
   emergencyFundMonths:

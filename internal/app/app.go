@@ -106,8 +106,22 @@ type resultsJSON struct {
 	Comparisons []comparisonJSON `json:"comparisons"`
 	Flip        *flipJSON        `json:"flip,omitempty"`
 	Earliest    *earliestJSON    `json:"earliest,omitempty"`
-	Warnings    []string         `json:"warnings"`
-	ConfigYaml  string           `json:"configYaml"`
+	// TodaysDollars is present when the plan has an inflation rate.
+	TodaysDollars *todaysDollarsJSON `json:"todaysDollars,omitempty"`
+	Warnings      []string           `json:"warnings"`
+	ConfigYaml    string             `json:"configYaml"`
+}
+
+// todaysDollarsJSON is the run read in the start month's prices (spec chapter
+// 02, Results JSON, todaysDollars; chapter 04 §12), in the shapes of the
+// top-level fields of the same names.
+type todaysDollarsJSON struct {
+	Today       string           `json:"today"`
+	Rows        []rowJSON        `json:"rows"`
+	Metrics     []metricJSON     `json:"metrics"`
+	Comparisons []comparisonJSON `json:"comparisons"`
+	Flip        *flipJSON        `json:"flip,omitempty"`
+	Earliest    *earliestJSON    `json:"earliest,omitempty"`
 }
 
 // comparisonJSON is one ordered pair: Scenario minus Against, both indexes
@@ -312,23 +326,48 @@ type optJSON struct {
 
 // ResultsJSON renders the normative WASM results shape (spec chapter 02).
 func ResultsJSON(f *Forecast, version string) ([]byte, error) {
+	res := f.Result
 	out := resultsJSON{
 		Version:     version,
 		Scenarios:   []string{},
-		Rows:        []rowJSON{},
 		CSV:         f.CSV,
-		Metrics:     []metricJSON{},
-		Comparisons: []comparisonJSON{},
+		Rows:        rowsJSON(res),
+		Metrics:     metricsJSON(res),
+		Comparisons: comparisonsJSON(res, nil),
+		Flip:        flipJSONOf(res, f.Flip, nil),
 		Warnings:    f.Warnings,
 		ConfigYaml:  f.ConfigYAML,
 	}
 	if out.Warnings == nil {
 		out.Warnings = []string{}
 	}
-	res := f.Result
 	for _, sc := range res.Scenarios {
 		out.Scenarios = append(out.Scenarios, sc.Name)
 	}
+	if f.Earliest != nil {
+		out.Earliest = earliestOf(f.Earliest)
+	}
+	if d := res.Deflator(); d != nil {
+		today := d.Result(res)
+		td := &todaysDollarsJSON{
+			Today:       res.Start.String(),
+			Rows:        rowsJSON(today),
+			Metrics:     metricsJSON(today),
+			Comparisons: comparisonsJSON(res, d),
+			Flip:        flipJSONOf(res, f.Flip, d),
+		}
+		if e := f.Earliest; e != nil {
+			converted := *e
+			converted.DecidedBy, converted.AtEarliest = d.Guardrails(e.DecidedBy), d.Guardrails(e.AtEarliest)
+			td.Earliest = earliestOf(&converted)
+		}
+		out.TodaysDollars = td
+	}
+	return json.Marshal(out)
+}
+
+func rowsJSON(res *engine.Result) []rowJSON {
+	rows := []rowJSON{}
 	for idx, m := range res.Dates() {
 		row := rowJSON{Date: m.String()}
 		for _, sc := range res.Scenarios {
@@ -342,8 +381,13 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 				Notes:  notes,
 			})
 		}
-		out.Rows = append(out.Rows, row)
+		rows = append(rows, row)
 	}
+	return rows
+}
+
+func metricsJSON(res *engine.Result) []metricJSON {
+	metrics := []metricJSON{}
 	for _, sc := range res.Scenarios {
 		m := metricJSON{KeyFigures: keyFiguresJSON{
 			LowestCash:     sc.KeyFigures.LowestCash,
@@ -388,14 +432,25 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 			}
 			m.Optimizations = append(m.Optimizations, oj)
 		}
-		out.Metrics = append(out.Metrics, m)
+		metrics = append(metrics, m)
 	}
+	return metrics
+}
+
+// comparisonsJSON compares every ordered pair of the nominal result, read in
+// today's dollars when d is not nil: the break-even months are decided in
+// nominal dollars either way (spec chapter 04 §12).
+func comparisonsJSON(res *engine.Result, d *engine.Deflator) []comparisonJSON {
+	out := []comparisonJSON{}
 	for i, a := range res.Scenarios {
 		for j, b := range res.Scenarios {
 			if i == j {
 				continue
 			}
 			cmp := res.Compare(a, b)
+			if d != nil {
+				cmp = d.Comparison(cmp)
+			}
 			series := func(sc engine.SeriesComparison) seriesComparisonJSON {
 				s := seriesComparisonJSON{Difference: sc.Difference, BreakEven: []breakEvenJSON{}}
 				for _, be := range sc.BreakEven {
@@ -407,7 +462,7 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 				}
 				return s
 			}
-			out.Comparisons = append(out.Comparisons, comparisonJSON{
+			out = append(out, comparisonJSON{
 				Scenario: i,
 				Against:  j,
 				Cash:     series(cmp.Cash),
@@ -415,32 +470,39 @@ func ResultsJSON(f *Forecast, version string) ([]byte, error) {
 			})
 		}
 	}
-	if fl := f.Flip; fl != nil {
-		series := func(sc engine.SeriesComparison) flipSeriesJSON {
-			s := flipSeriesJSON{Difference: sc.Difference, BreakEven: []flipBreakEvenJSON{}}
-			for _, be := range sc.BreakEven {
-				s.BreakEven = append(s.BreakEven, flipBreakEvenJSON{Date: be.Month.String(), Flipped: be.FirstAhead})
-			}
-			return s
-		}
-		entry := &flipJSON{
-			Choice: fl.Choice,
-			Option: fl.Option,
-			Name:   fl.Name,
-			Cash:   series(fl.Comparison.Cash),
-			Total:  series(fl.Comparison.Total),
+	return out
+}
 
-			Guardrails: guardrailsJSON(fl.Flipped.Guardrails),
-		}
-		for i, sc := range res.Scenarios {
-			if sc == fl.Original {
-				entry.Scenario = i
-			}
-		}
-		out.Flip = entry
+// flipJSONOf renders a flip, read in today's dollars when d is not nil; nil
+// without one.
+func flipJSONOf(res *engine.Result, fl *FlipResult, d *engine.Deflator) *flipJSON {
+	if fl == nil {
+		return nil
 	}
-	if f.Earliest != nil {
-		out.Earliest = earliestOf(f.Earliest)
+	cmp, guardrails := fl.Comparison, fl.Flipped.Guardrails
+	if d != nil {
+		cmp, guardrails = d.Comparison(cmp), d.Guardrails(guardrails)
 	}
-	return json.Marshal(out)
+	series := func(sc engine.SeriesComparison) flipSeriesJSON {
+		s := flipSeriesJSON{Difference: sc.Difference, BreakEven: []flipBreakEvenJSON{}}
+		for _, be := range sc.BreakEven {
+			s.BreakEven = append(s.BreakEven, flipBreakEvenJSON{Date: be.Month.String(), Flipped: be.FirstAhead})
+		}
+		return s
+	}
+	entry := &flipJSON{
+		Choice: fl.Choice,
+		Option: fl.Option,
+		Name:   fl.Name,
+		Cash:   series(cmp.Cash),
+		Total:  series(cmp.Total),
+
+		Guardrails: guardrailsJSON(guardrails),
+	}
+	for i, sc := range res.Scenarios {
+		if sc == fl.Original {
+			entry.Scenario = i
+		}
+	}
+	return entry
 }

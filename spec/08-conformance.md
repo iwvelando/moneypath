@@ -43,6 +43,21 @@ expectedMetrics:
       - {name: After the plan, kind: cashFloor, result: doesNotApply}
 ```
 
+When the plan sets an inflation rate, an `expectedMetrics` entry may also pin the
+scenario in today's dollars (chapter 04 §12) under `todaysDollars`, with the same keys
+and rules as the entry itself: `keyFigures`, `emergencyFund`, `guardrails` and
+`optimizations`, read from the today's-dollars reading.
+
+```yaml
+expectedMetrics:
+  - scenario: grows
+    keyFigures: {…}
+    todaysDollars:
+      keyFigures: {lowestCash: 24271.08, lowestCashDate: "2028-01", …}
+      guardrails:
+        - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2027-06", margin: 4383.50}
+```
+
 An `expectedComparisons` entry pins one ordered pair, `scenario` minus `against`, for
 `cash` and for `total`:
 
@@ -61,6 +76,9 @@ expectedComparisons:
 
 Beyond what the entry states, every month's difference must equal the difference of that
 pair's `expected.csv` columns, within the case's `tolerance` for each of the two cells.
+When `expected.csv` has today's-dollars columns, the pair's comparison in today's
+dollars must also have the same break-even months as the nominal one, and every
+month's difference must equal the difference of those columns by the same rule.
 `expected.csv` itself carries no comparison columns.
 
 An `earliest` entry asks one question of the case's plan, run as the manifest says,
@@ -85,9 +103,9 @@ earliest:
     atEarliest: […]
 ```
 
-A case passes when every numeric cell matches within `tolerance` (compare parsed values,
-not strings), and all dates, headers, and note strings match
-exactly. Tolerances absorb float64 formatting edge cases, not semantic slack.
+Every cell other than the date and a scenario's notes is numeric. A case passes when
+every numeric cell matches within `tolerance` (compare parsed values, not strings), and
+all dates, headers, and note strings match exactly. Tolerances absorb float64 formatting edge cases, not semantic slack.
 
 ## `testdata/problems/<case>/`
 
@@ -121,8 +139,8 @@ side.
 |---|---|---|
 | Conformance | `TestConformance` (`conformance/`) | Each normative case reproduces `expected.csv` under its manifest rules. |
 | Problems | `TestProblems` (`conformance/`) | Each `testdata/problems` case raises exactly the problems its `expected.yaml` lists, natively and, when `node` is present, byte-identically from the wasm module. |
-| Growth that changes nothing | `TestGrowthThatChangesNothingLeavesEveryCaseAlone` (`conformance/`) | Every case without growth of its own gives exactly the same results and CSV with an inflation rate and `growth: 0` beside every amount and escrow, and with `growth: inflation` at a rate that is absent or 0 (chapter 03, Growth). |
-| Native ↔ WASM parity | `TestNativeWASMParity` (`conformance/`) | For every conformance config, native and WASM CSV are byte-identical. Runs the wasm module under Node; self-skips when `node` is absent. |
+| Growth that changes nothing | `TestGrowthThatChangesNothingLeavesEveryCaseAlone` (`conformance/`) | Every case without growth of its own gives exactly the same results and CSV with `growth: inflation` at a rate that is absent or 0 (chapter 03, Growth). With an inflation rate of 3.0 and `growth: 0` beside every amount and escrow, it gives the same nominal results, and its CSV is the same with the today's-dollars columns (chapter 05) left out. |
+| Native ↔ WASM parity | `TestNativeWASMParity` (`conformance/`) | For every conformance config, native and WASM CSV are byte-identical, the today's-dollars columns of a case with an inflation rate included. Runs the wasm module under Node; self-skips when `node` is absent. |
 | Static bundle | `TestStaticBundle` (`conformance/`) | The web build produces a standalone `dist/`: relative URLs throughout and a content-hashed engine (chapter 02). Self-skips when `web/dist` is not built. |
 | Distribution | `web/scripts/check-dist.mjs` (`make dist`) | `dist/` holds the real engine, the icons and link-preview card, the 404 page, and the license notices. |
 | Browser | `web/e2e/` (Playwright; `make test-browser`, `make test-webkit`) | The production build, under the production CSP, loads the real engine, runs a forecast and both downloads, survives denied storage, and never scrolls sideways on a 360 px phone or an iPhone. Tests tagged `@smoke` also run against the live site after each deploy. |

@@ -702,3 +702,65 @@ What follows from the rule, each deliberate:
   too, possibly for other guardrails, and `holds` shows which.
 - The answer describes the path the question was asked of. Other scenarios sharing a
   baseline entry are not moved, and the reported forecast is not changed.
+
+## 12. Today's dollars
+
+A plan whose `simulation.inflationRate` (chapter 03) is set and not 0 is also reported
+in **today's dollars**: the start month's prices, the prices its amounts are written in
+(§2.1). Like the key figures (§8), the conversion is read from what the forecast
+reports and adds nothing to the simulation. Every nominal figure stays as it is. A plan
+whose rate is absent or 0 has no today's-dollars reading.
+
+**The deflator.** For a month `m` with `m − start = 12k + j` and `0 ≤ j < 12`, and
+`i = inflationRate`:
+
+- `D(m) = (1 + i/100)^k · ρ^j`, where `ρ` is the twelfth root of `1 + i/100`.
+- `D(start) = 1`, and `D` is exactly `(1 + i/100)^k`, the growth factor of an amount
+  that follows inflation (§2.1), in each anniversary month. Between anniversaries it
+  rises a little each month, because prices drift even while the amounts in a plan
+  step. So an amount that follows inflation reads as written in each anniversary month
+  and slightly less in the months after it: about 2.7 % less in the eleventh, at 3 %.
+- `ρ` is computed as `√(√(∛(1 + i/100)))`: the cube root, then two square roots. The
+  powers are computed by multiplying `k` and `j` times, and `D(m)` is their product.
+  No fractional power is taken, so every build computes the same bits.
+- A figure `x` of month `m` reads `x / D(m)` in today's dollars, unrounded like every
+  reported number.
+
+**What is converted.**
+
+- **Series.** `liquid` and `total` (§1), and the differences of a comparison (§9), are
+  divided by `D(m)` month by month.
+- **Key figures** (§8). `endingCash` and `endingTotal` are divided by `D(end)`.
+  `lowestCash` and `lowestCashDate` are read by §8's rule from the converted `liquid`,
+  so the lowest month can be another month than the nominal one. At a rate above 0,
+  positive cash that stays at the same nominal amount is lowest in today's dollars at
+  the end.
+- **Amounts reported with a month.** Each is divided by `D` of its own month. A
+  guardrail's `margin` (§10) is divided at its tightest month and a debtFree's `owed` at
+  its first breach. An optimizer summary's `floor`, `minCash` and `headroom` (§7) are
+  divided at the month they describe. For a target held to a guardrail, that is the
+  guardrail's tightest month. For a target held to the emergency fund, it is the earliest
+  month of the suffix whose `liquid` equals `minCash` (over every month when the floor
+  is never reached).
+
+**What is decided once, in nominal dollars.** Guardrail results, first breaches,
+tightest months, cleared months and `marginMonths`; break-even months; the optimizer's
+search and chosen values; and the earliest month (§11). Today's dollars repeat each of
+them as reported and convert only the amounts above. A balance and a floor, or two
+paths, are divided by the same `D` in a month, so their order cannot change, and
+deciding again after dividing could only move a comparison at the last cent. A
+guardrail's outcome therefore never depends on how it is read.
+
+**What reads the same.** The emergency-fund figures (§5) are in today's prices already
+(the first year's expenses, against starting cash), and since `D(start) = 1` they read
+the same. The optimizer's chosen `amount` is a plan value written in the start month's
+prices and is not converted, nor are the other fields it searches. Notes (§6) report
+the amounts that actually move and stay nominal.
+
+What follows from the rule, each deliberate:
+
+- A negative rate, falling prices, has `D` below 1 after the start, and today's dollars
+  read higher than nominal.
+- A one-month plan has only `start`, where `D` is 1: both readings are the same.
+- The months a comparison, a guardrail or the earliest month names are the same in
+  both readings; only the amounts beside them differ.

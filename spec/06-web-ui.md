@@ -211,6 +211,18 @@ The app covers, at a coarse grain:
   Editing the config
   marks all of these as describing an earlier version of the plan; they stay readable,
   being the baseline the next run will be compared against.
+  When the plan has an inflation rate other than 0, the results header offers two
+  readings beside Download CSV, each drawn as a button with the chosen one in the
+  accent: Nominal, where it starts, and Today's dollars, the
+  plan's start month's prices (chapter 04 §12). The second names that month ("Today's
+  dollars (June 2026)") unless it is the current month. The choice switches every
+  amount on the results page, the tabs' sparklines, the chart, the table, the key figures,
+  guardrails, optimizer figures, the comparison, the flip and the earliest month, to the
+  engine's second set. Months, results and notes stay as they are. A flip or an
+  earliest-month answer already shown keeps its question and switches with the rest.
+  The choice lasts across runs while the page is open and is not saved with the plan.
+  A plan without a rate has no such choice. The CSV download is the same whichever
+  reading is shown: it carries both (chapter 05).
 - **Getting data in and out** — uploading a version 2 config (choices and
   selections are kept; a file with no `version` field or in the older finance-forecast
   format is refused with an explanation), downloading the engine-serialized

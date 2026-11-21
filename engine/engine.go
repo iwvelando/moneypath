@@ -21,6 +21,10 @@ type Options struct {
 type Result struct {
 	Start, End config.Month
 	Scenarios  []*ScenarioResult
+	// InflationRate is the plan's simulation.inflationRate. No nominal figure
+	// depends on it; it is how the result reads in today's dollars (spec
+	// chapter 04 §12).
+	InflationRate float64
 }
 
 type ScenarioResult struct {
@@ -94,6 +98,12 @@ type Optimization struct {
 	Floor       float64
 	MinimumCash float64
 	Headroom    float64
+	// MinimumCashMonth is the month MinimumCash is read at: the guardrail's
+	// tightest month, or for the emergency fund the earliest month with the
+	// least cash it considered (spec chapter 04 §7). Floor and Headroom are
+	// the floor and margin there. It is how they read in today's dollars
+	// (§12), and the start for a debtFree target.
+	MinimumCashMonth config.Month
 	// Guardrail is the result of the guardrail the target is held to, on the
 	// reported value's forecast; nil for a target held to the emergency fund.
 	Guardrail  *GuardrailResult
@@ -141,8 +151,9 @@ func Run(cfg *config.Config, opts Options) (*Result, error) {
 
 func forecast(cfg *config.Config, opts Options) *Result {
 	res := &Result{
-		Start: cfg.Simulation.ResolvedStart,
-		End:   cfg.Simulation.ResolvedEnd,
+		Start:         cfg.Simulation.ResolvedStart,
+		End:           cfg.Simulation.ResolvedEnd,
+		InflationRate: cfg.Simulation.InflationRate,
 	}
 	for _, sc := range cfg.Scenarios {
 		if !sc.ResolvedActive {

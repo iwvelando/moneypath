@@ -88,8 +88,9 @@ func TestNativeWASMParity(t *testing.T) {
 			options := fmt.Sprintf(`{"optimize":%v,"now":%q}`, mf.Optimize, arbitraryNow)
 			out := runCmd(t, node, harness, wasmExec, wasmPath, filepath.Join(dir, "config.yaml"), options)
 			var payload struct {
-				CSV   string `json:"csv"`
-				Error string `json:"error"`
+				CSV           string          `json:"csv"`
+				TodaysDollars json.RawMessage `json:"todaysDollars"`
+				Error         string          `json:"error"`
 			}
 			if err := json.Unmarshal([]byte(out), &payload); err != nil {
 				t.Fatalf("wasm output is not JSON: %v\n%s", err, out)
@@ -99,6 +100,12 @@ func TestNativeWASMParity(t *testing.T) {
 			}
 			if payload.CSV != nativeCSV {
 				t.Errorf("CSV differs between native and WASM builds\n--- native ---\n%s\n--- wasm ---\n%s", nativeCSV, payload.CSV)
+			}
+			// The CSV above holds today's dollars for a plan with a rate. The
+			// results JSON is not held to the bit (chapter 02, Determinism),
+			// but the WASM build must report the reading too.
+			if cfg.Simulation.InflationRate != 0 && len(payload.TodaysDollars) == 0 {
+				t.Errorf("the plan has an inflation rate, but the WASM results have no today's dollars")
 			}
 		})
 	}

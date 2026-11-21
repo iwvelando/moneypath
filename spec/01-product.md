@@ -15,7 +15,8 @@ Cash can earn interest at one plan-wide rate — 0% by default, the worst case o
 non-interest-bearing account, or higher to model a high-yield savings account. Amounts
 are written in the start month's prices, and each can stay fixed, grow with one
 plan-wide inflation rate or grow at its own yearly rate, so a plan that runs for decades
-can let income and costs rise.
+can let income and costs rise. With an inflation rate set, the results can also be read
+in today's dollars, the start month's prices.
 
 The more faithfully the user describes their events, the more useful the projection. The
 tool is a deterministic best-guess guide, not a Monte Carlo engine or a financial-advice

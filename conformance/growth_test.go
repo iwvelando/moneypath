@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"gopkg.in/yaml.v3"
@@ -110,6 +111,15 @@ func TestGrowthThatChangesNothingLeavesEveryCaseAlone(t *testing.T) {
 				{"0", "inflation"},
 			} {
 				got, gotCSV := runPlan(t, withGrowth(t, data, variant.rate, variant.growth), mf.Optimize)
+				if variant.rate == "3.0" {
+					// The rate alone changes no nominal figure; it adds the
+					// today's-dollars columns (spec chapter 05) and nothing else.
+					if gotCSV == wantCSV {
+						t.Errorf("inflation rate %q: the CSV has no today's-dollars columns", variant.rate)
+					}
+					gotCSV = withoutTodaysDollars(t, gotCSV)
+					got.InflationRate = 0
+				}
 				if gotCSV != wantCSV {
 					t.Errorf("inflation rate %q, growth %s: the CSV differs", variant.rate, variant.growth)
 				}
@@ -119,4 +129,27 @@ func TestGrowthThatChangesNothingLeavesEveryCaseAlone(t *testing.T) {
 			}
 		})
 	}
+}
+
+// withoutTodaysDollars drops a CSV's today's-dollars columns and renders the
+// rest as the engine renders a CSV (spec chapter 05).
+func withoutTodaysDollars(t *testing.T, s string) string {
+	t.Helper()
+	rows := parseCSV(t, s)
+	var b strings.Builder
+	for _, row := range rows {
+		first := true
+		for j, cell := range row {
+			if strings.Contains(rows[0][j], " dollars (") {
+				continue
+			}
+			if !first {
+				b.WriteByte(',')
+			}
+			first = false
+			b.WriteString(`"` + strings.ReplaceAll(cell, `"`, `""`) + `"`)
+		}
+		b.WriteByte('\n')
+	}
+	return b.String()
 }

@@ -1,17 +1,28 @@
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { FlipSubject } from '../config/choices';
-import { EngineError, type FlipComparison, type FlipRequest, type ForecastResults } from '../engine/types';
+import {
+  EngineError,
+  type FlipComparison,
+  type FlipRequest,
+  type ForecastResults,
+  type Reading,
+  type Readings,
+} from '../engine/types';
 import { Chart } from './Chart';
 import { BreakEven } from './Difference';
 import { GuardrailTable } from './Guardrails';
+import { inReading, pick } from './reading';
 
 interface FlipProps {
+  /** The run's results, in nominal dollars. */
   results: ForecastResults;
+  /** How to read the amounts; nominal by default. */
+  reading?: Reading;
   /** The scenario's position in the results. */
   scenario: number;
   subject: FlipSubject;
   /** Asks the engine for the flip, against the plan these results came from. */
-  run: (request: FlipRequest) => Promise<FlipComparison>;
+  run: (request: FlipRequest) => Promise<Readings<FlipComparison>>;
   /** Adds the flipped path to the plan; returns an explanation on refusal, otherwise null. */
   onKeep: (scenarioId: string, choiceId: string, optionId: string, name: string) => string | null;
 }
@@ -20,7 +31,7 @@ type Outcome =
   | { state: 'idle' }
   | { state: 'running' }
   | { state: 'failed'; message: string }
-  | { state: 'done'; flip: FlipComparison; kept: boolean; keepError: string | null };
+  | { state: 'done'; answer: Readings<FlipComparison>; kept: boolean; keepError: string | null };
 
 /**
  * One scenario with a single choice made differently, against the scenario
@@ -28,7 +39,7 @@ type Outcome =
  * The engine works the flipped path out; nothing here changes the plan
  * unless the reader keeps the path.
  */
-export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
+export function Flip({ results, reading = 'nominal', scenario, subject, run, onKeep }: FlipProps) {
   const base = useId();
   const [choiceId, setChoiceId] = useState('');
   const [optionId, setOptionId] = useState('');
@@ -75,8 +86,8 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
     }
     setOutcome({ state: 'running' });
     run({ scenario: scenarioName, choice: choice.name, option: picked.name }).then(
-      (flip) => {
-        if (request.current === mine) setOutcome({ state: 'done', flip, kept: false, keepError: null });
+      (answer) => {
+        if (request.current === mine) setOutcome({ state: 'done', answer, kept: false, keepError: null });
       },
       (error: unknown) => {
         if (request.current !== mine) return;
@@ -88,11 +99,15 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
     );
   };
 
-  const keep = (flip: FlipComparison) => {
+  const keep = (answer: Readings<FlipComparison>) => {
     if (!option) return;
-    const keepError = onKeep(subject.scenarioId, choice.id, option.id, flip.name);
-    setOutcome({ state: 'done', flip, kept: keepError === null, keepError });
+    const keepError = onKeep(subject.scenarioId, choice.id, option.id, answer.nominal.name);
+    setOutcome({ state: 'done', answer, kept: keepError === null, keepError });
   };
+
+  // The answer in the reading chosen; the months are the same in both.
+  const flip = outcome.state === 'done' ? pick(outcome.answer, reading) : null;
+  const metrics = inReading(results, reading).metrics;
 
   return (
     <section class="flip">
@@ -151,18 +166,18 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
             {outcome.message}
           </p>
         ) : null}
-        {outcome.state === 'done' && option ? (
+        {outcome.state === 'done' && flip && option ? (
           <>
             <dl class="difference__breakeven">
               <BreakEven
                 label="Total"
-                months={outcome.flip.total.breakEven.map((m) => ({ date: m.date, leader: m.flipped ? 0 : 1 }))}
-                scenarios={[outcome.flip.name, scenarioName]}
+                months={flip.total.breakEven.map((m) => ({ date: m.date, leader: m.flipped ? 0 : 1 }))}
+                scenarios={[flip.name, scenarioName]}
               />
               <BreakEven
                 label="Liquid"
-                months={outcome.flip.cash.breakEven.map((m) => ({ date: m.date, leader: m.flipped ? 0 : 1 }))}
-                scenarios={[outcome.flip.name, scenarioName]}
+                months={flip.cash.breakEven.map((m) => ({ date: m.date, leader: m.flipped ? 0 : 1 }))}
+                scenarios={[flip.name, scenarioName]}
               />
             </dl>
             <p class="difference__reading">
@@ -175,16 +190,16 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
               pathLabel="Path"
               nested
               paths={[
-                { name: scenarioName, guardrails: results.metrics[scenario]?.guardrails },
-                { name: outcome.flip.name, guardrails: outcome.flip.guardrails },
+                { name: scenarioName, guardrails: metrics[scenario]?.guardrails },
+                { name: flip.name, guardrails: flip.guardrails },
               ]}
             />
             <Chart
               dates={results.rows.map((row) => row.date)}
-              liquid={outcome.flip.cash.difference}
-              total={outcome.flip.total.difference}
-              scenarioName={outcome.flip.name}
-              subject={`of ${outcome.flip.name} minus ${scenarioName}`}
+              liquid={flip.cash.difference}
+              total={flip.total.difference}
+              scenarioName={flip.name}
+              subject={`of ${flip.name} minus ${scenarioName}`}
             />
             <div class="flip__keep">
               {/* Kept, the button stays where the focus is but no longer acts. */}
@@ -193,7 +208,7 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
                 class="btn btn--small"
                 aria-disabled={outcome.kept ? 'true' : undefined}
                 onClick={() => {
-                  if (!outcome.kept) keep(outcome.flip);
+                  if (!outcome.kept) keep(outcome.answer);
                 }}
               >
                 {outcome.kept ? 'Kept as a scenario' : 'Keep as a scenario'}
@@ -201,7 +216,7 @@ export function Flip({ results, scenario, subject, run, onKeep }: FlipProps) {
               <p role="status">
                 {outcome.kept
                   ? 'Added to your plan. Run the forecast again to see it beside the others.'
-                  : `Adds “${outcome.flip.name}” to your plan. Until then this comparison changes nothing.`}
+                  : `Adds “${flip.name}” to your plan. Until then this comparison changes nothing.`}
               </p>
               {/* Beside what the button does, never in place of it. */}
               {outcome.keepError ? (

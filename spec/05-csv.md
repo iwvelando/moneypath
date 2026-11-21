@@ -8,9 +8,10 @@ The web app's "Download CSV" serves this text exactly as the engine renders it (
 
 ## Format (normative — conformance fixtures match byte-for-byte)
 
-All fields double-quoted. Dates ascending. One column triple per scenario, ordered as
-scenarios appear in the config (inactive scenarios omitted entirely). A scenario defined
-by a `select` is a column triple like any other; choices and options do not appear:
+All fields double-quoted. Dates ascending. One column triple per scenario (five columns
+with today's dollars, below), ordered as scenarios appear in the config (inactive
+scenarios omitted entirely). A scenario defined by a `select` is a column triple like
+any other; choices and options do not appear:
 
 ```
 "date","liquid (<scenario1>)","total (<scenario1>)","notes (<scenario1>)",…
@@ -24,6 +25,18 @@ by a `select` is a column triple like any other; choices and options do not appe
 - A date some scenario lacks (different simulation spans cannot happen in v2 — all
   scenarios share the window — but defensive rendering uses `""`).
 - Rows end with `\n`, including the last.
+- **Today's dollars.** When the plan's `simulation.inflationRate` is set and not 0,
+  each scenario has five columns rather than three: liquid and total in today's dollars
+  (chapter 04 §12) follow its total, before its notes. Their headers name the plan's
+  start month, the month whose prices they hold, as `YYYY-MM`:
+
+  ```
+  "date","liquid (Base)","total (Base)","liquid in 2026-06 dollars (Base)","total in 2026-06 dollars (Base)","notes (Base)",…
+  "2026-06","25020.00","75528.33","25020.00","75528.33","…",…
+  ```
+
+  The nominal columns and their headers are the same as without the rate. A plan whose
+  rate is absent or 0 has no such columns.
 - If there are no results, the CSV is just the literal header
   `Date,Scenario,Liquid,Total,Notes`.
 

@@ -79,8 +79,10 @@ func runOptimized(cfg *config.Config, opts Options) (*Result, error) {
 // forecast, and floor and minCash are the guardrail's floor and its balance
 // at the tightest month (zero for a debtFree, which has no dollar floor).
 type evalResult struct {
-	feasible  bool
-	minCash   float64
+	feasible bool
+	minCash  float64
+	// minMonth is the index of the month minCash is read at.
+	minMonth  int
 	floor     float64
 	headroom  float64
 	guardrail *GuardrailResult
@@ -147,6 +149,7 @@ func optimizeTarget(cfg *config.Config, opts Options, scIdx, evIdx int) (*Optimi
 	report := func(e evalResult) {
 		sum.Floor = e.floor
 		sum.MinimumCash = e.minCash
+		sum.MinimumCashMonth = cfg.Simulation.ResolvedStart + config.Month(e.minMonth)
 		sum.Headroom = e.headroom
 		sum.Guardrail = e.guardrail
 	}
@@ -261,17 +264,23 @@ func feasibility(liquid []float64, floor float64) evalResult {
 		}
 	}
 	if first < 0 {
-		min := math.Inf(1)
-		for _, v := range liquid {
-			min = math.Min(min, v)
-		}
-		return evalResult{feasible: false, minCash: min, floor: floor, headroom: min - floor}
+		min, at := least(liquid, 0)
+		return evalResult{feasible: false, minCash: min, minMonth: at, floor: floor, headroom: min - floor}
 	}
-	min := math.Inf(1)
-	for _, v := range liquid[first:] {
+	min, at := least(liquid, first)
+	return evalResult{feasible: round2(min) >= centFloor, minCash: min, minMonth: at, floor: floor, headroom: min - floor}
+}
+
+// least is the minimum of series[from:] and the earliest index holding it.
+func least(series []float64, from int) (float64, int) {
+	min, at := math.Inf(1), from
+	for i, v := range series[from:] {
+		if v < min {
+			at = from + i
+		}
 		min = math.Min(min, v)
 	}
-	return evalResult{feasible: round2(min) >= centFloor, minCash: min, floor: floor, headroom: min - floor}
+	return min, at
 }
 
 // guardrailFeasibility holds a candidate's path to a guardrail: feasible iff
@@ -283,6 +292,7 @@ func guardrailFeasibility(g *config.Guardrail, start config.Month, path *Scenari
 	e := evalResult{feasible: r.Result == GuardrailHolds, guardrail: &r}
 	if balance, ok := guardrailBalance(g, start, path); ok && r.HasTightest {
 		e.floor, e.minCash, e.headroom = guardrailFloor(g, start, r.Tightest), balance(r.Tightest), r.Margin
+		e.minMonth = int(r.Tightest - start)
 	}
 	return e
 }

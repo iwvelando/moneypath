@@ -12,15 +12,18 @@ export interface MonthlyRow {
 interface MonthlyTableProps {
   rows: MonthlyRow[];
   scenarioName: string;
+  /** The run the rows came from; a new one starts closed. Without it, new rows do. */
+  run?: unknown;
 }
 
-export function MonthlyTable({ rows, scenarioName }: MonthlyTableProps) {
+export function MonthlyTable({ rows, scenarioName, run }: MonthlyTableProps) {
   const id = useId();
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const hasNotes = rows.some((row) => row.notes.length > 0);
 
-  // A fresh run starts closed; ResultsView also keys this table by scenario.
-  useEffect(() => setExpanded(new Set()), [rows]);
+  // A fresh run starts closed, while another reading of the same run keeps
+  // what is open; ResultsView also keys this table by scenario.
+  useEffect(() => setExpanded(new Set()), [run ?? rows]);
 
   const toggle = (date: string) => {
     setExpanded((current) => {

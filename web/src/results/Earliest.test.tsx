@@ -2,7 +2,14 @@ import { render } from 'preact';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { EarliestSubject } from '../config/earliest';
-import { EngineError, type EarliestAnswer, type EarliestRequest, type ForecastResults } from '../engine/types';
+import {
+  EngineError,
+  type EarliestAnswer,
+  type EarliestRequest,
+  type ForecastResults,
+  type Reading,
+  type Readings,
+} from '../engine/types';
 import { Earliest } from './Earliest';
 
 let host: HTMLDivElement;
@@ -78,9 +85,14 @@ const found: EarliestAnswer = {
 
 type Run = (request: EarliestRequest) => Promise<EarliestAnswer>;
 
-function show(run: Run, data: ForecastResults = results): void {
+function show(run: Run, data: ForecastResults = results, reading: Reading = 'nominal', today: EarliestAnswer | null = null): void {
+  const both = (request: EarliestRequest): Promise<Readings<EarliestAnswer>> =>
+    run(request).then((nominal) => ({ nominal, today }));
   act(() => {
-    render(<Earliest results={data} scenario={0} subject={subject} guardrails={guardrails} run={run} />, host);
+    render(
+      <Earliest results={data} reading={reading} scenario={0} subject={subject} guardrails={guardrails} run={both} />,
+      host,
+    );
   });
 }
 
@@ -231,5 +243,26 @@ describe('the earliest month', () => {
       await Promise.resolve();
     });
     expect(text()).toContain('Earliest month: 2026-03');
+  });
+});
+
+describe('the earliest month read in today’s dollars', () => {
+  const today: EarliestAnswer = {
+    ...found,
+    decidedBy: [{ ...found.decidedBy![0]!, margin: -7.5 }],
+    atEarliest: [{ ...found.atEarliest![0]!, margin: 3.95 }, found.atEarliest![1]!],
+  };
+
+  it('shows the amounts of the reading chosen beside the same months, without asking again', async () => {
+    const run = vi.fn<Run>(() => Promise.resolve(found));
+    show(run, results, 'nominal', today);
+    await find();
+    expect(text()).toContain('Tightest 2026-04, $7.75 short');
+    show(run, results, 'today', today);
+    expect(run).toHaveBeenCalledTimes(1);
+    expect(text()).toContain('Earliest month: 2026-02');
+    expect(text()).toContain('Tightest 2026-04, $7.50 short');
+    expect(text()).not.toContain('$7.75');
+    expect(text()).toContain('$3.95');
   });
 });

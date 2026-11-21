@@ -443,6 +443,33 @@ p {
   outline-offset: 1px;
 }
 
+/* The results' reading: each option is an outlined button, so the one not
+   chosen reads as something to press, and the chosen one takes the accent. */
+.segmented.results__reading {
+  gap: 6px;
+  padding: 0;
+  border: 0;
+}
+
+.segmented.results__reading label {
+  padding: 6px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.82rem;
+}
+
+.segmented.results__reading label:hover:not(.is-active) {
+  background: var(--surface-3);
+}
+
+.segmented.results__reading label.is-active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  font-weight: 600;
+}
+
 /* -------------------------------------------------------------- messages */
 
 .confirm {

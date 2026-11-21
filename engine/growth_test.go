@@ -340,6 +340,9 @@ scenarios:
 		{", inflationRate: 0", ", growth: fixed"},
 	} {
 		got := runDoc(t, plan(variant[0], variant[1]))
+		// The result records the rate, which only today's dollars read
+		// (chapter 04 §12); every nominal figure must be the same.
+		got.InflationRate = 0
 		if !reflect.DeepEqual(got, want) {
 			t.Errorf("%v: the results differ from fixed", variant)
 		}

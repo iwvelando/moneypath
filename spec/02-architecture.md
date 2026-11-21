@@ -181,6 +181,9 @@ Each entry has:
                               "margin": -7.75}],
                "atEarliest": [{"name": "Cushion", "kind": "cashFloor", "result": "holds",
                                "tightestDate": "2028-04", "margin": 4.09}, …]},
+  "todaysDollars": {"today": "2025-06",
+                    "rows": […], "metrics": […], "comparisons": […],
+                    "flip": {…}, "earliest": {…}},
   "warnings": ["…validation warnings…"],
   "configYaml": "…the config as run (reflects optimizer adjustments when enabled)…"
 }
@@ -274,6 +277,18 @@ for `startDate`/`endDate` — and the `…Display` strings are those same number
 for a reader (`YYYY-MM` for the date fields). A consumer that needs to write a chosen
 value back into a config reads `value` for `amount` and `frequency`, and `valueDisplay`
 for the date fields.
+
+`todaysDollars` is present only when the plan's `simulation.inflationRate` is set and
+not 0, and the results are otherwise exactly what the same run reports without it. It
+reads the run in today's dollars (chapter 04 §12). `today` is the plan's start month, the
+month whose prices it holds, as a `YYYY-MM` string. `rows`, `metrics`, `comparisons`,
+`flip` and `earliest` have the shapes of the top-level fields of the same names, and
+`flip` and `earliest` are present under the same rules. Each repeats its top-level
+counterpart exactly, every date, result, month count, break-even month, note,
+emergency-fund figure and optimizer value included, except for the amounts that chapter 04 §12
+converts: `liquid` and `total`, each `difference`, the `keyFigures` (with
+`lowestCashDate` read from the converted series), a guardrail's `margin` and `owed`, and
+an optimization's `floor`, `minimumCash` and `headroom`.
 
 ## Determinism (normative)
 
