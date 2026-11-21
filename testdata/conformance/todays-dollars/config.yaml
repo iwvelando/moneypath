@@ -1,0 +1,54 @@
+# Today's dollars (spec chapter 04 §12; chapter 05). A plan with an inflation
+# rate of 3 % that grows nothing, so every nominal figure is what it would be
+# without the rate, and the CSV gains each scenario's liquid and total in the
+# start month's prices.
+version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2028-12
+  startingCash: 25000.00
+  inflationRate: 3.0
+recommendations:
+  emergencyFundMonths: 3
+guardrails:
+  - name: Cushion
+    kind: cashFloor
+    amount: 24000.00
+    growth: inflation
+  - name: Car gone by mid-2028
+    kind: debtFree
+    loans: [Car]
+    startDate: 2028-06
+common:
+  events:
+    - name: Salary
+      amount: 4000.00
+    - name: Living
+      amount: -4000.00
+scenarios:
+  - name: steady
+  - name: bonus later
+    events:
+      - name: Trip
+        amount: -3000.00
+        startDate: 2026-03
+        endDate: 2026-03
+      - name: Bonus
+        amount: 5000.00
+        startDate: 2027-06
+        endDate: 2027-06
+  - name: car
+    loans:
+      - name: Car
+        principal: 12000.00
+        interestRate: 0
+        term: 48
+        startDate: 2026-01
+    events:
+      - name: Car budget
+        amount: 250.00
+  - name: spend
+    events:
+      - name: Fun
+        amount: -100.00
+        optimize: {field: amount, min: -1000, max: 0}

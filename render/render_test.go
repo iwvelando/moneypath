@@ -69,3 +69,38 @@ func TestCSVNeverPrintsNegativeZero(t *testing.T) {
 		t.Errorf("CSV = %q, want %q", got, want)
 	}
 }
+
+// Spec chapter 05, today's dollars: with an inflation rate, each scenario's
+// liquid and total in the start month's prices follow its total, under
+// headers that name that month.
+func TestCSVTodaysDollarsColumns(t *testing.T) {
+	start, _ := config.ParseMonth("2026-06")
+	res := &engine.Result{
+		Start:         start,
+		End:           start + 12,
+		InflationRate: 3,
+		Scenarios: []*engine.ScenarioResult{{
+			Name:   "Base",
+			Liquid: make([]float64, 13),
+			Total:  make([]float64, 13),
+			Notes:  make([][]string, 13),
+		}},
+	}
+	res.Scenarios[0].Liquid[0], res.Scenarios[0].Total[0] = 1000, 2000
+	res.Scenarios[0].Liquid[12], res.Scenarios[0].Total[12] = 1030, 2060
+	res.Scenarios[0].Notes[12] = []string{"a note"}
+	lines := strings.Split(CSV(res), "\n")
+	for i, want := range map[int]string{
+		0:  `"date","liquid (Base)","total (Base)","liquid in 2026-06 dollars (Base)","total in 2026-06 dollars (Base)","notes (Base)"`,
+		1:  `"2026-06","1000.00","2000.00","1000.00","2000.00",""`,
+		13: `"2027-06","1030.00","2060.00","1000.00","2000.00","a note"`,
+	} {
+		if lines[i] != want {
+			t.Errorf("line %d = %s, want %s", i, lines[i], want)
+		}
+	}
+	res.InflationRate = 0
+	if got := CSV(res); strings.Contains(got, "dollars") {
+		t.Errorf("a rate of 0 has today's-dollars columns:\n%s", got)
+	}
+}

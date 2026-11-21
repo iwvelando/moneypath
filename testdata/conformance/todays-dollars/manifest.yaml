@@ -1,0 +1,71 @@
+description: >
+  Today's dollars, in a plan with an inflation rate of 3 % that grows nothing,
+  so every nominal figure is what the plan computes without the rate. Each
+  scenario's columns gain liquid and total in 2026-01 dollars. "steady" keeps
+  $25,000.00 in cash throughout: nominal, its lowest cash is in the start
+  month, and in today's dollars it is in the last. "bonus later" is lowest
+  nominally in 2026-03 and in today's dollars in 2027-05, the month before the
+  bonus, and it overtakes "steady" in 2027-06 in both readings. A cash floor
+  that tracks inflation breaks in 2028-01, when its margin is converted at
+  that anniversary. The car's debt-free breaks in 2028-06 with $4,500.00 owed,
+  converted at that month. The optimizer's emergency-fund target on "spend"
+  converts its floor, lowest cash and headroom at the month of that lowest
+  cash, the last month, and keeps its chosen amount as written. The
+  emergency-fund figures read the same in both.
+normative: true
+optimize: true
+tolerance: 0.01
+expectedMetrics:
+  - scenario: steady
+    keyFigures: {lowestCash: 25000.00, lowestCashDate: "2026-01", endingCash: 25000.00, endingTotal: 25000.00}
+    guardrails:
+      - {name: Cushion, kind: cashFloor, result: breaks, firstBreachDate: "2028-01", tightestDate: "2028-01", margin: -461.60}
+      - {name: Car gone by mid-2028, kind: debtFree, result: holds, tightestDate: "2026-01", marginMonths: 29}
+    todaysDollars:
+      keyFigures: {lowestCash: 22934.9661, lowestCashDate: "2028-12", endingCash: 22934.9661, endingTotal: 22934.9661}
+      emergencyFund: {targetMonths: 3, averageMonthlyExpenses: 4000.00, targetAmount: 12000.00, initialLiquid: 25000.00, fundedMonths: 6.25, shortfall: 0, surplus: 13000.00}
+      guardrails:
+        - {name: Cushion, kind: cashFloor, result: breaks, firstBreachDate: "2028-01", tightestDate: "2028-01", margin: -435.1023}
+        - {name: Car gone by mid-2028, kind: debtFree, result: holds, tightestDate: "2026-01", marginMonths: 29}
+  - scenario: bonus later
+    keyFigures: {lowestCash: 22000.00, lowestCashDate: "2026-03", endingCash: 27000.00, endingTotal: 27000.00}
+    guardrails:
+      - {name: Cushion, kind: cashFloor, result: breaks, firstBreachDate: "2026-03", tightestDate: "2027-01", margin: -2720.00}
+      - {name: Car gone by mid-2028, kind: debtFree, result: holds, tightestDate: "2026-01", marginMonths: 29}
+    todaysDollars:
+      keyFigures: {lowestCash: 21149.8057, lowestCashDate: "2027-05", endingCash: 24769.7634, endingTotal: 24769.7634}
+      guardrails:
+        - {name: Cushion, kind: cashFloor, result: breaks, firstBreachDate: "2026-03", tightestDate: "2027-01", margin: -2640.7767}
+        - {name: Car gone by mid-2028, kind: debtFree, result: holds, tightestDate: "2026-01", marginMonths: 29}
+  - scenario: car
+    keyFigures: {lowestCash: 25000.00, lowestCashDate: "2026-01", endingCash: 25000.00, endingTotal: 25000.00}
+    guardrails:
+      - {name: Cushion, kind: cashFloor, result: breaks, firstBreachDate: "2028-01", tightestDate: "2028-01", margin: -461.60}
+      - {name: Car gone by mid-2028, kind: debtFree, result: breaks, firstBreachDate: "2028-06", owed: 4500.00}
+    todaysDollars:
+      guardrails:
+        - {name: Cushion, kind: cashFloor, result: breaks, firstBreachDate: "2028-01", tightestDate: "2028-01", margin: -435.1023}
+        - {name: Car gone by mid-2028, kind: debtFree, result: breaks, firstBreachDate: "2028-06", owed: 4189.7607}
+  - scenario: spend
+    keyFigures: {lowestCash: 13000.12, lowestCashDate: "2028-12", endingCash: 13000.12, endingTotal: 13000.12}
+    emergencyFund: {targetMonths: 3, averageMonthlyExpenses: 4333.33, targetAmount: 12999.99, initialLiquid: 25000.00, fundedMonths: 5.7692, shortfall: 0, surplus: 12000.01}
+    optimizations:
+      - {targetName: Fun, field: amount, original: -100, value: -333.33, originalDisplay: "-$100.00", valueDisplay: "-$333.33",
+         floor: 12999.99, minimumCash: 13000.12, headroom: 0.13, iterations: 17, converged: true}
+    todaysDollars:
+      keyFigures: {lowestCash: 11926.2925, lowestCashDate: "2028-12", endingCash: 11926.2925, endingTotal: 11926.2925}
+      emergencyFund: {targetMonths: 3, averageMonthlyExpenses: 4333.33, targetAmount: 12999.99, initialLiquid: 25000.00, fundedMonths: 5.7692, shortfall: 0, surplus: 12000.01}
+      optimizations:
+        - {targetName: Fun, field: amount, original: -100, value: -333.33, originalDisplay: "-$100.00", valueDisplay: "-$333.33",
+           floor: 11926.1732, minimumCash: 11926.2925, headroom: 0.1193, iterations: 17, converged: true}
+expectedComparisons:
+  - scenario: bonus later
+    against: steady
+    cash:
+      breakEven:
+        - {date: "2027-06", leader: bonus later}
+      endingDifference: 2000.00
+    total:
+      breakEven:
+        - {date: "2027-06", leader: bonus later}
+      endingDifference: 2000.00

@@ -88,6 +88,9 @@ type scenarioMetric struct {
 	// Guardrails, when given, is the scenario's complete list of guardrail
 	// results (spec chapter 04 §10).
 	Guardrails []guardrailMetric `yaml:"guardrails"`
+	// TodaysDollars pins the scenario read in today's dollars (spec chapter 04
+	// §12), by the same rules.
+	TodaysDollars *scenarioMetric `yaml:"todaysDollars"`
 }
 
 type guardrailMetric struct {
@@ -185,6 +188,19 @@ func runCase(t *testing.T, dir string) {
 	}
 	compareCSV(t, string(wantBytes), got, mf.Tolerance)
 	compareMetrics(t, mf.ExpectedMetrics, res)
+	today := res.Deflator().Result(res)
+	for _, wm := range mf.ExpectedMetrics {
+		if wm.TodaysDollars == nil {
+			continue
+		}
+		if today == nil {
+			t.Errorf("scenario %q: today's dollars pinned, but the plan has no inflation rate", wm.Scenario)
+			continue
+		}
+		in := *wm.TodaysDollars
+		in.Scenario = wm.Scenario
+		t.Run("todaysDollars", func(t *testing.T) { compareMetrics(t, []scenarioMetric{in}, today) })
+	}
 	compareComparisons(t, mf.ExpectedComparisons, res, string(wantBytes), mf.Tolerance)
 	for i, want := range mf.Earliest {
 		compareEarliest(t, fmt.Sprintf("earliest %d", i), cdata, now, mf.Optimize, want)
@@ -272,6 +288,11 @@ func compareComparisons(t *testing.T, want []pairComparison, res *engine.Result,
 		index[sc.Name] = i
 	}
 	rows := parseCSV(t, wantCSV)
+	// Three columns a scenario, or five with today's dollars (spec chapter 05).
+	stride := 3
+	if len(res.Scenarios) > 0 {
+		stride = (len(rows[0]) - 1) / len(res.Scenarios)
+	}
 	for _, wp := range want {
 		pair := wp.Scenario + " minus " + wp.Against
 		a, aok := index[wp.Scenario]
@@ -281,6 +302,24 @@ func compareComparisons(t *testing.T, want []pairComparison, res *engine.Result,
 			continue
 		}
 		got := res.Compare(res.Scenarios[a], res.Scenarios[b])
+		if d := res.Deflator(); d != nil {
+			// Read in today's dollars: the same break-even months, and the
+			// differences of the today's-dollars columns (spec chapter 08).
+			today := d.Comparison(got)
+			for _, s := range []struct {
+				name           string
+				nominal, today engine.SeriesComparison
+				column         int
+			}{
+				{"cash", got.Cash, today.Cash, 3},
+				{"total", got.Total, today.Total, 4},
+			} {
+				if !reflect.DeepEqual(s.nominal.BreakEven, s.today.BreakEven) {
+					t.Errorf("%s: %s break-even in today's dollars %v, nominal %v", pair, s.name, s.today.BreakEven, s.nominal.BreakEven)
+				}
+				compareDifferences(t, pair+" in today's dollars", s.name, s.today.Difference, rows, a, b, stride, s.column, tol)
+			}
+		}
 		for _, series := range []struct {
 			name   string
 			want   *seriesComparison
@@ -314,19 +353,30 @@ func compareComparisons(t *testing.T, want []pairComparison, res *engine.Result,
 			if last := diff[len(diff)-1]; math.Abs(last-series.want.EndingDifference) > 0.01 {
 				t.Errorf("%s: %s endingDifference want %.4f, got %.4f", pair, series.name, series.want.EndingDifference, last)
 			}
-			for i, d := range diff {
-				row := rows[i+1]
-				av, aerr := strconv.ParseFloat(row[a*3+series.column], 64)
-				bv, berr := strconv.ParseFloat(row[b*3+series.column], 64)
-				if aerr != nil || berr != nil {
-					t.Errorf("%s: %s in %s: non-numeric expected.csv cell", pair, series.name, row[0])
-					continue
-				}
-				// Each of the two cells may be off by the tolerance.
-				if math.Abs(d-(av-bv)) > 2*tol {
-					t.Errorf("%s: %s in %s: want %.2f, got %.4f", pair, series.name, row[0], av-bv, d)
-				}
-			}
+			compareDifferences(t, pair, series.name, diff, rows, a, b, stride, series.column, tol)
+		}
+	}
+}
+
+// compareDifferences checks every month's difference against the difference
+// of the two scenarios' expected.csv cells at the given column offset.
+func compareDifferences(t *testing.T, pair, name string, diff []float64, rows [][]string, a, b, stride, column int, tol float64) {
+	t.Helper()
+	if len(diff) != len(rows)-1 {
+		t.Errorf("%s: %s difference has %d months, expected.csv has %d", pair, name, len(diff), len(rows)-1)
+		return
+	}
+	for i, d := range diff {
+		row := rows[i+1]
+		av, aerr := strconv.ParseFloat(row[a*stride+column], 64)
+		bv, berr := strconv.ParseFloat(row[b*stride+column], 64)
+		if aerr != nil || berr != nil {
+			t.Errorf("%s: %s in %s: non-numeric expected.csv cell", pair, name, row[0])
+			continue
+		}
+		// Each of the two cells may be off by the tolerance.
+		if math.Abs(d-(av-bv)) > 2*tol {
+			t.Errorf("%s: %s in %s: want %.2f, got %.4f", pair, name, row[0], av-bv, d)
 		}
 	}
 }
@@ -355,10 +405,10 @@ func compareCSV(t *testing.T, want, got string, tol float64) {
 		}
 		for j := range wrows[i] {
 			w, g := wrows[i][j], grows[i][j]
-			// Numeric cells (liquid/total, i.e. data-row columns j%3 in
-			// {1,2}) compare as parsed values within tolerance; everything
-			// else — header, dates, notes — compares exactly.
-			if i > 0 && j > 0 && j%3 != 0 {
+			// Numeric cells (every data-row cell but the date and the notes)
+			// compare as parsed values within tolerance; everything else —
+			// header, dates, notes — compares exactly.
+			if i > 0 && j > 0 && !strings.HasPrefix(wrows[0][j], "notes (") {
 				wf, werr := strconv.ParseFloat(w, 64)
 				gf, gerr := strconv.ParseFloat(g, 64)
 				if werr != nil || gerr != nil {
