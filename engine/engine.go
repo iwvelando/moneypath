@@ -176,18 +176,18 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 
 	var loans []*loanSim
 	for _, l := range own.Loans {
-		loans = append(loans, buildLoanSchedule(l, end))
+		loans = append(loans, buildLoanSchedule(l, start, end))
 	}
 	for _, l := range shared.Loans {
-		loans = append(loans, buildLoanSchedule(l, end))
+		loans = append(loans, buildLoanSchedule(l, start, end))
 	}
 
 	var invs []*invSim
 	for _, inv := range own.Investments {
-		invs = append(invs, newInvSim(inv, "scenario"))
+		invs = append(invs, newInvSim(inv, "scenario", start))
 	}
 	for _, inv := range shared.Investments {
-		invs = append(invs, newInvSim(inv, "common"))
+		invs = append(invs, newInvSim(inv, "common", start))
 	}
 
 	sr.Owed = make(map[string][]float64, len(loans))
@@ -222,9 +222,11 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		negEvents := 0.0
 		for _, ev := range events {
 			if ev.OccursAt(m) {
-				eventDelta += *ev.Amount
-				if *ev.Amount < 0 {
-					negEvents += -*ev.Amount
+				// Grown from the plan's start (§2.1).
+				amount := ev.AmountAt(start, m)
+				eventDelta += amount
+				if amount < 0 {
+					negEvents += -amount
 				}
 			}
 		}

@@ -46,7 +46,7 @@ conformance fixtures natively.
 
 ```sh
 make preview-lan              # builds, then serves web/dist/ on port 4180
-make preview-lan PREVIEW_PORT=4190
+make preview-lan PREVIEW_PORT=4193
 ```
 
 It serves the production build, under the production Content-Security-Policy, to
@@ -58,6 +58,11 @@ always is, and Safari runs WebAssembly several times slower without one.
 
 The port stays clear of 4181, which the browser tests use, so a preview can stay up
 while they run. Stop it with Ctrl-C when the phone check is done.
+
+When 4180 is taken, pick another port a browser will open. Browsers refuse a list of
+restricted ports, mostly those of other services, and say only that the page could
+not be opened. Safari refuses 4190, and Chromium and Safari both refuse 4045, 6000,
+6665–6669 and 10080, among others. 4193 is not restricted.
 
 ## Tests
 

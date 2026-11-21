@@ -61,6 +61,10 @@ func Check(cfg *Config, now Month) []Problem {
 	if sim.CashInterestRate < 0 {
 		c.fail("simulation.cashInterestRate", "The cash interest rate must be at least 0.")
 	}
+	c.inflation = sim.InflationRate
+	if !(sim.InflationRate > -100) || math.IsInf(sim.InflationRate, 0) {
+		c.fail("simulation.inflationRate", "The inflation rate must be more than -100.")
+	}
 
 	// Recommendations.
 	cfg.ResolvedEmergencyFundMonths = 6
@@ -177,6 +181,29 @@ type checker struct {
 	// windowed holds the guardrails whose window is known and in order,
 	// so that it can be held against the simulation's months.
 	windowed map[*Guardrail]bool
+	// inflation is the plan's inflation rate, which a growth of inflation
+	// follows.
+	inflation float64
+}
+
+// growth checks a growth or an escrow growth at path, whose label in the app
+// is label, and resolves it against the plan's inflation rate (spec chapter
+// 03, Growth). unused, when set, is why a growth written there has no effect.
+func (c *checker) growth(g *Growth, path, label, unused string) {
+	g.resolve(c.inflation)
+	if g.Fixed() {
+		return
+	}
+	switch {
+	case g.invalid != nil || math.IsNaN(*g.rateOr0()) || math.IsInf(*g.rateOr0(), 0):
+		c.fail(path, "%s must be fixed, inflation or a yearly rate in percent, such as 3.", label)
+	case g.rate != nil && *g.rate <= -100:
+		c.fail(path, "The yearly growth must be more than -100.")
+	case unused != "":
+		c.warn(path, "%s", unused)
+	case g.inflation && c.inflation == 0:
+		c.warn(path, "This follows the plan’s inflation rate, which is 0, so it stays the same.")
+	}
 }
 
 func (c *checker) fail(path, format string, args ...any) {
@@ -309,6 +336,14 @@ func (c *checker) guardrails(guardrails []*Guardrail, plan planNames) {
 		default:
 			c.fail(at("kind"), "“%s” is not a kind of guardrail. Use cashFloor, debtFree or lasts.", g.Kind)
 		}
+		unused := ""
+		switch {
+		case g.Kind == GuardrailDebtFree:
+			unused = "A debt-free guardrail does not use growth, so this has no effect."
+		case g.Kind == GuardrailLasts && g.Amount == nil:
+			unused = "Growth applies to the amount, and this guardrail has none, so this has no effect."
+		}
+		c.growth(&g.Growth, at("growth"), "Growth", unused)
 
 		start, haveStart := c.start, c.window
 		if g.StartDate != "" {
@@ -372,6 +407,7 @@ func (c *checker) event(ev *Event, path, noOptimize string) {
 	if ev.Percentage != nil {
 		c.fail(join(path, "percentage"), "A percentage can only be used on an investment’s withdrawal.")
 	}
+	c.growth(&ev.Growth, join(path, "growth"), "Growth", "")
 	c.schedule(ev, path)
 	if ev.Optimize != nil {
 		if noOptimize != "" {
@@ -437,6 +473,7 @@ func (c *checker) payment(ev *Event, path string) {
 	if ev.Percentage != nil {
 		c.fail(join(path, "percentage"), "A percentage cannot be used here.")
 	}
+	c.growth(&ev.Growth, join(path, "growth"), "Growth", "")
 	if ev.Optimize != nil {
 		c.fail(join(path, "optimize"), "An optimizer cannot be used here.")
 	}
@@ -467,6 +504,11 @@ func (c *checker) loan(l *Loan, path string) {
 	if l.Escrow < 0 {
 		c.fail(at("escrow"), "The escrow must be at least 0.")
 	}
+	noEscrow := ""
+	if l.Escrow == 0 {
+		noEscrow = "There is no escrow to grow, so this has no effect."
+	}
+	c.growth(&l.EscrowGrowth, at("escrowGrowth"), "Escrow growth", noEscrow)
 	if l.MortgageInsurance < 0 {
 		c.fail(at("mortgageInsurance"), "The mortgage insurance must be at least 0.")
 	}
@@ -549,6 +591,11 @@ func (c *checker) investment(inv *Investment, path string) {
 				c.fail(join(p, "percentage"), "The percentage must be more than 0.")
 			}
 		}
+		byPercentage := ""
+		if !hasAmount && hasPct {
+			byPercentage = "A percentage withdrawal already follows the balance, so growth has no effect."
+		}
+		c.growth(&ev.Growth, join(p, "growth"), "Growth", byPercentage)
 		if ev.Optimize != nil {
 			c.fail(join(p, "optimize"), "An optimizer cannot be used here.")
 		}

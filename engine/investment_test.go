@@ -21,7 +21,7 @@ func TestGrowthBeforeContribution(t *testing.T) {
 	iv := newInvSim(&config.Investment{
 		Name: "A", StartingValue: 1200, AnnualReturnRate: 12,
 		Contributions: []*config.Event{simpleEvent(t, 600, "2025-02", "2025-02", 1)},
-	}, "scenario")
+	}, "scenario", 0)
 	res := iv.processMonth(month(t, "2025-02"))
 	// growth = 1200 * 0.01 = 12 (not (1200+600)*0.01 = 18)
 	wantValue := 1200 + 12 + 600.0
@@ -40,7 +40,7 @@ func TestWithdrawalGrowthFirst(t *testing.T) {
 		Name: "B", StartingValue: 1000, AnnualReturnRate: 12,
 		TaxRate: 25, WithdrawalTaxRate: 10,
 		Withdrawals: []*config.Event{simpleEvent(t, 500, "2025-01", "2025-01", 1)},
-	}, "common")
+	}, "common", 0)
 	res := iv.processMonth(month(t, "2025-01"))
 	// growth 10, tax 2.5, afterTax 7.5 → value 1007.5, growthBalance 7.5.
 	// withdrawal 500: fromGrowth 7.5, fromBasis 492.5; wTax = 0.75.
@@ -65,7 +65,7 @@ func TestPercentageWithdrawal(t *testing.T) {
 	ev.ResolvedEnd = month(t, "2030-01")
 	iv := newInvSim(&config.Investment{
 		Name: "C", StartingValue: 10000, Withdrawals: []*config.Event{ev},
-	}, "scenario")
+	}, "scenario", 0)
 	res := iv.processMonth(month(t, "2025-01"))
 	if math.Abs(res.netWithdrawal-400) > 1e-9 {
 		t.Errorf("net withdrawal = %.4f, want 400 (4%% of 10000)", res.netWithdrawal)
@@ -81,7 +81,7 @@ func TestPercentageWithdrawal(t *testing.T) {
 func TestNegativeGrowthShiftsToBasis(t *testing.T) {
 	iv := newInvSim(&config.Investment{
 		Name: "D", StartingValue: 1200, AnnualReturnRate: -12,
-	}, "scenario")
+	}, "scenario", 0)
 	iv.processMonth(month(t, "2025-01"))
 	if iv.growthBalance != 0 {
 		t.Errorf("growthBalance = %.4f, want 0", iv.growthBalance)
@@ -99,7 +99,7 @@ func TestNegativeGrowthShiftsToBasis(t *testing.T) {
 func TestPayoffFundingWithdrawal(t *testing.T) {
 	iv := newInvSim(&config.Investment{
 		Name: "E", StartingValue: 0, WithdrawalTaxRate: 20, FundLoanPayoffs: true,
-	}, "scenario")
+	}, "scenario", 0)
 	iv.value, iv.basis, iv.growthBalance = 1000, 600, 400
 	// nlv = 1000 − 0.2·min(1000,400) = 920.
 	if math.Abs(iv.netLiquidationValue()-920) > 1e-9 {

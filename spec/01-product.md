@@ -12,7 +12,10 @@ The simulator steps month by month from a start date to an end date and reports,
 scenario, the **liquid** balance (cash) and **total** net worth (cash + investments) at
 every month, plus notes about notable happenings (loan payoffs, withdrawals, etc.).
 Cash can earn interest at one plan-wide rate — 0% by default, the worst case of a
-non-interest-bearing account, or higher to model a high-yield savings account.
+non-interest-bearing account, or higher to model a high-yield savings account. Amounts
+are written in the start month's prices, and each can stay fixed, grow with one
+plan-wide inflation rate or grow at its own yearly rate, so a plan that runs for decades
+can let income and costs rise.
 
 The more faithfully the user describes their events, the more useful the projection. The
 tool is a deterministic best-guess guide, not a Monte Carlo engine or a financial-advice
@@ -51,7 +54,8 @@ Out of scope (design must not preclude them, but build none of them):
 - Accounts, authentication, server-side persistence, telemetry.
 - A command-line tool, and conversion of plans written for finance-forecast, the tool
   moneypath succeeds. A file in that format is refused with a plain explanation.
-- Multi-currency, inflation modeling, Monte Carlo simulation, tax-bracket modeling.
+- Multi-currency, Monte Carlo simulation, tax-bracket modeling, an inflation rate that
+  varies by year.
 
 ## Why the architecture looks like this
 

@@ -1,0 +1,46 @@
+version: 2
+simulation: {startDate: 2026-06, endDate: 2036-05, startingCash: 1000, inflationRate: -100}
+guardrails:
+  - {name: Cushion, kind: cashFloor, amount: 5000, growth: inflaton}
+  - {name: Shrinking, kind: cashFloor, amount: 5000, growth: -100}
+  - {name: Debt gone, kind: debtFree, startDate: 2030-01, growth: [3]}
+common:
+  events:
+    - {name: Rent, amount: -2000, growth: {rate: 3}}
+    - {name: Salary, amount: 5000, growth: "4"}
+    - {name: Gym, amount: -50, growth: -100.5}
+    - {name: Phone, amount: -80, growth: Fixed}
+    - {name: Insurance, amount: -100, growth: 2}
+  loans:
+    - name: Mortgage
+      principal: 100000
+      interestRate: 4
+      term: 360
+      startDate: 2026-06
+      escrow: 300
+      escrowGrowth: yes
+      extraPrincipalPayments:
+        - {amount: 100, growth: -101}
+  investments:
+    - name: 401k
+      contributions:
+        - {amount: 500, growth: lots}
+      withdrawals:
+        - {amount: 1000, growth: -200, startDate: 2035-01}
+choices:
+  - name: Housing
+    options:
+      - name: Keep
+      - name: Renegotiate
+        change:
+          events:
+            - name: Insurance
+              set: {growth: double}
+          loans:
+            - name: Mortgage
+              set: {escrowGrowth: -100}
+scenarios:
+  - name: plan
+    select: {Housing: Keep}
+    events:
+      - {name: Bonus, amount: 1000, growth: "inflation"}

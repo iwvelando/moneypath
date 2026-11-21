@@ -60,3 +60,39 @@ describe('every help', () => {
     expect(eventAmountHelp('extraPrincipalPayment')).toBe(HELP.eventAmountExtraPrincipal);
   });
 });
+
+// spec/03, Growth and Conventions: the help for the inflation rate and every
+// growth states what the simulation assumes, and the help for each rate says
+// it is nominal, with inflation applied separately.
+describe('the help states the assumptions behind growth', () => {
+  const growthHelps = {
+    inflationRate: HELP.inflationRate,
+    growth: HELP.growth,
+    growthRate: HELP.growthRate,
+    escrowGrowth: HELP.escrowGrowth,
+    guardrailGrowth: HELP.guardrailGrowth,
+  };
+
+  it.each(Object.entries(growthHelps))('%s states every assumption', (_, help) => {
+    const text = helpText(help);
+    expect(text).toMatch(/start month’s prices/);
+    expect(text).toMatch(/once a year/);
+    expect(text).toMatch(/anniversar/);
+    expect(text).toMatch(/not an APR|not APRs/);
+    expect(text).toMatch(/stays the same/);
+  });
+
+  it.each(['cashInterestRate', 'loanInterestRate', 'investmentAnnualReturnRate'] as const)(
+    '%s says it is nominal, with inflation applied separately',
+    (key) => {
+      const text = helpText(HELP[key]);
+      expect(text).toMatch(/APR/);
+      expect(text).toMatch(/nominal/);
+      expect(text).toMatch(/inflation rate is applied separately/);
+    },
+  );
+
+  it('the guardrail floor no longer claims to be the same in every month', () => {
+    expect(helpText(HELP.guardrailAmount)).toMatch(/unless/);
+  });
+});

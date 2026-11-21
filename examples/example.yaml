@@ -15,6 +15,10 @@ simulation:
   # in an account that pays nothing). Try 4.0 to model a high-yield savings
   # account. Enter it after tax; only positive cash earns it.
   cashInterestRate: 0
+  # Optional; how much prices rise each year, in percent (2.5 means prices are
+  # 2.5% higher a year later). Default 0. It changes nothing on its own: only
+  # an amount with `growth: inflation` follows it. Rates above stay nominal.
+  inflationRate: 2.5
 
 recommendations:
   # Months of average expenses to target for the emergency-fund
@@ -24,9 +28,15 @@ recommendations:
 # Everything under `common` is shared by every scenario.
 common:
   events:
-    # Positive amounts are income, negative amounts are spending.
+    # Positive amounts are income, negative amounts are spending. Amounts are
+    # written in the start month's prices.
     - name: Social security
       amount: 1000.00
+      # Optional; how the amount changes over the years: fixed (the default),
+      # inflation (follows inflationRate) or a yearly percent such as 3. It
+      # steps once a year, on the anniversaries of the simulation's startDate,
+      # counted from that start whenever the event itself starts.
+      growth: inflation
       frequency: 1        # every month (default)
       startDate: 2050-01  # begins here; defaults to the simulation start
     - name: Service quarterly bill
@@ -102,6 +112,9 @@ scenarios:
         # property being sold, 12x escrow is paid every December afterward
         # (property costs continue after payoff).
         escrow: 500.00
+        # Property tax and insurance usually rise: let the escrow follow
+        # inflation (or a yearly percent of its own). Default fixed.
+        escrowGrowth: inflation
         # Monthly mortgage insurance, charged while remaining/original
         # principal exceeds the cutoff percentage.
         mortgageInsurance: 50.00
@@ -119,6 +132,7 @@ scenarios:
         contributionsFromCash: true
         contributions:
           - amount: 750.00
+            growth: 3         # 3% more each year, like the pay it comes from
             startDate: 2025-07
 
   - name: sell and downsize

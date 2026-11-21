@@ -92,6 +92,10 @@ func collectUnknownKeys(node *yaml.Node, t reflect.Type, path string, problems *
 	for t.Kind() == reflect.Pointer {
 		t = t.Elem()
 	}
+	// A growth takes any value as written, and Check says what is wrong with it.
+	if t == reflect.TypeOf(Growth{}) {
+		return
+	}
 	// A value reached through an alias is the value it stands for, at the
 	// place the alias is written.
 	if node.Kind == yaml.AliasNode && node.Alias != nil {

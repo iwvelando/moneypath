@@ -11,6 +11,9 @@ import (
 // for threshold payoffs (spec chapter 04 §3).
 type loanSim struct {
 	l *config.Loan
+	// start is the plan's first month, from which escrow and extra payments
+	// grow (§2.1).
+	start config.Month
 
 	payments    map[config.Month]float64 // month -> billed payment
 	escrowComp  map[config.Month]float64 // escrow included in regular payments
@@ -24,10 +27,12 @@ type loanSim struct {
 }
 
 // buildLoanSchedule expands a loan into its schedule, stopping at simEnd at
-// the latest (spec chapter 04 §3.2).
-func buildLoanSchedule(l *config.Loan, simEnd config.Month) *loanSim {
+// the latest (spec chapter 04 §3.2). Escrow and extra payments grow from
+// start, the plan's first month.
+func buildLoanSchedule(l *config.Loan, start, simEnd config.Month) *loanSim {
 	ls := &loanSim{
 		l:           l,
+		start:       start,
 		payments:    map[config.Month]float64{},
 		escrowComp:  map[config.Month]float64{},
 		remainAfter: map[config.Month]float64{},
@@ -72,11 +77,12 @@ func buildLoanSchedule(l *config.Loan, simEnd config.Month) *loanSim {
 			remaining/l.Principal > l.MortgageInsuranceCutoff/100 {
 			mi = l.MortgageInsurance
 		}
-		pay := interest + principalPaid + l.Escrow + mi
+		escrow := ls.escrowAt(cur)
+		pay := interest + principalPaid + escrow + mi
 		if idx == 1 {
 			pay += l.DownPayment
 		}
-		escrowYear += l.Escrow
+		escrowYear += escrow
 		remaining -= principalPaid
 
 		if round2(remaining) <= 0 || idx == l.Term {
@@ -84,11 +90,11 @@ func buildLoanSchedule(l *config.Loan, simEnd config.Month) *loanSim {
 			// the year's escrow accrual (§3.2 end check, §3.6).
 			remaining = 0
 			pay -= escrowYear
-			ls.record(cur, pay, l.Escrow, remaining)
+			ls.record(cur, pay, escrow, remaining)
 			ls.endLoan(cur, true, simEnd)
 			return ls
 		}
-		ls.record(cur, pay, l.Escrow, remaining)
+		ls.record(cur, pay, escrow, remaining)
 		cur++
 	}
 	return ls
@@ -112,15 +118,22 @@ func (ls *loanSim) record(m config.Month, pay, escrow, remaining float64) {
 	ls.lastGen = m
 }
 
+// escrowAt is the escrow billed in month m: the loan's escrow grown by its
+// escrow growth (§3.2, §2.1).
+func (ls *loanSim) escrowAt(m config.Month) float64 {
+	return ls.l.Escrow * ls.l.EscrowGrowth.Factor(ls.start, m)
+}
+
 // endLoan marks the loan finished at m; when the asset is kept, escrow
-// costs continue as 12*escrow every December from m through simEnd (§3.6).
+// costs continue as twelve times each December's escrow, every December
+// from m through simEnd (§3.6).
 func (ls *loanSim) endLoan(m config.Month, kept bool, simEnd config.Month) {
 	ls.ended = true
 	ls.endMonth = m
 	if kept && ls.l.Escrow > 0 {
 		for d := m; d <= simEnd; d++ {
 			if d.IsDecember() {
-				ls.payments[d] += 12 * ls.l.Escrow
+				ls.payments[d] += 12 * ls.escrowAt(d)
 			}
 		}
 	}
@@ -132,7 +145,7 @@ func (ls *loanSim) extraPrincipalAt(m config.Month, remaining float64) float64 {
 	total := 0.0
 	for _, ev := range ls.l.ExtraPrincipalPayments {
 		if ev.OccursAt(m) {
-			total += *ev.Amount
+			total += ev.AmountAt(ls.start, m)
 		}
 	}
 	return math.Min(total, remaining)

@@ -31,6 +31,10 @@ type Simulation struct {
 	// CashInterestRate is the annual percent earned on positive cash,
 	// compounded monthly (spec chapter 03; 0 when unset).
 	CashInterestRate float64 `yaml:"cashInterestRate,omitempty"`
+	// InflationRate is the yearly percent prices rise by, year over year,
+	// which a growth of inflation follows (spec chapter 03, Growth; 0 when
+	// unset).
+	InflationRate float64 `yaml:"inflationRate,omitempty"`
 
 	ResolvedStart        Month   `yaml:"-"`
 	ResolvedEnd          Month   `yaml:"-"`
@@ -54,6 +58,7 @@ type Guardrail struct {
 	Name        string   `yaml:"name"`
 	Kind        string   `yaml:"kind"`
 	Amount      *float64 `yaml:"amount,omitempty"`
+	Growth      Growth   `yaml:"growth,omitempty"`
 	Investments []string `yaml:"investments,omitempty"`
 	Loans       []string `yaml:"loans,omitempty"`
 	StartDate   string   `yaml:"startDate,omitempty"`
@@ -93,6 +98,7 @@ type Scenario struct {
 type Event struct {
 	Name       string    `yaml:"name,omitempty"`
 	Amount     *float64  `yaml:"amount,omitempty"`
+	Growth     Growth    `yaml:"growth,omitempty"`
 	Percentage *float64  `yaml:"percentage,omitempty"`
 	Frequency  *int      `yaml:"frequency,omitempty"`
 	StartDate  string    `yaml:"startDate,omitempty"`
@@ -102,6 +108,13 @@ type Event struct {
 	ResolvedStart     Month `yaml:"-"`
 	ResolvedEnd       Month `yaml:"-"`
 	ResolvedFrequency int   `yaml:"-"`
+}
+
+// AmountAt is what an occurrence of the (validated) event moves in month m
+// of a plan that starts at start: its amount, grown by its growth (spec
+// chapter 04 §2.1).
+func (e *Event) AmountAt(start, m Month) float64 {
+	return *e.Amount * e.Growth.Factor(start, m)
 }
 
 // OccursAt reports whether the (validated) event has an occurrence at m
@@ -124,6 +137,7 @@ type Loan struct {
 	Term                    int      `yaml:"term"`
 	StartDate               string   `yaml:"startDate"`
 	Escrow                  float64  `yaml:"escrow,omitempty"`
+	EscrowGrowth            Growth   `yaml:"escrowGrowth,omitempty"`
 	MortgageInsurance       float64  `yaml:"mortgageInsurance,omitempty"`
 	MortgageInsuranceCutoff float64  `yaml:"mortgageInsuranceCutoff,omitempty"`
 	EarlyPayoffThreshold    float64  `yaml:"earlyPayoffThreshold,omitempty"`

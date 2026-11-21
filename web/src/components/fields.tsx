@@ -144,6 +144,11 @@ interface NumberFieldProps {
    * an iPhone's decimal keypad has no minus key.
    */
   signed?: boolean;
+  /**
+   * Said while the box is empty, for a value the plan cannot do without that
+   * the engine never sees missing. It holds the run like any field error.
+   */
+  missingMessage?: string;
   /** The field's key in its entry of the config document. */
   field?: string;
 }
@@ -170,6 +175,7 @@ export function NumberField({
   placeholder,
   suffix,
   signed = false,
+  missingMessage,
   field,
 }: NumberFieldProps) {
   const base = useId();
@@ -186,13 +192,18 @@ export function NumberField({
   }, [value]);
 
   const malformed = draft.trim() !== '' && !Number.isFinite(Number(draft));
+  const own = malformed
+    ? 'Enter a number.'
+    : missingMessage !== undefined && draft.trim() === ''
+      ? missingMessage
+      : null;
   const { path, notes, invalid, describedBy } = useFieldNotes(
     field,
-    malformed ? { tone: 'error', text: 'Enter a number.' } : null,
+    own === null ? null : { tone: 'error', text: own },
     helpId,
     messageId,
   );
-  useDraftProblem(path, malformed ? 'Enter a number.' : null);
+  useDraftProblem(path, own);
 
   const commit = (raw: string) => {
     setDraft(raw);

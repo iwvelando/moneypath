@@ -1,0 +1,95 @@
+# Growth (spec chapter 03, Growth; chapter 04 §2.1, §3, §4, §5, §10). The
+# plan starts mid-year, so every amount that grows steps in June. "grows"
+# keeps every growth as written; "fixed" selects the option that sets each
+# one back to fixed, so the two share their first year and their
+# emergency-fund target.
+version: 2
+simulation:
+  startDate: 2026-06
+  endDate: 2031-12
+  startingCash: 25000.00
+  inflationRate: 3.0
+guardrails:
+  - name: Cushion
+    kind: cashFloor
+    amount: 20000.00
+    growth: inflation
+  - name: Fixed cushion
+    kind: cashFloor
+    amount: 20000.00
+common:
+  events:
+    - name: Salary
+      amount: 3000.00
+      growth: 4
+    - name: Rent
+      amount: -2000.00
+      growth: inflation
+    - name: Phone
+      amount: -80.00
+    - name: Streaming
+      amount: -100.00
+      growth: -10
+    - name: Roof
+      amount: -10000.00
+      growth: inflation
+      startDate: 2030-03
+      endDate: 2030-03
+  loans:
+    - name: Home
+      principal: 12000.00
+      interestRate: 0
+      term: 30
+      startDate: 2026-06
+      escrow: 100.00
+      escrowGrowth: inflation
+      extraPrincipalPayments:
+        - amount: 200.00
+          growth: inflation
+          frequency: 12
+          startDate: 2027-01
+  investments:
+    - name: 401k
+      startingValue: 50000.00
+      annualReturnRate: 5.0
+      contributionsFromCash: true
+      contributions:
+        - amount: 300.00
+          growth: 4
+          endDate: 2029-05
+      withdrawals:
+        - amount: 1000.00
+          growth: inflation
+          startDate: 2029-06
+choices:
+  - name: Growth
+    options:
+      - name: As written
+      - name: Every amount fixed
+        change:
+          events:
+            - {name: Salary, set: {growth: ~}}
+            - {name: Rent, set: {growth: ~}}
+            - {name: Streaming, set: {growth: ~}}
+            - {name: Roof, set: {growth: ~}}
+          loans:
+            - name: Home
+              set:
+                escrowGrowth: ~
+                extraPrincipalPayments:
+                  - {amount: 200.00, frequency: 12, startDate: 2027-01}
+          investments:
+            - name: 401k
+              set:
+                contributions:
+                  - {amount: 300.00, endDate: 2029-05}
+                withdrawals:
+                  - {amount: 1000.00, startDate: 2029-06}
+scenarios:
+  - name: grows
+    select: {Growth: As written}
+  - name: fixed
+    select: {Growth: Every amount fixed}
+  - name: not run
+    active: false
+    select: {Growth: As written}

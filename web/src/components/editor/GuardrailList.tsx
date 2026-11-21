@@ -13,6 +13,7 @@ import {
 import { formatMoney } from '../../util/format';
 import { HelpTip } from '../HelpTip';
 import { MonthField, NumberField, SelectField, TextField } from '../fields';
+import { GrowthField } from '../GrowthField';
 import { At, Notes, PathProblems, noteOf, usePath, useProblemsAt } from '../problems';
 
 const KINDS = [
@@ -238,6 +239,16 @@ function GuardrailCard({ guardrail, names, index, onChange, onRemove, onDuplicat
               step={500}
               placeholder="Never emptied"
               onChange={(amount) => patch({ amount })}
+            />
+          ) : null}
+          {/* A debt-free has no floor to grow; a growth the plan gives one stays for its warning. */}
+          {guardrail.kind !== 'debtFree' || guardrail.growth.mode !== 'fixed' ? (
+            <GrowthField
+              label="Growth"
+              help={HELP.guardrailGrowth}
+              field="growth"
+              value={guardrail.growth}
+              onChange={(growth) => patch({ growth })}
             />
           ) : null}
         </div>

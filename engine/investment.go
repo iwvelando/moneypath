@@ -12,12 +12,14 @@ import (
 type invSim struct {
 	inv   *config.Investment
 	scope string // "scenario" or "common"
+	// start is the plan's first month, from which amounts grow (§2.1).
+	start config.Month
 
 	value, basis, growthBalance float64
 }
 
-func newInvSim(inv *config.Investment, scope string) *invSim {
-	return &invSim{inv: inv, scope: scope, value: inv.StartingValue, basis: inv.StartingValue}
+func newInvSim(inv *config.Investment, scope string, start config.Month) *invSim {
+	return &invSim{inv: inv, scope: scope, start: start, value: inv.StartingValue, basis: inv.StartingValue}
 }
 
 type invMonthResult struct {
@@ -50,7 +52,7 @@ func (s *invSim) processMonth(m config.Month) invMonthResult {
 	c := 0.0
 	for _, ev := range inv.Contributions {
 		if ev.OccursAt(m) {
-			c += *ev.Amount
+			c += ev.AmountAt(s.start, m)
 		}
 	}
 	s.value += c
@@ -69,7 +71,7 @@ func (s *invSim) processMonth(m config.Month) invMonthResult {
 			pctTotal += *ev.Percentage
 			w += s.value * *ev.Percentage / 100
 		} else {
-			w += *ev.Amount
+			w += ev.AmountAt(s.start, m)
 		}
 	}
 	w = math.Min(math.Max(w, 0), s.value)

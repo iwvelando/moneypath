@@ -1,0 +1,64 @@
+description: >
+  The plan's inflation rate and every growth are numbers more than -100, and a
+  growth is otherwise one of the words fixed and inflation, matched exactly. A
+  quoted number, a list and a mapping are refused at the growth, on an event,
+  a guardrail (whatever its kind), a loan's escrow, an extra payment, a
+  contribution and a withdrawal, and under an option's change. The word
+  inflation may be quoted.
+problems:
+  - level: error
+    path: simulation.inflationRate
+    where: Simulation
+    message: The inflation rate must be more than -100.
+  - level: error
+    path: guardrails.0.growth
+    where: Guardrail “Cushion”
+    message: Growth must be fixed, inflation or a yearly rate in percent, such as 3.
+  - level: error
+    path: guardrails.1.growth
+    where: Guardrail “Shrinking”
+    message: The yearly growth must be more than -100.
+  - level: error
+    path: guardrails.2.growth
+    where: Guardrail “Debt gone”
+    message: Growth must be fixed, inflation or a yearly rate in percent, such as 3.
+  - level: error
+    path: common.events.0.growth
+    where: Baseline, event “Rent”
+    message: Growth must be fixed, inflation or a yearly rate in percent, such as 3.
+  - level: error
+    path: common.events.1.growth
+    where: Baseline, event “Salary”
+    message: Growth must be fixed, inflation or a yearly rate in percent, such as 3.
+  - level: error
+    path: common.events.2.growth
+    where: Baseline, event “Gym”
+    message: The yearly growth must be more than -100.
+  - level: error
+    path: common.events.3.growth
+    where: Baseline, event “Phone”
+    message: Growth must be fixed, inflation or a yearly rate in percent, such as 3.
+  - level: error
+    path: common.loans.0.escrowGrowth
+    where: Baseline, loan “Mortgage”
+    message: Escrow growth must be fixed, inflation or a yearly rate in percent, such as 3.
+  - level: error
+    path: common.loans.0.extraPrincipalPayments.0.growth
+    where: Baseline, loan “Mortgage”, extra payment 1
+    message: The yearly growth must be more than -100.
+  - level: error
+    path: common.investments.0.contributions.0.growth
+    where: Baseline, investment “401k”, contribution 1
+    message: Growth must be fixed, inflation or a yearly rate in percent, such as 3.
+  - level: error
+    path: common.investments.0.withdrawals.0.growth
+    where: Baseline, investment “401k”, withdrawal 1
+    message: The yearly growth must be more than -100.
+  - level: error
+    path: choices.0.options.1.change.events.0.set.growth
+    where: Choice “Housing”, option “Renegotiate”, changed event “Insurance”
+    message: Growth must be fixed, inflation or a yearly rate in percent, such as 3.
+  - level: error
+    path: choices.0.options.1.change.loans.0.set.escrowGrowth
+    where: Choice “Housing”, option “Renegotiate”, changed loan “Mortgage”
+    message: The yearly growth must be more than -100.
