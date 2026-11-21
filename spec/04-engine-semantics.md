@@ -732,8 +732,9 @@ whose rate is absent or 0 has no today's-dollars reading.
   divided by `D(m)` month by month.
 - **Key figures** (§8). `endingCash` and `endingTotal` are divided by `D(end)`.
   `lowestCash` and `lowestCashDate` are read by §8's rule from the converted `liquid`,
-  so the lowest month can be another month than the nominal one. Cash that stays at
-  the same nominal amount is lowest in today's dollars at the end.
+  so the lowest month can be another month than the nominal one. At a rate above 0,
+  positive cash that stays at the same nominal amount is lowest in today's dollars at
+  the end.
 - **Amounts reported with a month.** Each is divided by `D` of its own month. A
   guardrail's `margin` (§10) is divided at its tightest month and a debtFree's `owed` at
   its first breach. An optimizer summary's `floor`, `minCash` and `headroom` (§7) are
