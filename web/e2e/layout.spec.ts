@@ -1069,3 +1069,31 @@ test('the choice of today’s dollars fits a narrow phone in both readings', asy
   expect(await overflow(page), 'today’s dollars').toBeLessThanOrEqual(0);
   await expect(page.getByRole('button', { name: 'Download CSV' })).toBeVisible();
 });
+
+// Both readings look like controls a reader can press, not only the chosen one.
+test('each reading is drawn as a button, and the chosen one stands out', async ({ page }) => {
+  await openApp(page);
+  await uploadAndRun(page, '../testdata/conformance/growth/config.yaml');
+  const looks = () =>
+    page.locator('.results__reading label').evaluateAll((labels) =>
+      labels.map((label) => {
+        const style = getComputedStyle(label);
+        return {
+          border: parseFloat(style.borderTopWidth),
+          borderColor: style.borderTopColor,
+          background: style.backgroundColor,
+          page: getComputedStyle(document.body).backgroundColor,
+        };
+      }),
+    );
+  const visible = (color: string) => color !== 'rgba(0, 0, 0, 0)' && color !== 'transparent';
+  const [chosen, other] = await looks();
+  for (const [name, option] of [['chosen', chosen!], ['other', other!]] as const) {
+    expect(option.border, `${name} border`).toBeGreaterThanOrEqual(1);
+    expect(visible(option.borderColor), `${name} border colour`).toBe(true);
+    expect(option.borderColor, `${name} border against the page`).not.toBe(option.page);
+    expect(visible(option.background), `${name} surface`).toBe(true);
+  }
+  expect(chosen!.background).not.toBe(other!.background);
+  expect(chosen!.borderColor).not.toBe(other!.borderColor);
+});

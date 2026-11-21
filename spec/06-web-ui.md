@@ -212,7 +212,8 @@ The app covers, at a coarse grain:
   marks all of these as describing an earlier version of the plan; they stay readable,
   being the baseline the next run will be compared against.
   When the plan has an inflation rate other than 0, the results header offers two
-  readings beside Download CSV: Nominal, where it starts, and Today's dollars, the
+  readings beside Download CSV, each drawn as a button with the chosen one in the
+  accent: Nominal, where it starts, and Today's dollars, the
   plan's start month's prices (chapter 04 §12). The second names that month ("Today's
   dollars (June 2026)") unless it is the current month. The choice switches every
   amount on the results page, the tabs' sparklines, the chart, the table, the key figures,
