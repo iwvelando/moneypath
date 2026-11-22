@@ -221,9 +221,17 @@ checks are green and the documentation is written:
 2. Run `make preview-lan` and give the owner the `https://` Network address it prints,
    with the revision or working-tree state it serves. This goes in private chat, never
    in an issue or PR.
-3. List what to try: the central interaction, the limits and refusals, edge cases
-   already tested, and anything rough or only checkable on a phone.
-4. Wait for the go-ahead. Fix each finding with its own failing test first, and offer
+3. Give a short guide in four parts, so the owner can tell what needs an answer:
+   - **Where to find it**: how to reach the change, and a plan to start from when
+     one helps. Show the way in; the owner explores on their own.
+   - **Decisions for you**: each open product choice, with the option the work takes
+     now. Only these ask for an answer; nothing elsewhere is worded as something to
+     confirm.
+   - **Rough edges**: known shortcomings and what was deliberately left out.
+   - **Already checked**: what step 1 covered and where (desktop, simulated phone,
+     real phone), and what only a real phone can show.
+4. Wait for the go-ahead, which names what the owner checked (see "Prompts for the
+   owner"). Fix each finding with its own failing test first, and offer
    the checkpoint again after a substantial change.
 
 The checkpoint is a gate unless the owner waives it for the task, or the work is
@@ -292,8 +300,8 @@ supply the detail, so the prompts need not repeat it.
 > Implement [task or issue] following the repository delivery procedure. Stop at the
 > exploration checkpoint.
 
-> Exploration approved. Complete final verification, open the PR and leave the
-> handoff. Stop there; do not merge.
+> Exploration approved; I checked [desktop, iPhone portrait, iPhone landscape]. Complete
+> final verification, open the PR and leave the handoff. Stop there; do not merge.
 
 > Use the repository's moneypath-review procedure to take over [PR]. You may fix and
 > push warranted changes. Once review and required verification are complete and CI
