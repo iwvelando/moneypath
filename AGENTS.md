@@ -117,7 +117,9 @@ DEVELOPMENT.md, "Delivering a change", has the full procedure. The rules:
 - **Stop at the exploration checkpoint.** For a new feature, or any change a user can
   see or feel in the web app, once the work is otherwise ready for `make pre-pr`: run
   `make preview-lan` and give the owner, in private chat, the `https://` Network
-  address it prints together with a short list of things to try. Never hand over
+  address it prints together with a short guide: where to find the change, the
+  decisions that are the owner's, known rough edges, and what was already checked
+  and where (DEVELOPMENT.md, "Iterate, then let the owner explore"). Never hand over
   `127.0.0.1` or `localhost`: a phone cannot open it. When the default port is taken,
   use a port browsers allow, such as 4193: Safari refuses 4190 (DEVELOPMENT.md,
   "Trying it on a phone"). Then wait for the go-ahead, unless the owner has waived the
