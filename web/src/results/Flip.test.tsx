@@ -245,3 +245,24 @@ describe('a flip read in today’s dollars', () => {
     expect(text()).toContain('2026-03: stay (Home: Move) moves ahead');
   });
 });
+
+describe('the flip in net worth', () => {
+  const labels = () => [...host.querySelectorAll('.difference__breakeven dt')].map((dt) => dt.textContent);
+
+  it('lists its break-even months and charts it when the flipped path owes differently', async () => {
+    show(async (request) => ({
+      ...answer(request),
+      netWorth: { difference: [0, -9000, -8800], breakEven: [{ date: '2026-02', flipped: false }] },
+    }));
+    await pick(1, 'op-move');
+    expect(labels()).toEqual(['Total break-even', 'Liquid break-even', 'Net worth break-even']);
+    expect(host.querySelectorAll('.chart__line')).toHaveLength(3);
+  });
+
+  it('is left out when it is the same as the total and nothing is owed', async () => {
+    show(async (request) => ({ ...answer(request), netWorth: { difference: [0, 150, 175], breakEven: [] } }));
+    await pick(1, 'op-move');
+    expect(labels()).toEqual(['Total break-even', 'Liquid break-even']);
+    expect(host.querySelectorAll('.chart__line')).toHaveLength(2);
+  });
+});

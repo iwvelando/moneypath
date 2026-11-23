@@ -108,3 +108,38 @@ describe('Chart graphics', () => {
     for (let i = 1; i < xs.length; i += 1) expect(xs[i]! - xs[i - 1]!).toBeGreaterThanOrEqual(52);
   });
 });
+
+describe('the net worth line', () => {
+  it('is drawn, labelled and read out when given', () => {
+    act(() => {
+      render(
+        <Chart dates={dates} liquid={[1, 2, 3, 4]} total={[5, 6, 7, 8]} netWorth={[-90, -80, 7, 8]} scenarioName="base" />,
+        host,
+      );
+    });
+    expect(host.querySelectorAll('.chart__line--networth')).toHaveLength(1);
+    expect([...host.querySelectorAll('.chart__legend li')].map((li) => li.textContent)).toEqual([
+      'Liquid', 'Total', 'Net worth', 'Below zero',
+    ]);
+    expect(host.querySelector('.chart__svg title')?.textContent).toContain('Liquid, total and net worth for base');
+    const chart = host.querySelector('.chart__svg')!;
+    act(() => {
+      chart.dispatchEvent(new FocusEvent('focus'));
+      chart.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    });
+    expect(host.querySelector('[role="status"]')?.textContent).toBe(
+      '2026-01: liquid $1.00, total $5.00, net worth -$90.00',
+    );
+    expect(host.querySelector('.chart__tooltip')?.textContent).toContain('Net worth -$90.00');
+  });
+
+  it('does not tint the months net worth is below zero', () => {
+    act(() => {
+      render(
+        <Chart dates={dates} liquid={[1, 2, 3, 4]} total={[5, 6, 7, 8]} netWorth={[-90, -80, 7, 8]} scenarioName="base" />,
+        host,
+      );
+    });
+    expect(host.querySelectorAll('.chart__danger')).toHaveLength(0);
+  });
+});

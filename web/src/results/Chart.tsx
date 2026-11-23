@@ -21,22 +21,27 @@ interface ChartProps {
   dates: string[];
   liquid: Series;
   total: Series;
+  /** A third line, when given. Unlike the others, it is not tinted below zero. */
+  netWorth?: Series;
   scenarioName: string;
   /** What the two lines show, for the chart's title; a scenario's net worth unless given. */
   subject?: string;
 }
 
 /**
- * Inline SVG line chart: Liquid and Total series, legend, hover/focus
- * tooltip, both axes ticked, tinted regions where a series is negative,
- * responsive, with an empty state. No charting library.
+ * Inline SVG line chart: Liquid and Total series, and Net worth when given,
+ * legend, hover/focus tooltip, both axes ticked, tinted regions where liquid
+ * or total is negative, responsive, with an empty state. No charting library.
  */
-export function Chart({ dates, liquid, total, scenarioName, subject }: ChartProps) {
+export function Chart({ dates, liquid, total, netWorth, scenarioName, subject }: ChartProps) {
   const { containerRef, width } = useChartWidth();
   const titleId = useId();
 
   const count = dates.length;
-  const extent = useMemo(() => extentOf([liquid, total]), [liquid, total]);
+  const extent = useMemo(
+    () => extentOf(netWorth ? [liquid, total, netWorth] : [liquid, total]),
+    [liquid, total, netWorth],
+  );
   const scale = useMemo(() => (extent ? valueScale(extent) : null), [extent]);
   const plot = plotOf(width, PAD, count, scale);
   const { plotHeight, x, y } = plot;
@@ -51,14 +56,20 @@ export function Chart({ dates, liquid, total, scenarioName, subject }: ChartProp
     );
   }
 
+  // Net worth leaves out what a loan bought, so being below zero is no alarm
+  // for it: it gets neither the tint nor an area of its own.
   const seriesSpec = [
-    { key: 'liquid' as const, label: 'Liquid', values: liquid, className: 'chart__line--liquid' },
-    { key: 'total' as const, label: 'Total', values: total, className: 'chart__line--total' },
+    { key: 'liquid', label: 'Liquid', values: liquid, className: 'chart__line--liquid', tinted: true },
+    { key: 'total', label: 'Total', values: total, className: 'chart__line--total', tinted: true },
+    ...(netWorth
+      ? [{ key: 'networth', label: 'Net worth', values: netWorth, className: 'chart__line--networth', tinted: false }]
+      : []),
   ];
+  const tinted = seriesSpec.filter((series) => series.tinted);
 
   const activeDate = active !== null ? (dates[active] ?? '') : '';
-  const activeLiquid = active !== null ? (liquid[active] ?? null) : null;
-  const activeTotal = active !== null ? (total[active] ?? null) : null;
+  const at = (values: Series): number | null => (active !== null ? (values[active] ?? null) : null);
+  const readout = seriesSpec.map((series) => ({ ...series, value: at(series.values) }));
 
   // Last present value of each series, labeled at the line's right end. The
   // two labels are nudged apart when the lines finish close together.
@@ -110,11 +121,11 @@ export function Chart({ dates, liquid, total, scenarioName, subject }: ChartProp
           {...handlers}
         >
           <title id={titleId}>
-            {`Liquid and total net worth ${subject ?? `for ${scenarioName}`}, ${dates[0]} to ${dates[count - 1]}. Use the arrow keys to read individual months.`}
+            {`${netWorth ? 'Liquid, total and net worth' : 'Liquid and total net worth'} ${subject ?? `for ${scenarioName}`}, ${dates[0]} to ${dates[count - 1]}. Use the arrow keys to read individual months.`}
           </title>
 
           <defs>
-            {seriesSpec.map((series) => (
+            {tinted.map((series) => (
               <linearGradient
                 key={series.key}
                 id={`${titleId}-grad-${series.key}`}
@@ -130,7 +141,7 @@ export function Chart({ dates, liquid, total, scenarioName, subject }: ChartProp
           </defs>
 
           <g aria-hidden="true">
-            {seriesSpec.map((series) =>
+            {tinted.map((series) =>
               negativeSpans(series.values, HALF_CENT).map((span, index) => (
                 <rect
                   key={`${series.key}-danger-${index}`}
@@ -147,7 +158,7 @@ export function Chart({ dates, liquid, total, scenarioName, subject }: ChartProp
           <ChartAxes plot={plot} scale={scale} dates={dates} />
 
           <g aria-hidden="true">
-            {seriesSpec.map((series) =>
+            {tinted.map((series) =>
               segments(series.values).map((segment, index) => (
                 <polygon
                   key={`${series.key}-area-${index}`}
@@ -196,12 +207,17 @@ export function Chart({ dates, liquid, total, scenarioName, subject }: ChartProp
           {active !== null ? (
             <g class="chart__cursor" aria-hidden="true">
               <line x1={x(active)} x2={x(active)} y1={PAD.top} y2={PAD.top + plotHeight} />
-              {activeLiquid !== null ? (
-                <circle class="chart__dot chart__dot--liquid" cx={x(active)} cy={y(activeLiquid)} r={4} />
-              ) : null}
-              {activeTotal !== null ? (
-                <circle class="chart__dot chart__dot--total" cx={x(active)} cy={y(activeTotal)} r={4} />
-              ) : null}
+              {readout.map((series) =>
+                series.value !== null ? (
+                  <circle
+                    key={series.key}
+                    class={`chart__dot chart__dot--${series.key}`}
+                    cx={x(active)}
+                    cy={y(series.value)}
+                    r={4}
+                  />
+                ) : null,
+              )}
             </g>
           ) : null}
         </svg>
@@ -215,14 +231,12 @@ export function Chart({ dates, liquid, total, scenarioName, subject }: ChartProp
             }}
           >
             <p class="chart__tooltip-date">{activeDate}</p>
-            <p>
-              <span class="chart__swatch chart__swatch--liquid" aria-hidden="true" /> Liquid{' '}
-              <strong>{activeLiquid === null ? '—' : formatMoney(activeLiquid)}</strong>
-            </p>
-            <p>
-              <span class="chart__swatch chart__swatch--total" aria-hidden="true" /> Total{' '}
-              <strong>{activeTotal === null ? '—' : formatMoney(activeTotal)}</strong>
-            </p>
+            {readout.map((series) => (
+              <p key={series.key}>
+                <span class={`chart__swatch chart__swatch--${series.key}`} aria-hidden="true" /> {series.label}{' '}
+                <strong>{series.value === null ? '—' : formatMoney(series.value)}</strong>
+              </p>
+            ))}
           </div>
         ) : null}
       </div>
@@ -230,9 +244,9 @@ export function Chart({ dates, liquid, total, scenarioName, subject }: ChartProp
       <p class="visually-hidden" role="status" aria-live="polite">
         {active === null
           ? ''
-          : `${activeDate}: liquid ${activeLiquid === null ? 'no value' : formatMoney(activeLiquid)}, total ${
-              activeTotal === null ? 'no value' : formatMoney(activeTotal)
-            }`}
+          : `${activeDate}: ${readout
+              .map((series) => `${series.label.toLowerCase()} ${series.value === null ? 'no value' : formatMoney(series.value)}`)
+              .join(', ')}`}
       </p>
     </div>
   );

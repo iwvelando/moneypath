@@ -1,0 +1,37 @@
+description: >
+  Liabilities and net worth, in a plan with an inflation rate of 3 %. Both
+  paths share a student loan that began in 2021-07, which owes $14,468.65
+  after its payment in the first month. "own and sell" also has a mortgage
+  that began in 2019-01, sold by date in 2027-09, and a car loan that starts
+  in 2026-06, so it owes nothing before then, and is paid off by threshold in
+  2027-10. Its total passes that of "rent and invest" in 2026-12, but its net
+  worth, which subtracts the mortgage, only in the sale month. After the car's
+  payoff both paths owe only the student loan, so their net worth differs by
+  what their totals do. The CSV is what it is without liabilities, which it
+  does not carry.
+normative: true
+optimize: false
+tolerance: 0.01
+expectedMetrics:
+  - scenario: rent and invest
+    keyFigures: {lowestCash: 20945.4428, lowestCashDate: "2026-01", endingCash: 54035.9395, endingTotal: 58822.6616, endingNetWorth: 51657.9616}
+    todaysDollars:
+      keyFigures: {lowestCash: 20945.4428, lowestCashDate: "2026-01", endingCash: 49572.4977, endingTotal: 53963.8301, endingNetWorth: 47390.9440}
+  - scenario: own and sell
+    keyFigures: {lowestCash: 21547.3534, lowestCashDate: "2026-01", endingCash: 138119.2186, endingTotal: 138119.2186, endingNetWorth: 130954.5187}
+    todaysDollars:
+      keyFigures: {lowestCash: 21547.3534, lowestCashDate: "2026-01", endingCash: 126710.3841, endingTotal: 126710.3841, endingNetWorth: 120137.4980}
+expectedComparisons:
+  - scenario: own and sell
+    against: rent and invest
+    cash:
+      breakEven: []
+      endingDifference: 84083.2792
+    total:
+      breakEven:
+        - {date: "2026-12", leader: own and sell}
+      endingDifference: 79296.5571
+    netWorth:
+      breakEven:
+        - {date: "2027-09", leader: own and sell}
+      endingDifference: 79296.5571

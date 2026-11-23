@@ -531,3 +531,51 @@ describe('reading in today’s dollars', () => {
     expect(disclosure().getAttribute('aria-expanded')).toBe('false');
   });
 });
+
+describe('net worth in a scenario’s own view', () => {
+  function showOwing(): void {
+    const results: ForecastResults = {
+      version: 'test',
+      scenarios: ['mortgage', 'renting'],
+      rows: ['2026-01', '2026-02'].map((date, row) => ({
+        date,
+        values: [
+          { liquid: 100 + row, total: 1000 + row, liabilities: 5000 - row, netWorth: -4000 + 2 * row, notes: [] },
+          { liquid: 200 + row, total: 2000 + row, liabilities: 0, netWorth: 2000 + row, notes: [] },
+        ],
+      })),
+      csv: '',
+      metrics: [{ optimizations: [] }, { optimizations: [] }],
+      warnings: [],
+      configYaml: '',
+    };
+    act(() => {
+      render(
+        <ResultsView
+          results={results}
+          durationMs={1}
+          optimizerRan={false}
+          onDownloadCsv={() => {}}
+          statusOf={(_: Adjustment) => 'missing'}
+          onApply={() => {}}
+        />,
+        host,
+      );
+    });
+  }
+
+  it('charts net worth, tabulates debt and says what net worth counts for a path that owes', () => {
+    showOwing();
+    expect(host.querySelectorAll('.chart__line--networth')).toHaveLength(1);
+    expect([...host.querySelectorAll('.results-table thead th')].map((th) => th.textContent)).toContain('Debt');
+    expect(host.querySelector('.results__networth')?.textContent).toMatch(/^Net worth is cash and investments/);
+  });
+
+  it('leaves them out for a path that owes nothing', () => {
+    showOwing();
+    act(() => tabs()[1]!.click());
+    expect(host.querySelectorAll('.chart__line--networth')).toHaveLength(0);
+    expect([...host.querySelectorAll('.results-table thead th')].map((th) => th.textContent)).not.toContain('Debt');
+    expect(host.querySelector('.results__networth')).toBeNull();
+  });
+});

@@ -146,22 +146,28 @@ The app covers, at a coarse grain:
   debt-free, `held to <name>` with the guardrail's own wording for when the debt clears.
 - **Results** — per-scenario summary (emergency fund, optimizer adjustments), a chart of
   liquid and total over time, and the full month-by-month table. The table initially
-  shows Date, Liquid, and Total. Months with notes have an arrow and a disclosure
+  shows Date, Liquid, and Total. For a path that owes something in some month, the
+  chart adds net worth as a dashed third line, which is not tinted below zero, the table
+  adds Debt (what its loans still owe) and Net worth, and the chart's heading says that
+  net worth is cash and investments less what the loans owe, counting no home, car or
+  other property. A path that owes nothing has a net worth equal to its total and shows
+  neither. Months with notes have an arrow and a disclosure
   button; clicking or tapping anywhere on that summary row, or activating its button
   with the keyboard, reveals the engine's notes as a list below it. Several months
   can stay open. Months without notes have no disclosure; switching scenarios or
   running a new forecast closes the details. CSV exports still contain all notes.
   With two or more scenarios, a Compare entry follows the scenario tabs and draws every
   scenario on one chart, in the plan's order, for one series at a time: the total first,
-  with a control to switch to liquid. Its vertical scale fits every scenario, including
+  with a control to switch to liquid, and to net worth when some scenario owes
+  something; net worth comes with the same sentence on what it counts. Its vertical scale fits every scenario, including
   one whose cash goes negative. Its legend names each scenario and doubles as the month
   readout: it lists every scenario's value for the month under the pointer, a tap, or
   the keyboard cursor, and for the final month otherwise. A plan with one scenario has
   no Compare entry. An isolated recorded month is drawn as a point so a plan
   containing only one month remains visible. Under the chart, a table of key
   figures has one row per scenario, in the plan's order: the lowest cash and the month
-  it is reached, cash and total at the end of the plan, and the emergency-fund
-  shortfall or surplus. The emergency-fund column is left out when the recommendation
+  it is reached, cash and total at the end of the plan, net worth at the end when some
+  scenario owes something, and the emergency-fund shortfall or surplus. The emergency-fund column is left out when the recommendation
   is disabled, never shown as zero. When the plan has guardrails, a second table under
   the key figures has a row per scenario and a column per guardrail: whether it holds,
   the month it first breaks, its tightest month and the margin there, as an amount to
@@ -177,16 +183,18 @@ The app covers, at a coarse grain:
   focus to it. Under the key figures, the difference between two scenarios: two
   pickers choose one scenario and the scenario to subtract from it, starting with the
   plan's first two, and choosing the scenario the other picker holds swaps them, so a
-  scenario is never compared with itself. For the total and for liquid it lists the
-  break-even months, each with the scenario that moves ahead, or says that the lead
-  never changes hands; a chart draws both differences over time with the same month
+  scenario is never compared with itself. For the total and for liquid, and for net worth
+  when some scenario owes something, it lists the break-even months, each with the
+  scenario that moves ahead, or says that the lead never changes hands; a chart draws
+  the differences over time with the same month
   readout as a scenario's own chart, tinting the months a difference is below zero.
   The comparison shows only figures the engine reported.
   When the plan has choices, a scenario's own view also offers to flip one of them:
   pick a choice and another of its options, and the engine compares the scenario with
   that one decision made differently and everything else as it is (chapter 02, Results
   JSON, `flip`). It shows the break-even months and the difference over time, as the
-  comparison of two scenarios does. This works for a plan with one scenario, is left
+  comparison of two scenarios does, with net worth when some scenario of the run owes
+  something or the flipped path owes differently from the scenario. This works for a plan with one scenario, is left
   out when no choice has another option to switch to, and describes the plan as it was
   run even after the editor has moved on. Reading it changes nothing. The flipped path
   enters the plan only when the reader keeps it, as a copy of the scenario placed after

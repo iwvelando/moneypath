@@ -164,11 +164,16 @@ export function Workspace({
     ) {
       card.dispatchEvent(new Event('editor:reveal'));
     }
+    // An entry that writes its own note about the error keeps its place for
+    // the error hidden, and a hidden element can be neither scrolled to nor
+    // focused: go to the entry instead.
+    const place = target.hidden ? (target.closest<HTMLElement>('.editor-card') ?? target) : target;
     // Once the cards have opened.
     window.setTimeout(() => {
       const gently = !window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      target.scrollIntoView?.({ behavior: gently ? 'smooth' : 'auto', block: 'center' });
-      (target.querySelector<HTMLElement>('input, select') ?? target).focus({ preventScroll: true });
+      place.scrollIntoView?.({ behavior: gently ? 'smooth' : 'auto', block: place === target ? 'center' : 'start' });
+      const field = place === target ? target.querySelector<HTMLElement>('input, select') : null;
+      (field ?? place).focus({ preventScroll: true });
     }, 0);
   };
 

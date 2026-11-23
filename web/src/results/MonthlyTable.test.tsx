@@ -88,3 +88,27 @@ describe('monthly event disclosures', () => {
     expect(host.querySelector('button')).toBeNull();
   });
 });
+
+describe('debt and net worth', () => {
+  const owing: MonthlyRow[] = [
+    { date: '2026-01', liquid: 25000, total: 65000, liabilities: 180000, netWorth: -115000, notes: [] },
+    { date: '2026-02', liquid: 26000, total: 66000, liabilities: 0, netWorth: 66000, notes: [] },
+  ];
+
+  it('adds a debt and a net worth column when the path owes something', () => {
+    show(owing);
+    expect([...host.querySelectorAll('thead th')].map((el) => el.textContent)).toEqual([
+      'Date', 'Liquid', 'Total', 'Debt', 'Net worth',
+    ]);
+    const first = [...host.querySelectorAll('tbody tr')][0]!;
+    expect([...first.querySelectorAll('td')].map((el) => el.textContent)).toEqual([
+      '$25,000.00', '$65,000.00', '$180,000.00', '-$115,000.00',
+    ]);
+    expect(host.querySelector('caption')?.textContent).toBe('Monthly liquid, total, debt and net worth for plan');
+  });
+
+  it('leaves them out when the path owes nothing', () => {
+    show(owing.map((row) => ({ ...row, liabilities: 0, netWorth: row.total })));
+    expect([...host.querySelectorAll('thead th')].map((el) => el.textContent)).toEqual(['Date', 'Liquid', 'Total']);
+  });
+});

@@ -1,0 +1,57 @@
+# Liabilities and net worth (spec chapter 04 §1, §8, §9, §12). Net worth is
+# total less what every loan of the path still owes: a loan that began before
+# the plan from the first month, a loan that starts inside the plan from its
+# start, nothing once a threshold payoff or a sale has ended it. The CSV has no
+# column for either (chapter 05), so this case pins them through the key
+# figures and a comparison.
+version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2028-12
+  startingCash: 20000.00
+  inflationRate: 3.0
+common:
+  events:
+    - name: Salary
+      amount: 6000.00
+    - name: Living
+      amount: -3000.00
+  loans:
+    - name: Student loan
+      principal: 24000.00
+      interestRate: 5.0
+      term: 120
+      startDate: 2021-07
+scenarios:
+  - name: rent and invest
+    events:
+      - name: Rent
+        amount: -1800.00
+    investments:
+      - name: Brokerage
+        startingValue: 4000.00
+        annualReturnRate: 6.0
+        taxRate: 0
+  - name: own and sell
+    events:
+      - name: Rent after the sale
+        amount: -1800.00
+        startDate: 2027-10
+    loans:
+      - name: Mortgage
+        principal: 250000.00
+        downPayment: 50000.00
+        interestRate: 3.5
+        term: 360
+        startDate: 2019-01
+        escrow: 300.00
+        earlyPayoffDate: 2027-09
+        sellProperty: true
+        sellPrice: 265000.00
+        sellCostsNet: 16000.00
+      - name: Car
+        principal: 18000.00
+        interestRate: 4.0
+        term: 48
+        startDate: 2026-06
+        earlyPayoffThreshold: 40000.00

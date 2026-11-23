@@ -290,3 +290,48 @@ describe('the scenario comparison', () => {
     expect(host.querySelector('.chart__line')).toBeNull();
   });
 });
+
+describe('comparing net worth', () => {
+  const owing = () =>
+    results({
+      mortgage: [
+        { liquid: 100, total: 1000, liabilities: 5000, netWorth: -4000, notes: [] },
+        { liquid: 200, total: 2000, liabilities: 4000, netWorth: -2000, notes: [] },
+        { liquid: 300, total: 3000, liabilities: 0, netWorth: 3000, notes: [] },
+      ],
+      renting: [
+        { liquid: 50, total: 900, liabilities: 0, netWorth: 900, notes: [] },
+        { liquid: 60, total: 950, liabilities: 0, netWorth: 950, notes: [] },
+        { liquid: 70, total: 990, liabilities: 0, netWorth: 990, notes: [] },
+      ],
+    });
+
+  it('is offered beside total and liquid when some scenario owes something', () => {
+    show(owing());
+    expect([...host.querySelectorAll('.comparison__choice')].map((b) => b.textContent)).toEqual([
+      'Total', 'Liquid', 'Net worth',
+    ]);
+    act(() => seriesButton('Net worth').click());
+    expect(seriesButton('Net worth').getAttribute('aria-pressed')).toBe('true');
+    expect(legend()).toEqual([
+      { name: 'mortgage', value: '$3,000.00' },
+      { name: 'renting', value: '$990.00' },
+    ]);
+    expect(host.querySelector('.comparison__month')?.textContent).toContain('Net worth in 2026-03');
+    expect(host.querySelector('.comparison__about')?.textContent).toMatch(/^Net worth is cash and investments/);
+  });
+
+  it('is not offered when nothing is owed', () => {
+    show(three());
+    expect([...host.querySelectorAll('.comparison__choice')].map((b) => b.textContent)).toEqual(['Total', 'Liquid']);
+    expect(host.querySelector('.comparison__about')).toBeNull();
+  });
+
+  it('goes back to total when a new run owes nothing', () => {
+    show(owing());
+    act(() => seriesButton('Net worth').click());
+    show(three());
+    expect(seriesButton('Total').getAttribute('aria-pressed')).toBe('true');
+    expect(host.querySelector('.comparison__month')?.textContent).toContain('Total in');
+  });
+});

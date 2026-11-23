@@ -185,3 +185,25 @@ describe('the key figures table', () => {
     expect(open.mock.calls[0]?.[0]).toBe(2);
   });
 });
+
+describe('net worth at the end', () => {
+  const owing = () => {
+    const data = results({
+      mortgage: { keyFigures: { ...figures(3000, '2025-02', 5500, 16115.2015), endingNetWorth: -150000 } },
+      renting: { keyFigures: { ...figures(5000, '2025-01', 8000, 18615.2015), endingNetWorth: 18615.2015 } },
+    });
+    data.rows[1]!.values[0] = { liquid: 1, total: 2, liabilities: 150002, netWorth: -150000, notes: [] };
+    return data;
+  };
+
+  it('is a column when some scenario owes something', () => {
+    show(owing());
+    expect(headers()).toEqual(['Scenario', 'Lowest cash', 'Ending cash', 'Ending total', 'Ending net worth']);
+    expect(body().map((row) => row[4])).toEqual(['-$150,000.00', '$18,615.20']);
+  });
+
+  it('is left out when nothing is owed', () => {
+    show(three());
+    expect(headers()).not.toContain('Ending net worth');
+  });
+});

@@ -284,6 +284,9 @@ export const HELP = {
     'A month works when every guardrail ticked here holds in it.',
     'A guardrail that does not apply to this scenario starts unticked.',
   ),
+
+  /* results */
+  netWorth: 'Net worth is cash and investments less what your loans still owe. It counts no home, car or other property.',
 } satisfies Record<string, Help>;
 
 export type HelpKey = keyof typeof HELP;

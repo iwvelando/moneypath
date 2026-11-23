@@ -295,6 +295,8 @@ describe('changing a baseline entry', () => {
     const card = changeCard();
     expect(card.querySelector('.editor-card__notice')).not.toBeNull();
     expect(card.textContent).toContain('The baseline has no loan named Mortgage');
+    // It stops the run, so it reads as an error, not a warning.
+    expect(card.querySelector('.target-note')?.className).toBe('target-note is-error');
     const written = (toConfigDocument(latest)['choices'] as { options: { change?: { loans: { name: string }[] } }[] }[])[0]!
       .options[1]!;
     expect(written.change!.loans[0]!.name).toBe('Mortgage');
@@ -372,6 +374,18 @@ describe('choosing a baseline entry to change or remove', () => {
     expect(picker('Housing', 'Sell and rent').value).toBe('');
     await click(card, 'Keep Living costs');
     expect(option('Housing', 'Sell and rent').remove.events).toEqual([]);
+  });
+
+  it('flags a removal whose entry the baseline lost, as an error', async () => {
+    await mount(example());
+    const card = optionCard('Housing', 'Sell and rent');
+    await choose(picker('Housing', 'Sell and rent'), 'liv');
+    await click(card, 'Remove it');
+    const living = latest.common.events.find((e) => e.name === 'Living costs')!;
+    await click(el(`event-${living.id}`), 'Remove Living costs');
+    const note = card.querySelector('.target-row .target-note');
+    expect(note?.textContent).toContain('The baseline has no event named Living costs');
+    expect(note?.className).toBe('target-note is-error');
   });
 
   it('starts a change with nothing changed yet', async () => {

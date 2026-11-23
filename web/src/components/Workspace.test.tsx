@@ -795,6 +795,35 @@ describe('run errors', () => {
     expect(buttons('Show the first')).toHaveLength(1);
   });
 
+  // A changed entry whose baseline target is gone writes its own note, so the
+  // error's place under its path is a hidden placeholder: going there means
+  // going to the entry.
+  it('goes to an entry that writes its own note about the error', async () => {
+    const choice = emptyChoice('Car');
+    const option = emptyOption('Refinance');
+    option.change.loans = [{ id: 'change-car', targetId: 'gone', targetName: 'Car loan', set: { interestRate: 3 } }];
+    choice.options = [option, emptyOption('Keep')];
+    const config = { ...makeConfig([], [emptyScenario('plan a', [choice])]), choices: [choice] };
+    const path = 'choices.0.options.0.change.loans.0';
+    await act(async () => {
+      render(
+        <Problems.Provider value={problemSet([{ level: 'error', path, where: 'Choice “Car”', message: 'The baseline has no loan named “Car loan”.' }])}>
+          <Harness initial={config} blocked />
+        </Problems.Provider>,
+        container,
+      );
+    });
+    const placeholder = container.querySelector<HTMLElement>(`[data-path="${path}"]`)!;
+    expect(placeholder.hidden).toBe(true);
+    const card = placeholder.closest<HTMLElement>('.editor-card')!;
+    await click('Show it');
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    });
+    expect(card.classList.contains('is-open')).toBe(true);
+    expect(document.activeElement).toBe(card);
+  });
+
   it('says nothing about errors until a run is asked for', async () => {
     await act(async () => {
       render(

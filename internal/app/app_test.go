@@ -162,8 +162,8 @@ scenarios:
 		t.Fatalf("want 2 scenarios' metrics, got %d", len(metrics))
 	}
 	want := []map[string]any{
-		{"lowestCash": 3000.0, "lowestCashDate": "2025-02", "endingCash": 5500.0, "endingTotal": 6500.0},
-		{"lowestCash": 5500.0, "lowestCashDate": "2025-01", "endingCash": 7000.0, "endingTotal": 8000.0},
+		{"lowestCash": 3000.0, "lowestCashDate": "2025-02", "endingCash": 5500.0, "endingTotal": 6500.0, "endingNetWorth": 6500.0},
+		{"lowestCash": 5500.0, "lowestCashDate": "2025-01", "endingCash": 7000.0, "endingTotal": 8000.0, "endingNetWorth": 8000.0},
 	}
 	for i, m := range metrics {
 		got, ok := m.(map[string]any)["keyFigures"].(map[string]any)
@@ -226,9 +226,11 @@ func TestResultsJSONComparesEveryOrderedPair(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := `[` +
-		`{"against":1,"cash":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,1100,0,-700]},"scenario":0,` +
+		`{"against":1,"cash":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,1100,0,-700]},` +
+		`"netWorth":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,1100,0,-700]},"scenario":0,` +
 		`"total":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,1100,0,-700]}},` +
-		`{"against":0,"cash":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,-1100,0,700]},"scenario":1,` +
+		`{"against":0,"cash":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,-1100,0,700]},` +
+		`"netWorth":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,-1100,0,700]},"scenario":1,` +
 		`"total":{"breakEven":[{"date":"2025-04","leader":1}],"difference":[0,-1100,0,700]}}]`
 	if string(got) != want {
 		t.Errorf("comparisons =\n%s\nwant\n%s", got, want)

@@ -1,5 +1,6 @@
 import { useId, useState } from 'preact/hooks';
 import type { BreakEvenMonth, ForecastResults } from '../engine/types';
+import { runOwes } from './balance';
 import { Chart } from './Chart';
 
 interface DifferenceProps {
@@ -49,6 +50,8 @@ export function Difference({ results }: DifferenceProps) {
   const comparison = comparisons.find((c) => c.scenario === first && c.against === second);
   if (!comparison) return null;
 
+  // Net worth is the total until something is owed.
+  const netWorth = runOwes(results) ? comparison.netWorth : undefined;
   const firstName = results.scenarios[first] ?? '';
   const secondName = results.scenarios[second] ?? '';
 
@@ -95,6 +98,7 @@ export function Difference({ results }: DifferenceProps) {
         <dl class="difference__breakeven">
           <BreakEven label="Total" months={comparison.total.breakEven} scenarios={results.scenarios} />
           <BreakEven label="Liquid" months={comparison.cash.breakEven} scenarios={results.scenarios} />
+          {netWorth ? <BreakEven label="Net worth" months={netWorth.breakEven} scenarios={results.scenarios} /> : null}
         </dl>
         <p class="difference__reading">
           Above zero, {firstName} is ahead of {secondName}; below zero, it is behind.
@@ -103,6 +107,7 @@ export function Difference({ results }: DifferenceProps) {
           dates={results.rows.map((row) => row.date)}
           liquid={comparison.cash.difference}
           total={comparison.total.difference}
+          netWorth={netWorth?.difference}
           scenarioName={firstName}
           subject={`of ${firstName} minus ${secondName}`}
         />

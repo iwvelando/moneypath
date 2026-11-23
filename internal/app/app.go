@@ -131,6 +131,7 @@ type comparisonJSON struct {
 	Against  int                  `json:"against"`
 	Cash     seriesComparisonJSON `json:"cash"`
 	Total    seriesComparisonJSON `json:"total"`
+	NetWorth seriesComparisonJSON `json:"netWorth"`
 }
 
 type seriesComparisonJSON struct {
@@ -145,6 +146,7 @@ type flipJSON struct {
 	Name     string         `json:"name"`
 	Cash     flipSeriesJSON `json:"cash"`
 	Total    flipSeriesJSON `json:"total"`
+	NetWorth flipSeriesJSON `json:"netWorth"`
 	// Guardrails are the flipped path's own; absent when the plan has none.
 	Guardrails []guardrailJSON `json:"guardrails,omitempty"`
 }
@@ -230,9 +232,11 @@ type rowJSON struct {
 }
 
 type valueJSON struct {
-	Liquid float64  `json:"liquid"`
-	Total  float64  `json:"total"`
-	Notes  []string `json:"notes"`
+	Liquid      float64  `json:"liquid"`
+	Total       float64  `json:"total"`
+	Liabilities float64  `json:"liabilities"`
+	NetWorth    float64  `json:"netWorth"`
+	Notes       []string `json:"notes"`
 }
 
 type metricJSON struct {
@@ -291,6 +295,7 @@ type keyFiguresJSON struct {
 	LowestCashDate string  `json:"lowestCashDate"`
 	EndingCash     float64 `json:"endingCash"`
 	EndingTotal    float64 `json:"endingTotal"`
+	EndingNetWorth float64 `json:"endingNetWorth"`
 }
 
 type efJSON struct {
@@ -376,9 +381,11 @@ func rowsJSON(res *engine.Result) []rowJSON {
 				notes = []string{}
 			}
 			row.Values = append(row.Values, valueJSON{
-				Liquid: sc.Liquid[idx],
-				Total:  sc.Total[idx],
-				Notes:  notes,
+				Liquid:      sc.Liquid[idx],
+				Total:       sc.Total[idx],
+				Liabilities: sc.Liabilities[idx],
+				NetWorth:    sc.NetWorth[idx],
+				Notes:       notes,
 			})
 		}
 		rows = append(rows, row)
@@ -394,6 +401,7 @@ func metricsJSON(res *engine.Result) []metricJSON {
 			LowestCashDate: sc.KeyFigures.LowestCashDate.String(),
 			EndingCash:     sc.KeyFigures.EndingCash,
 			EndingTotal:    sc.KeyFigures.EndingTotal,
+			EndingNetWorth: sc.KeyFigures.EndingNetWorth,
 		}, Guardrails: guardrailsJSON(sc.Guardrails)}
 		if sc.EmergencyFund != nil {
 			ef := sc.EmergencyFund
@@ -467,6 +475,7 @@ func comparisonsJSON(res *engine.Result, d *engine.Deflator) []comparisonJSON {
 				Against:  j,
 				Cash:     series(cmp.Cash),
 				Total:    series(cmp.Total),
+				NetWorth: series(cmp.NetWorth),
 			})
 		}
 	}
@@ -491,11 +500,12 @@ func flipJSONOf(res *engine.Result, fl *FlipResult, d *engine.Deflator) *flipJSO
 		return s
 	}
 	entry := &flipJSON{
-		Choice: fl.Choice,
-		Option: fl.Option,
-		Name:   fl.Name,
-		Cash:   series(cmp.Cash),
-		Total:  series(cmp.Total),
+		Choice:   fl.Choice,
+		Option:   fl.Option,
+		Name:     fl.Name,
+		Cash:     series(cmp.Cash),
+		Total:    series(cmp.Total),
+		NetWorth: series(cmp.NetWorth),
 
 		Guardrails: guardrailsJSON(guardrails),
 	}
