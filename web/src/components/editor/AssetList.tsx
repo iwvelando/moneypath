@@ -21,7 +21,7 @@ export function AssetFields({ asset, showName = true, onChange }: AssetFieldsPro
   const patch = (changes: Partial<AssetModel>) => onChange({ ...asset, ...changes });
   return (
     <>
-      <EditorFields title="Value">
+      <EditorFields title="Value over time">
         <div class="field-grid">
           {showName ? (
             <TextField field="name" label="Name" help={HELP.assetName} value={asset.name} required onInput={(name) => patch({ name })} />
