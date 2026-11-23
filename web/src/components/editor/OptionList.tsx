@@ -95,7 +95,7 @@ function ChangeCard({ kind, change, entry, simulation, onChange, onRemove, open,
       }
     >
       {effective === null ? (
-        <p class="target-note is-warning">
+        <p class="target-note is-error">
           The baseline has no {KIND_NOUN[kind]} named {name}. Add it back to the baseline under that name, or
           stop changing it here.
         </p>
@@ -281,7 +281,7 @@ function BaselineEffects({ config, choice, option, onChange }: BaselineEffectsPr
                   Removes <strong>{name}</strong>
                   <span class="target-row__kind"> ({KIND_NOUN[kind]})</span> on the paths that pick this option.
                   {entry ? null : (
-                    <span class="target-note is-warning">
+                    <span class="target-note is-error">
                       {' '}
                       The baseline has no {KIND_NOUN[kind]} named {name}. Add it back to the baseline under that
                       name, or keep it here.

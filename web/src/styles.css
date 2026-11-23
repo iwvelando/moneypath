@@ -3254,8 +3254,9 @@ input[type='checkbox'], input[type='radio'] {
   color: var(--text-muted);
 }
 
-.target-note.is-warning {
-  color: var(--warn);
+/* The entry it names is gone, which stops a run: an error. */
+.target-note.is-error {
+  color: var(--danger);
 }
 
 p.target-note {
