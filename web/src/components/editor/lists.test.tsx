@@ -3,9 +3,11 @@ import { useState } from 'preact/hooks';
 import { act } from 'preact/test-utils';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  emptyAsset,
   emptyEvent,
   emptyInvestment,
   emptyLoan,
+  type AssetModel,
   type EventModel,
   type InvestmentModel,
   type LoanModel,
@@ -15,6 +17,8 @@ import {
 import { EventList } from './EventList';
 import { InvestmentList } from './InvestmentList';
 import { LoanList } from './LoanList';
+import { AssetList } from './AssetList';
+import { AssetNames } from './assetNames';
 
 const simulation: SimulationModel = {
   startDate: '',
@@ -278,5 +282,63 @@ describe('the guardrail an optimizer target is held to', () => {
       field.dispatchEvent(new Event('change', { bubbles: true }));
     });
     expect(onChange.mock.calls.at(-1)![0][0]!.optimize).toMatchObject({ field: 'endDate', guardrail: 'Cushion' });
+  });
+});
+
+describe('assets', () => {
+  it('AssetList prepends a new asset and edits its value and appreciation', async () => {
+    function Harness({ onChange }: { onChange: (assets: AssetModel[]) => void }) {
+      const [assets, setAssets] = useState<AssetModel[]>([{ ...emptyAsset(), name: 'House', value: 300000 }]);
+      return <AssetList assets={assets} onChange={(next) => { setAssets(next); onChange(next); }} />;
+    }
+    const onChange = vi.fn<(assets: AssetModel[]) => void>();
+    await act(async () => render(<Harness onChange={onChange} />, container));
+    await act(async () => click('Add asset'));
+    const added = onChange.mock.calls[0]![0]!;
+    expect(added.map((asset) => asset.name)).toEqual(['', 'House']);
+    // The new card opens with its fields.
+    const labels = Array.from(container.querySelectorAll('label')).map((el) => el.textContent?.trim());
+    expect(labels).toEqual(expect.arrayContaining(['Value', 'Appreciation', 'Purchase month', 'Sale month', 'Selling costs']));
+  });
+
+  it('a loan offers the plan’s assets under Secured on, and hides its own sale once secured', async () => {
+    const onChange = vi.fn<(loans: LoanModel[]) => void>();
+    const show = async (loan: LoanModel) => {
+      await act(async () => {
+        render(
+          <AssetNames.Provider value={['House', 'Car']}>
+            <LoanList loans={[loan]} simulation={simulation} onChange={onChange} />
+          </AssetNames.Provider>,
+          container,
+        );
+      });
+      const toggle = container.querySelector<HTMLButtonElement>('button[aria-expanded="false"]');
+      if (toggle) await act(async () => toggle.click());
+    };
+    await show({ ...emptyLoan(), name: 'Mortgage' });
+    const select = (): HTMLSelectElement => {
+      const label = Array.from(container.querySelectorAll('label')).find((el) => el.textContent?.trim() === 'Secured on');
+      return container.querySelector<HTMLSelectElement>(`#${label!.getAttribute('for')!}`)!;
+    };
+    expect(Array.from(select().options).map((o) => o.textContent)).toEqual(['No asset', 'House', 'Car']);
+    expect(container.textContent).toContain('Sell the property at payoff');
+
+    await act(async () => {
+      select().value = 'House';
+      select().dispatchEvent(new Event('change', { bubbles: true }));
+    });
+    expect(onChange.mock.calls.at(-1)![0]![0]!.asset).toBe('House');
+
+    await show({ ...emptyLoan(), name: 'Mortgage', asset: 'House' });
+    expect(container.textContent).not.toContain('Sell the property at payoff');
+    expect(container.textContent).toContain('This loan is paid off when House is sold');
+
+    // A sale of its own stays on screen, for the engine's error.
+    await show({ ...emptyLoan(), name: 'Mortgage', asset: 'House', sellProperty: true });
+    expect(container.textContent).toContain('Sell the property at payoff');
+
+    // A name the plan does not list stays picked, as written.
+    await show({ ...emptyLoan(), name: 'Mortgage', asset: 'Yacht' });
+    expect(select().value).toBe('Yacht');
   });
 });

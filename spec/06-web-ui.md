@@ -54,9 +54,12 @@ The app covers, at a coarse grain:
 
 - A **config editor** — simulation settings (including the interest rate cash earns
   and the plan's inflation rate),
-  the baseline (the config's `common` events / loans / investments), choices with their
-  options, and scenarios with their selections, their own events / loans / investments
-  and per-event optimizer blocks. Existing entries appear as compact
+  the baseline (the config's `common` events / loans / investments / assets), choices
+  with their options, and scenarios with their selections, their own events / loans /
+  investments / assets and per-event optimizer blocks. A loan picks the asset it is
+  secured on under "Secured on", from every asset name in the plan; once secured, its
+  own sale fields are hidden unless they hold something, in place of a line saying the
+  loan is paid off when the asset is sold. Existing entries appear as compact
   summaries and open into inline forms. Several entries can stay open, and each list
   offers Expand all / Collapse all. Adding or duplicating an entry opens it and focuses
   its name; jumping to an optimized event reveals its form. Collapsing an entry
@@ -146,12 +149,13 @@ The app covers, at a coarse grain:
   debt-free, `held to <name>` with the guardrail's own wording for when the debt clears.
 - **Results** — per-scenario summary (emergency fund, optimizer adjustments), a chart of
   liquid and total over time, and the full month-by-month table. The table initially
-  shows Date, Liquid, and Total. For a path that owes something in some month, the
-  chart adds net worth as a dashed third line, which is not tinted below zero, the table
-  adds Debt (what its loans still owe) and Net worth, and the chart's heading says that
-  net worth is cash and investments less what the loans owe, counting no home, car or
-  other property. A path that owes nothing has a net worth equal to its total and shows
-  neither. Months with notes have an arrow and a disclosure
+  shows Date, Liquid, and Total. For a path that owes something or holds an asset in
+  some month, the chart adds net worth as a dashed third line, which is not tinted below
+  zero, the table adds Debt (what its loans still owe) and Net worth, and the chart's
+  heading says that net worth is cash, investments and the listed assets less what the
+  loans owe. A path that holds an asset also has Assets (before Debt) and Equity (after
+  Net worth) columns, and the heading adds what equity is. A path that owes and holds
+  nothing has a net worth equal to its total and shows none of these. Months with notes have an arrow and a disclosure
   button; clicking or tapping anywhere on that summary row, or activating its button
   with the keyboard, reveals the engine's notes as a list below it. Several months
   can stay open. Months without notes have no disclosure; switching scenarios or
@@ -159,7 +163,7 @@ The app covers, at a coarse grain:
   With two or more scenarios, a Compare entry follows the scenario tabs and draws every
   scenario on one chart, in the plan's order, for one series at a time: the total first,
   with a control to switch to liquid, and to net worth when some scenario owes
-  something; net worth comes with the same sentence on what it counts. Its vertical scale fits every scenario, including
+  or holds something; net worth comes with the same sentence on what it counts. Its vertical scale fits every scenario, including
   one whose cash goes negative. Its legend names each scenario and doubles as the month
   readout: it lists every scenario's value for the month under the pointer, a tap, or
   the keyboard cursor, and for the final month otherwise. A plan with one scenario has
@@ -167,7 +171,7 @@ The app covers, at a coarse grain:
   containing only one month remains visible. Under the chart, a table of key
   figures has one row per scenario, in the plan's order: the lowest cash and the month
   it is reached, cash and total at the end of the plan, net worth at the end when some
-  scenario owes something, and the emergency-fund shortfall or surplus. The emergency-fund column is left out when the recommendation
+  scenario owes or holds something, and the emergency-fund shortfall or surplus. The emergency-fund column is left out when the recommendation
   is disabled, never shown as zero. When the plan has guardrails, a second table under
   the key figures has a row per scenario and a column per guardrail: whether it holds,
   the month it first breaks, its tightest month and the margin there, as an amount to
@@ -184,7 +188,7 @@ The app covers, at a coarse grain:
   pickers choose one scenario and the scenario to subtract from it, starting with the
   plan's first two, and choosing the scenario the other picker holds swaps them, so a
   scenario is never compared with itself. For the total and for liquid, and for net worth
-  when some scenario owes something, it lists the break-even months, each with the
+  when some scenario owes or holds something, it lists the break-even months, each with the
   scenario that moves ahead, or says that the lead never changes hands; a chart draws
   the differences over time with the same month
   readout as a scenario's own chart, tinting the months a difference is below zero.
@@ -194,7 +198,7 @@ The app covers, at a coarse grain:
   that one decision made differently and everything else as it is (chapter 02, Results
   JSON, `flip`). It shows the break-even months and the difference over time, as the
   comparison of two scenarios does, with net worth when some scenario of the run owes
-  something or the flipped path owes differently from the scenario. This works for a plan with one scenario, is left
+  or holds something or the flipped path's net-worth difference departs from its total's. This works for a plan with one scenario, is left
   out when no choice has another option to switch to, and describes the plan as it was
   run even after the editor has moved on. Reading it changes nothing. The flipped path
   enters the plan only when the reader keeps it, as a copy of the scenario placed after
