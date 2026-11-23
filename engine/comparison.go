@@ -2,11 +2,12 @@ package engine
 
 import "github.com/iwvelando/moneypath/config"
 
-// Comparison is one scenario minus another, for cash and for total (spec
-// chapter 04 §9).
+// Comparison is one scenario minus another, for cash, total and net worth
+// (spec chapter 04 §9).
 type Comparison struct {
-	Cash  SeriesComparison
-	Total SeriesComparison
+	Cash     SeriesComparison
+	Total    SeriesComparison
+	NetWorth SeriesComparison
 }
 
 // SeriesComparison holds one series of a Comparison. Difference has one entry
@@ -32,8 +33,9 @@ func (r *Result) Compare(a, b *ScenarioResult) Comparison {
 // is month start+i (spec chapter 04 §9).
 func Compare(start config.Month, a, b *ScenarioResult) Comparison {
 	return Comparison{
-		Cash:  compareSeries(start, a.Liquid, b.Liquid),
-		Total: compareSeries(start, a.Total, b.Total),
+		Cash:     compareSeries(start, a.Liquid, b.Liquid),
+		Total:    compareSeries(start, a.Total, b.Total),
+		NetWorth: compareSeries(start, a.NetWorth, b.NetWorth),
 	}
 }
 

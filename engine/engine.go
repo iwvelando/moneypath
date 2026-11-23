@@ -5,7 +5,9 @@ package engine
 
 import (
 	"fmt"
+	"maps"
 	"math"
+	"slices"
 
 	"github.com/iwvelando/moneypath/config"
 )
@@ -31,7 +33,11 @@ type ScenarioResult struct {
 	Name   string
 	Liquid []float64
 	Total  []float64
-	Notes  [][]string
+	// Liabilities is what every loan of the path owes at the end of each
+	// month, and NetWorth is Total less it (spec chapter 04 §1, step 6).
+	Liabilities []float64
+	NetWorth    []float64
+	Notes       [][]string
 	// Owed is the principal each loan name owes at the end of each month,
 	// summed over the path's loans with that name, and Holdings each account
 	// name's value; both are index-aligned with Liquid. They are read by
@@ -53,14 +59,19 @@ type KeyFigures struct {
 	LowestCashDate config.Month
 	EndingCash     float64
 	EndingTotal    float64
+	EndingNetWorth float64
 }
 
 // keyFigures reads a scenario's key figures from its recorded series, whose
 // index i is month start+i. Lowest cash is decided in whole cents and the
 // earliest month attaining it wins (spec chapter 04 §8).
-func keyFigures(start config.Month, liquid, total []float64) KeyFigures {
+func keyFigures(start config.Month, liquid, total, netWorth []float64) KeyFigures {
 	if len(liquid) == 0 || len(total) == 0 {
 		return KeyFigures{LowestCashDate: start}
+	}
+	endingNetWorth := 0.0
+	if len(netWorth) > 0 {
+		endingNetWorth = netWorth[len(netWorth)-1]
 	}
 	lowest := 0
 	for i, v := range liquid {
@@ -73,6 +84,7 @@ func keyFigures(start config.Month, liquid, total []float64) KeyFigures {
 		LowestCashDate: start + config.Month(lowest),
 		EndingCash:     liquid[len(liquid)-1],
 		EndingTotal:    total[len(total)-1],
+		EndingNetWorth: endingNetWorth,
 	}
 }
 
@@ -302,7 +314,14 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		}
 	}
 
-	sr.KeyFigures = keyFigures(start, sr.Liquid, sr.Total)
+	// Step 6's liabilities are what a debtFree that lists no loans reads, summed
+	// the same way, so the two agree to the bit (spec chapter 04 §1, §10).
+	sr.Liabilities = owedOn(sr.Owed, slices.Sorted(maps.Keys(sr.Owed)), n)
+	sr.NetWorth = make([]float64, n)
+	for i := range n {
+		sr.NetWorth[i] = sr.Total[i] - sr.Liabilities[i]
+	}
+	sr.KeyFigures = keyFigures(start, sr.Liquid, sr.Total, sr.NetWorth)
 
 	if emMonths > 0 {
 		ef := &EmergencyFund{TargetMonths: emMonths, InitialLiquid: startingCash}

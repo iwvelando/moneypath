@@ -1,5 +1,6 @@
 import type { EmergencyFundMetrics, ForecastResults } from '../engine/types';
 import { formatMoney, isNegativeMoney } from '../util/format';
+import { runOwes } from './balance';
 import { ScenarioSample } from './scenarioStyle';
 
 interface KeyFiguresProps {
@@ -9,6 +10,7 @@ interface KeyFiguresProps {
 }
 
 const COLUMNS = ['Lowest cash', 'Ending cash', 'Ending total'];
+const NET_WORTH_COLUMN = 'Ending net worth';
 const FUND_COLUMN = 'Emergency fund';
 
 /** The column's name, shown beside the value where the table stacks; the header cell already tells assistive technology. */
@@ -61,6 +63,8 @@ function FundCell({ fund }: { fund: EmergencyFundMetrics | null }) {
 export function KeyFigures({ results, onOpenScenario }: KeyFiguresProps) {
   // The recommendation is on or off for the whole run, so the column is too.
   const showFund = results.metrics.some((metrics) => metrics?.emergencyFund);
+  // Until something is owed, net worth is the total.
+  const showNetWorth = runOwes(results);
 
   return (
     <section class="figures">
@@ -79,6 +83,11 @@ export function KeyFigures({ results, onOpenScenario }: KeyFiguresProps) {
                   {column}
                 </th>
               ))}
+              {showNetWorth ? (
+                <th role="columnheader" scope="col" class="numeric">
+                  {NET_WORTH_COLUMN}
+                </th>
+              ) : null}
               {showFund ? (
                 <th role="columnheader" scope="col" class="numeric">
                   {FUND_COLUMN}
@@ -119,6 +128,7 @@ export function KeyFigures({ results, onOpenScenario }: KeyFiguresProps) {
                   />
                   <MoneyCell label={COLUMNS[1]!} value={figures?.endingCash} />
                   <MoneyCell label={COLUMNS[2]!} value={figures?.endingTotal} />
+                  {showNetWorth ? <MoneyCell label={NET_WORTH_COLUMN} value={figures?.endingNetWorth} /> : null}
                   {showFund ? <FundCell fund={metrics?.emergencyFund ?? null} /> : null}
                 </tr>
               );

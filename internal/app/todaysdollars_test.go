@@ -47,9 +47,11 @@ scenarios:
 // amountKeys are the fields chapter 04 §12 converts; everything else in
 // today's dollars repeats the nominal results.
 var amountKeys = map[string]bool{
-	"liquid": true, "total": true, "difference": true, "margin": true, "owed": true,
+	"liquid": true, "total": true, "liabilities": true, "netWorth": true,
+	"difference": true, "margin": true, "owed": true,
 	"floor": true, "minimumCash": true, "headroom": true,
 	"lowestCash": true, "lowestCashDate": true, "endingCash": true, "endingTotal": true,
+	"endingNetWorth": true,
 }
 
 // masked drops every converted field, so what is left must match exactly.
@@ -152,7 +154,7 @@ func TestResultsJSONCarriesTodaysDollars(t *testing.T) {
 		row, trow := r.(map[string]any), todayRows[i].(map[string]any)
 		for s, v := range row["values"].([]any) {
 			nv, tv := v.(map[string]any), trow["values"].([]any)[s].(map[string]any)
-			for _, k := range []string{"liquid", "total"} {
+			for _, k := range []string{"liquid", "total", "liabilities", "netWorth"} {
 				if want := nv[k].(float64) / at(row["date"]); tv[k] != want {
 					t.Errorf("%s %s scenario %d = %v, want %v", row["date"], k, s, tv[k], want)
 				}
@@ -164,7 +166,7 @@ func TestResultsJSONCarriesTodaysDollars(t *testing.T) {
 		t.Fatalf("%d comparisons", len(cmps))
 	}
 	for i, c := range cmps {
-		for _, series := range []string{"cash", "total"} {
+		for _, series := range []string{"cash", "total", "netWorth"} {
 			nd := c.(map[string]any)[series].(map[string]any)["difference"].([]any)
 			td := todayCmps[i].(map[string]any)[series].(map[string]any)["difference"].([]any)
 			for j := range nd {
@@ -182,6 +184,7 @@ func TestResultsJSONCarriesTodaysDollars(t *testing.T) {
 		want := map[string]any{
 			"lowestCash": kf.LowestCash, "lowestCashDate": kf.LowestCashDate.String(),
 			"endingCash": kf.EndingCash, "endingTotal": kf.EndingTotal,
+			"endingNetWorth": kf.EndingNetWorth,
 		}
 		if !reflect.DeepEqual(tm["keyFigures"], want) {
 			t.Errorf("scenario %d key figures %v, want %v", s, tm["keyFigures"], want)
@@ -247,6 +250,12 @@ func TestTodaysDollarsCarryTheFlipAndTheEarliestMonth(t *testing.T) {
 	for i, v := range f.Flip.Comparison.Cash.Difference {
 		if want := v / d.At(start+config.Month(i)); cash[i] != want {
 			t.Errorf("flip cash difference %d = %v, want %v", i, cash[i], want)
+		}
+	}
+	netWorth := flip["netWorth"].(map[string]any)["difference"].([]any)
+	for i, v := range f.Flip.Comparison.NetWorth.Difference {
+		if want := v / d.At(start+config.Month(i)); netWorth[i] != want {
+			t.Errorf("flip net worth difference %d = %v, want %v", i, netWorth[i], want)
 		}
 	}
 	wantGuardrails := d.Guardrails(f.Flip.Flipped.Guardrails)

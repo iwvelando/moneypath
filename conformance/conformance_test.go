@@ -68,6 +68,9 @@ type pairComparison struct {
 	Against  string            `yaml:"against"`
 	Cash     *seriesComparison `yaml:"cash"`
 	Total    *seriesComparison `yaml:"total"`
+	// NetWorth is optional: expected.csv has no net-worth column to check its
+	// months against (spec chapter 08).
+	NetWorth *seriesComparison `yaml:"netWorth"`
 }
 
 type seriesComparison struct {
@@ -111,6 +114,8 @@ type keyFigureMetric struct {
 	LowestCashDate string  `yaml:"lowestCashDate"`
 	EndingCash     float64 `yaml:"endingCash"`
 	EndingTotal    float64 `yaml:"endingTotal"`
+	// EndingNetWorth is optional; nil leaves it unchecked (spec chapter 08).
+	EndingNetWorth *float64 `yaml:"endingNetWorth"`
 }
 
 type optMetric struct {
@@ -355,6 +360,42 @@ func compareComparisons(t *testing.T, want []pairComparison, res *engine.Result,
 			}
 			compareDifferences(t, pair, series.name, diff, rows, a, b, stride, series.column, tol)
 		}
+		if wp.NetWorth != nil {
+			compareNetWorth(t, pair, wp, got, res.Deflator())
+		}
+	}
+}
+
+// compareNetWorth checks a pinned net-worth comparison: its break-even months,
+// the same in today's dollars, and its ending difference. expected.csv has no
+// net-worth column, so its months are not checked one by one (spec chapter
+// 08).
+func compareNetWorth(t *testing.T, pair string, wp pairComparison, got engine.Comparison, d *engine.Deflator) {
+	t.Helper()
+	gotMonths := []breakEvenMonth{}
+	for _, be := range got.NetWorth.BreakEven {
+		leader := wp.Against
+		if be.FirstAhead {
+			leader = wp.Scenario
+		}
+		gotMonths = append(gotMonths, breakEvenMonth{Date: be.Month.String(), Leader: leader})
+	}
+	wantMonths := append([]breakEvenMonth{}, wp.NetWorth.BreakEven...)
+	if !reflect.DeepEqual(gotMonths, wantMonths) {
+		t.Errorf("%s: netWorth break-even want %v, got %v", pair, wantMonths, gotMonths)
+	}
+	diff := got.NetWorth.Difference
+	if len(diff) == 0 {
+		t.Errorf("%s: netWorth difference is empty", pair)
+		return
+	}
+	if last := diff[len(diff)-1]; math.Abs(last-wp.NetWorth.EndingDifference) > 0.01 {
+		t.Errorf("%s: netWorth endingDifference want %.4f, got %.4f", pair, wp.NetWorth.EndingDifference, last)
+	}
+	if d != nil {
+		if today := d.Comparison(got).NetWorth; !reflect.DeepEqual(today.BreakEven, got.NetWorth.BreakEven) {
+			t.Errorf("%s: netWorth break-even in today's dollars %v, nominal %v", pair, today.BreakEven, got.NetWorth.BreakEven)
+		}
 	}
 }
 
@@ -455,6 +496,9 @@ func compareMetrics(t *testing.T, want []scenarioMetric, res *engine.Result) {
 				if math.Abs(c.want-c.got) > tol {
 					t.Errorf("scenario %q: keyFigures.%s want %.4f, got %.4f", wm.Scenario, c.name, c.want, c.got)
 				}
+			}
+			if w := wk.EndingNetWorth; w != nil && math.Abs(*w-gk.EndingNetWorth) > tol {
+				t.Errorf("scenario %q: keyFigures.endingNetWorth want %.4f, got %.4f", wm.Scenario, *w, gk.EndingNetWorth)
 			}
 		}
 		if len(wm.EmergencyFund) > 0 {

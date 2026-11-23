@@ -8,6 +8,7 @@ import {
   type Reading,
   type Readings,
 } from '../engine/types';
+import { runOwes, seriesDiffer } from './balance';
 import { Chart } from './Chart';
 import { BreakEven } from './Difference';
 import { GuardrailTable } from './Guardrails';
@@ -108,6 +109,12 @@ export function Flip({ results, reading = 'nominal', scenario, subject, run, onK
   // The answer in the reading chosen; the months are the same in both.
   const flip = outcome.state === 'done' ? pick(outcome.answer, reading) : null;
   const metrics = inReading(results, reading).metrics;
+  // Net worth shows when something is owed on either path: the run's, or the
+  // flipped path's, which only shows as a net worth unlike the total.
+  const netWorth =
+    flip?.netWorth && (runOwes(results) || seriesDiffer(flip.netWorth.difference, flip.total.difference))
+      ? flip.netWorth
+      : undefined;
 
   return (
     <section class="flip">
@@ -179,6 +186,13 @@ export function Flip({ results, reading = 'nominal', scenario, subject, run, onK
                 months={flip.cash.breakEven.map((m) => ({ date: m.date, leader: m.flipped ? 0 : 1 }))}
                 scenarios={[flip.name, scenarioName]}
               />
+              {netWorth ? (
+                <BreakEven
+                  label="Net worth"
+                  months={netWorth.breakEven.map((m) => ({ date: m.date, leader: m.flipped ? 0 : 1 }))}
+                  scenarios={[flip.name, scenarioName]}
+                />
+              ) : null}
             </dl>
             <p class="difference__reading">
               Above zero, {scenarioName} is better off with {option.name} than with {choice.current.name}; below
@@ -198,6 +212,7 @@ export function Flip({ results, reading = 'nominal', scenario, subject, run, onK
               dates={results.rows.map((row) => row.date)}
               liquid={flip.cash.difference}
               total={flip.total.difference}
+              netWorth={netWorth?.difference}
               scenarioName={flip.name}
               subject={`of ${flip.name} minus ${scenarioName}`}
             />

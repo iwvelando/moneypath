@@ -183,3 +183,30 @@ describe('the difference between two scenarios', () => {
     expect(host.innerHTML).toBe('');
   });
 });
+
+describe('the difference in net worth', () => {
+  const owing = () => {
+    const data = three();
+    data.rows[1]!.values[1] = { liquid: 1, total: 2, liabilities: 300, netWorth: -298, notes: [] };
+    data.comparisons = data.comparisons!.map((c) => ({
+      ...c,
+      netWorth: c.scenario === 0 && c.against === 1
+        ? series([0, 450, 175], [{ date: '2026-02', leader: 0 }])
+        : series(c.total.difference),
+    }));
+    return data;
+  };
+
+  it('lists its break-even months and charts it when some scenario owes something', () => {
+    show(owing());
+    expect(breakEven('Net worth')).toBe('2026-02: rent moves ahead');
+    expect(host.querySelectorAll('.chart__line')).toHaveLength(3);
+    expect(finalMonth()).toBe('2026-03: liquid -$250.00, total $175.00, net worth $175.00');
+  });
+
+  it('is left out when nothing is owed', () => {
+    show(three());
+    expect(host.querySelectorAll('.difference__breakeven > div')).toHaveLength(2);
+    expect(host.querySelectorAll('.chart__line')).toHaveLength(2);
+  });
+});

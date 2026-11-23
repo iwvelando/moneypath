@@ -13,7 +13,7 @@ func TestKeyFiguresReadTheRecordedSeries(t *testing.T) {
 	start := month(t, "2025-01")
 	got := keyFigures(start,
 		[]float64{5000, 4200, 1800.25, 2600, 3100},
-		[]float64{9000, 8300, 6000, 6900, 7500.5})
+		[]float64{9000, 8300, 6000, 6900, 7500.5}, nil)
 	want := KeyFigures{
 		LowestCash:     1800.25,
 		LowestCashDate: month(t, "2025-03"),
@@ -28,7 +28,7 @@ func TestKeyFiguresReadTheRecordedSeries(t *testing.T) {
 // Spec chapter 04 §8: when several months share the lowest cash, the earliest
 // is reported.
 func TestKeyFiguresLowestCashTieGoesToTheEarliestMonth(t *testing.T) {
-	got := keyFigures(month(t, "2025-01"), []float64{5000, 3000, 5000, 3000, 6000}, []float64{5000, 3000, 5000, 3000, 6000})
+	got := keyFigures(month(t, "2025-01"), []float64{5000, 3000, 5000, 3000, 6000}, []float64{5000, 3000, 5000, 3000, 6000}, nil)
 	if got.LowestCashDate != month(t, "2025-02") || got.LowestCash != 3000 {
 		t.Errorf("lowest cash = %v at %s, want 3000 at 2025-02", got.LowestCash, got.LowestCashDate)
 	}
@@ -38,7 +38,7 @@ func TestKeyFiguresLowestCashTieGoesToTheEarliestMonth(t *testing.T) {
 // that is lower only by float noise does not take the place of an earlier one,
 // and the value reported is the earlier month's own.
 func TestKeyFiguresLowestCashComparesWholeCents(t *testing.T) {
-	got := keyFigures(month(t, "2025-01"), []float64{100, 50.004, 50.001, 60}, []float64{100, 50.004, 50.001, 60})
+	got := keyFigures(month(t, "2025-01"), []float64{100, 50.004, 50.001, 60}, []float64{100, 50.004, 50.001, 60}, nil)
 	if got.LowestCashDate != month(t, "2025-02") || got.LowestCash != 50.004 {
 		t.Errorf("lowest cash = %v at %s, want 50.004 at 2025-02", got.LowestCash, got.LowestCashDate)
 	}
@@ -47,7 +47,7 @@ func TestKeyFiguresLowestCashComparesWholeCents(t *testing.T) {
 // Spec chapter 04 §8: cash that never falls after the start month reports
 // that month's cash and the start month.
 func TestKeyFiguresLowestCashCanBeTheStartMonth(t *testing.T) {
-	got := keyFigures(month(t, "2025-01"), []float64{5000, 5500, 6000}, []float64{5000, 5500, 6000})
+	got := keyFigures(month(t, "2025-01"), []float64{5000, 5500, 6000}, []float64{5000, 5500, 6000}, nil)
 	if got.LowestCashDate != month(t, "2025-01") || got.LowestCash != 5000 {
 		t.Errorf("lowest cash = %v at %s, want 5000 at 2025-01", got.LowestCash, got.LowestCashDate)
 	}

@@ -86,7 +86,8 @@ func (d *Deflator) Result(r *Result) *Result {
 func (d *Deflator) Path(sr *ScenarioResult) *ScenarioResult {
 	out := *sr
 	out.Liquid, out.Total = d.series(sr.Liquid), d.series(sr.Total)
-	out.KeyFigures = keyFigures(d.start, out.Liquid, out.Total)
+	out.Liabilities, out.NetWorth = d.series(sr.Liabilities), d.series(sr.NetWorth)
+	out.KeyFigures = keyFigures(d.start, out.Liquid, out.Total, out.NetWorth)
 	out.Guardrails = d.Guardrails(sr.Guardrails)
 	out.Optimizations = nil
 	for _, o := range sr.Optimizations {
@@ -135,5 +136,5 @@ func (d *Deflator) Comparison(c Comparison) Comparison {
 	series := func(s SeriesComparison) SeriesComparison {
 		return SeriesComparison{Difference: d.series(s.Difference), BreakEven: s.BreakEven}
 	}
-	return Comparison{Cash: series(c.Cash), Total: series(c.Total)}
+	return Comparison{Cash: series(c.Cash), Total: series(c.Total), NetWorth: series(c.NetWorth)}
 }

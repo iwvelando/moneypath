@@ -42,4 +42,6 @@ any other; choices and options do not appear:
 
 The CSV carries the forecast only. Comparisons between scenarios, a flipped path and
 guardrail results (chapter 02, Results JSON) are not part of it, so a plan with
-guardrails renders the same CSV as the plan without them.
+guardrails renders the same CSV as the plan without them. Liabilities and net worth
+(chapter 04 §1) are in the results, not the CSV, so a plan with loans renders the same
+columns as it always has.

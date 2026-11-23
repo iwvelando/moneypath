@@ -155,19 +155,8 @@ func debtFreeTest(out *GuardrailResult, g *config.Guardrail, start, first, last 
 		// amount is the same on every run and in every build.
 		names = slices.Sorted(maps.Keys(path.Owed))
 	}
-	var loans [][]float64
-	for _, name := range names {
-		if v, ok := path.Owed[name]; ok {
-			loans = append(loans, v)
-		}
-	}
-	owed := func(m config.Month) float64 {
-		total := 0.0
-		for _, v := range loans {
-			total += v[m-start]
-		}
-		return total
-	}
+	series := owedOn(path.Owed, names, len(path.Liquid))
+	owed := func(m config.Month) float64 { return series[m-start] }
 	out.Result = GuardrailHolds
 	for m := first; m <= last; m++ {
 		if round2(owed(m)) != 0 {
@@ -184,4 +173,16 @@ func debtFreeTest(out *GuardrailResult, g *config.Guardrail, start, first, last 
 	}
 	out.HasTightest, out.Tightest = true, cleared
 	out.MarginMonths = int(first - cleared)
+}
+
+// owedOn is what the loans with the given names owe in each of n months,
+// summed in the order given. A name with no loan owes nothing.
+func owedOn(owed map[string][]float64, names []string, n int) []float64 {
+	out := make([]float64, n)
+	for _, name := range names {
+		for i, v := range owed[name] {
+			out[i] += v
+		}
+	}
+	return out
 }

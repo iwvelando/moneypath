@@ -136,6 +136,7 @@ scenarios:
 		LowestCashDate: end,
 		EndingCash:     25000 / d.At(end),
 		EndingTotal:    26000 / d.At(end),
+		EndingNetWorth: 26000 / d.At(end),
 	}
 	if sr.KeyFigures != want {
 		t.Errorf("key figures in today's dollars %+v, want %+v", sr.KeyFigures, want)

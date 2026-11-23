@@ -1,10 +1,12 @@
 import { useId, useMemo, useState } from 'preact/hooks';
+import { HELP } from '../config/help';
 import { EmptyChartSketch } from '../components/icons';
 import type { ForecastResults } from '../engine/types';
 import { formatMoney, isNegativeMoney } from '../util/format';
 import { ChartAxes, plotOf, useChartWidth, useMonthCursor } from './chartParts';
 import { extentOf, segments, valueScale, type Series } from './chartScale';
 import { GuardrailTable } from './Guardrails';
+import { runOwes } from './balance';
 import { KeyFigures } from './KeyFigures';
 import { SCENARIO_COLORS, ScenarioSample, styleOf } from './scenarioStyle';
 
@@ -12,11 +14,12 @@ import { SCENARIO_COLORS, ScenarioSample, styleOf } from './scenarioStyle';
 // right pad only has to hold half of the last date label.
 const PAD = { top: 18, right: 28, bottom: 34, left: 72 };
 
-type SeriesKey = 'total' | 'liquid';
+type SeriesKey = 'total' | 'liquid' | 'netWorth';
 
 const SERIES: { key: SeriesKey; label: string }[] = [
   { key: 'total', label: 'Total' },
   { key: 'liquid', label: 'Liquid' },
+  { key: 'netWorth', label: 'Net worth' },
 ];
 
 interface ComparisonProps {
@@ -32,7 +35,11 @@ interface ComparisonProps {
  * cursor, and for the final month otherwise.
  */
 export function Comparison({ results, onOpenScenario }: ComparisonProps) {
-  const [seriesKey, setSeriesKey] = useState<SeriesKey>('total');
+  const [chosenKey, setSeriesKey] = useState<SeriesKey>('total');
+  // Net worth is offered once something is owed; until then it is the total.
+  const owes = useMemo(() => runOwes(results), [results]);
+  const offered = owes ? SERIES : SERIES.filter((series) => series.key !== 'netWorth');
+  const seriesKey = offered.some((series) => series.key === chosenKey) ? chosenKey : 'total';
   const seriesLabel = SERIES.find((series) => series.key === seriesKey)?.label ?? '';
 
   const dates = useMemo(() => results.rows.map((row) => row.date), [results.rows]);
@@ -51,7 +58,7 @@ export function Comparison({ results, onOpenScenario }: ComparisonProps) {
       <div class="results__section-heading comparison__heading">
         <h3>Scenarios side by side</h3>
         <div class="comparison__series" role="group" aria-label="Series to compare">
-          {SERIES.map((series) => (
+          {offered.map((series) => (
             <button
               key={series.key}
               type="button"
@@ -64,6 +71,7 @@ export function Comparison({ results, onOpenScenario }: ComparisonProps) {
           ))}
         </div>
       </div>
+      {seriesKey === 'netWorth' ? <p class="comparison__about">{HELP.netWorth}</p> : null}
       <ComparisonChart dates={dates} lines={lines} seriesLabel={seriesLabel} />
       </div>
       <KeyFigures results={results} onOpenScenario={onOpenScenario} />
@@ -148,7 +156,7 @@ function ComparisonChart({ dates, lines, seriesLabel }: ComparisonChartProps) {
           {...handlers}
         >
           <title id={titleId}>
-            {`${seriesLabel} net worth for every scenario (${lines
+            {`${seriesLabel === 'Net worth' ? seriesLabel : `${seriesLabel} net worth`} for every scenario (${lines
               .map((line) => line.name)
               .join(', ')}), ${dates[0]} to ${dates[count - 1]}. Use the arrow keys to read individual months.`}
           </title>

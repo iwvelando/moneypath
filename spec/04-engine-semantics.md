@@ -73,11 +73,24 @@ For each **active** scenario, independently:
   5. **Update cash**:
      `cash += cashInterest + eventDelta + loanDelta − cashContributions + withdrawalCash`.
   6. **Record**: `liquid[m] = cash`;
-     `total[m] = cash + (running sum of investment values)`.
+     `total[m] = cash + (running sum of investment values)`;
+     `liabilities[m] = owed[m]` on every loan of the path, as §10 defines `owed` and
+     sums it for a debtFree that lists no loans; `netWorth[m] = total[m] − liabilities[m]`.
   7. Accumulate emergency-fund expense stats (§5) for the first 12 simulated months.
 
-Results per scenario: the date→liquid and date→total series, date→notes lists, and
-metrics (§5, §7).
+Results per scenario: the date→liquid, date→total, date→liabilities and date→netWorth
+series, date→notes lists, and metrics (§5, §7).
+
+`liabilities` is the principal the path still owes at the end of `m`, after that
+month's payments. A loan owes nothing before its `startDate` and nothing from the
+month it ends (§10), so a loan that starts inside the plan adds to it from its
+`startDate`, and one that began before the plan from `start`, at the balance its own
+schedule has reached after its payment in `start` (§3.2). Escrow, including escrow that continues after a payoff (§3.6),
+is a cost and not a debt. Negative cash is not a liability: it already lowers `liquid`
+and `total`. A plan with no loans has `liabilities` of 0 and `netWorth` equal to
+`total` in every month. `netWorth` counts no property: a loan's balance is subtracted,
+but what it bought is not added, so a sale (§3.5) raises `netWorth` by about the
+proceeds in its month.
 
 ### 1.1 Cash interest
 
@@ -486,11 +499,12 @@ are read from the recorded series (§1) and add nothing to the simulation:
   with `round2(liquid[m]) = min round2(liquid)`, and `lowestCash = liquid[m]`, unrounded
   like every other reported number. A scenario whose cash never falls after the start
   month therefore reports that month's cash and `start`.
-- `endingCash` and `endingTotal` — `liquid` and `total` of the last recorded month.
+- `endingCash`, `endingTotal` and `endingNetWorth` — `liquid`, `total` and `netWorth`
+  of the last recorded month.
 
-When `start == end` only that one month is recorded (§1), so all four describe it:
-`lowestCash = endingCash = liquid[start]`, `endingTotal = total[start]`, and
-`lowestCashDate = start`.
+When `start == end` only that one month is recorded (§1), so all five describe it:
+`lowestCash = endingCash = liquid[start]`, `endingTotal = total[start]`,
+`endingNetWorth = netWorth[start]`, and `lowestCashDate = start`.
 
 The figures describe the forecast that is reported: with the optimizer (§7), the final
 forecast on the adjusted config. They do not depend on the emergency-fund
@@ -500,10 +514,12 @@ recommendation (§5) and are reported when it is disabled.
 
 Two active scenarios can be compared as an ordered pair (A, B), read "A minus B". Like
 the key figures (§8), the comparison is read from the recorded series (§1) and adds
-nothing to the simulation. It is made for cash and for total separately:
+nothing to the simulation. It is made for cash, for total and for net worth
+separately, reading `liquid`, `total` and `netWorth`:
 
-- **Difference** — for every recorded month `m`, `liquid_A[m] − liquid_B[m]` and
-  `total_A[m] − total_B[m]`, unrounded like every other reported number. The pair
+- **Difference** — for every recorded month `m`, `liquid_A[m] − liquid_B[m]`,
+  `total_A[m] − total_B[m]` and `netWorth_A[m] − netWorth_B[m]`, unrounded like every
+  other reported number. The pair
   (B, A) reports the same amounts with the opposite sign.
 - **Who leads a month** — the scenario whose value is greater in whole cents: A leads
   `m` when `round2(A[m]) > round2(B[m])`, B leads when it is less, and otherwise the
@@ -530,8 +546,9 @@ What follows from the rule, each deliberate:
 - A series with one scenario ahead in every month it is not level reports no
   break-even months, as does a plan of one month (§1).
 
-The cash and total series are walked independently, so a path can catch up in cash in a
-month in which it is still behind in total. The break-even months of (B, A) are those of
+The three series are walked independently, so a path can catch up in cash in a month
+in which it is still behind in total, and lead in total while it trails in net worth
+because it owes more. The break-even months of (B, A) are those of
 (A, B), each with the same scenario moving ahead.
 
 The comparison describes the forecast that is reported: with the optimizer (§7), the
@@ -728,9 +745,10 @@ whose rate is absent or 0 has no today's-dollars reading.
 
 **What is converted.**
 
-- **Series.** `liquid` and `total` (§1), and the differences of a comparison (§9), are
-  divided by `D(m)` month by month.
-- **Key figures** (§8). `endingCash` and `endingTotal` are divided by `D(end)`.
+- **Series.** `liquid`, `total`, `liabilities` and `netWorth` (§1), and the
+  differences of a comparison (§9), are divided by `D(m)` month by month.
+- **Key figures** (§8). `endingCash`, `endingTotal` and `endingNetWorth` are divided by
+  `D(end)`.
   `lowestCash` and `lowestCashDate` are read by §8's rule from the converted `liquid`,
   so the lowest month can be another month than the nominal one. At a rate above 0,
   positive cash that stays at the same nominal amount is lowest in today's dollars at

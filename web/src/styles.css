@@ -23,6 +23,7 @@
   --ok: #326d5e;
   --series-liquid: #b07040;
   --series-total: #326d5e;
+  --series-networth: #3f6fb5;
   --scenario-0: #0d7f66;
   --scenario-1: #cc7430;
   --scenario-2: #3f6fb5;
@@ -58,6 +59,7 @@
     --ok: #95c8ad;
     --series-liquid: #ddb180;
     --series-total: #95c8ad;
+    --series-networth: #8fb0e8;
     --scenario-0: #239a85;
     --scenario-1: #d27c3a;
     --scenario-2: #5f8fdc;
@@ -91,6 +93,7 @@
   --ok: #95c8ad;
   --series-liquid: #ddb180;
   --series-total: #95c8ad;
+  --series-networth: #8fb0e8;
   --scenario-0: #239a85;
   --scenario-1: #d27c3a;
   --scenario-2: #5f8fdc;
@@ -1505,6 +1508,10 @@ select.input {
   background: var(--series-total);
 }
 
+.chart__swatch--networth {
+  background: var(--series-networth);
+}
+
 .chart__swatch--danger {
   height: 10px;
   width: 12px;
@@ -1559,6 +1566,12 @@ select.input {
   stroke: var(--series-total);
 }
 
+/* Dashed, so it reads apart from total where the two run together. */
+.chart__line--networth {
+  stroke: var(--series-networth);
+  stroke-dasharray: 7 4;
+}
+
 .chart__area {
   stroke: none;
   pointer-events: none;
@@ -1586,6 +1599,10 @@ select.input {
   fill: var(--series-total);
 }
 
+.chart__endlabel--networth {
+  fill: var(--series-networth);
+}
+
 .chart__cursor line {
   stroke: var(--border-strong);
   stroke-width: 1;
@@ -1599,6 +1616,12 @@ select.input {
 
 .chart__dot--total {
   fill: var(--series-total);
+  stroke: var(--surface);
+  stroke-width: 1.5;
+}
+
+.chart__dot--networth {
+  fill: var(--series-networth);
   stroke: var(--surface);
   stroke-width: 1.5;
 }
@@ -1700,6 +1723,13 @@ select.input {
 .comparison__month {
   margin: 0 0 8px;
   font-size: 0.83rem;
+  color: var(--text-muted);
+}
+
+/* What net worth counts, above the month line when it is the series shown. */
+.comparison__about {
+  margin: 0 0 14px;
+  font-size: 0.8rem;
   color: var(--text-muted);
 }
 

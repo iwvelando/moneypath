@@ -128,12 +128,13 @@ Each entry has:
   "scenarios": ["scenario name", "…"],
   "rows": [
     {"date": "2025-06",
-     "values": [{"liquid": 30000.0, "total": 55000.0, "notes": ["…"]}, …]}
+     "values": [{"liquid": 30000.0, "total": 55000.0, "liabilities": 180000.0,
+                 "netWorth": -125000.0, "notes": ["…"]}, …]}
   ],
   "csv": "…engine-rendered CSV (chapter 05)…",
   "metrics": [
     {"keyFigures": {"lowestCash": 0.0, "lowestCashDate": "2025-06",
-                    "endingCash": 0.0, "endingTotal": 0.0},
+                    "endingCash": 0.0, "endingTotal": 0.0, "endingNetWorth": 0.0},
      "guardrails": [
        {"name": "Cushion", "kind": "cashFloor", "result": "breaks",
         "firstBreachDate": "2027-02", "tightestDate": "2027-02", "margin": -4545.36},
@@ -160,13 +161,15 @@ Each entry has:
     {"scenario": 0, "against": 1,
      "cash":  {"difference": [0.0, …],
                "breakEven": [{"date": "2026-03", "leader": 1}]},
-     "total": {"difference": [0.0, …], "breakEven": []}}
+     "total": {"difference": [0.0, …], "breakEven": []},
+     "netWorth": {"difference": [0.0, …], "breakEven": []}}
   ],
   "flip": {"scenario": 0, "choice": "Housing", "option": "Sell and rent",
            "name": "current path (Housing: Sell and rent)",
            "cash":  {"difference": [0.0, …],
                      "breakEven": [{"date": "2026-03", "flipped": true}]},
            "total": {"difference": [0.0, …], "breakEven": []},
+           "netWorth": {"difference": [0.0, …], "breakEven": []},
            "guardrails": [{"name": "Cushion", "kind": "cashFloor", "result": "holds",
                            "tightestDate": "2026-01", "margin": 5000.0}, …]},
   "earliest": {"scenario": 0, "entry": "common.loans.0", "name": "Car",
@@ -193,8 +196,11 @@ Each entry has:
 and each scenario's `select` (chapter 03, Canonical form), never the resolved lists.
 
 `rows` is sorted ascending by date; `values` and `metrics` are index-aligned with
-`scenarios`. `liquid`/`total` are omitted (JSON `null` or absent) for dates a scenario has
-no value for. Numbers are raw float64 values; formatting is the consumer's job.
+`scenarios`. `liquid`, `total`, `liabilities` and `netWorth` are the series of chapter 04
+§1, present in every plan: a plan with no loans reports `liabilities` of 0 and a
+`netWorth` equal to `total`. They are omitted (JSON `null` or absent) for dates a
+scenario has no value for. Numbers are raw float64 values; formatting is the
+consumer's job.
 
 `keyFigures` (chapter 04 §8) is present for every scenario; `lowestCashDate` is a
 `YYYY-MM` string. `emergencyFund` is absent when the recommendation is disabled, and
@@ -215,7 +221,7 @@ are `YYYY-MM` strings, and `margin` and `owed` are in currency, unrounded.
 scenarios, `scenario` minus `against`, both given as indexes into `scenarios`. Entries
 are ordered by `scenario` and then by `against`, so both orders of a pair are present and
 a consumer never negates a difference. It is an empty array when there are fewer than two
-scenarios. For `cash` and for `total`, `difference` is index-aligned with `rows`, and
+scenarios. For `cash`, `total` and `netWorth`, `difference` is index-aligned with `rows`, and
 `breakEven` lists the break-even months in ascending order, each with its `YYYY-MM`
 `date` and the index of the scenario that moves ahead as `leader`; it is an empty array
 when the lead never changes hands.
@@ -229,7 +235,7 @@ by hand, under the same options as the run, so with the optimizer it is optimize
 that scenario would be. It is not a scenario of the plan: it appears nowhere else in the
 results, and `csv` and `configYaml` do not carry it. `scenario` indexes `scenarios`,
 `choice` and `option` repeat the request, and `name` is the flipped path's display name,
-`<scenario> (<choice>: <option>)`. `cash` and `total` are the comparison of chapter 04
+`<scenario> (<choice>: <option>)`. `cash`, `total` and `netWorth` are the comparison of chapter 04
 §9 read as flipped path minus scenario: `difference` is index-aligned with `rows`, and
 each `breakEven` entry has `flipped` true when the flipped path moves ahead in that
 month and false when the scenario does. `guardrails`, in the shape of `metrics[].guardrails`,
@@ -286,7 +292,8 @@ month whose prices it holds, as a `YYYY-MM` string. `rows`, `metrics`, `comparis
 `flip` and `earliest` are present under the same rules. Each repeats its top-level
 counterpart exactly, every date, result, month count, break-even month, note,
 emergency-fund figure and optimizer value included, except for the amounts that chapter 04 §12
-converts: `liquid` and `total`, each `difference`, the `keyFigures` (with
+converts: `liquid`, `total`, `liabilities` and `netWorth`, each `difference`, the
+`keyFigures` (with
 `lowestCashDate` read from the converted series), a guardrail's `margin` and `owed`, and
 an optimization's `floor`, `minimumCash` and `headroom`.
 

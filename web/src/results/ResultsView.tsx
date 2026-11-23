@@ -23,6 +23,8 @@ import { Flip } from './Flip';
 import { GuardrailList, RunGuardrails, debtFreeClause } from './Guardrails';
 import { MonthlyTable, type MonthlyRow } from './MonthlyTable';
 import { EmergencyFundGauge } from './Gauge';
+import { HELP } from '../config/help';
+import { pathOwes } from './balance';
 import { inReading, readingLabel } from './reading';
 import { OverlaySparkline, Sparkline } from './Sparkline';
 
@@ -307,24 +309,29 @@ export function ResultsView({
     [shown.scenarios, shown.rows],
   );
 
-  const { dates, liquid, total, rows } = useMemo(() => {
+  const { dates, liquid, total, netWorth, rows } = useMemo(() => {
     const d: string[] = [];
     const l: (number | null)[] = [];
     const t: (number | null)[] = [];
+    const n: (number | null)[] = [];
     const r: MonthlyRow[] = [];
     for (const row of shown.rows) {
       const value = row.values[index] ?? null;
       d.push(row.date);
       l.push(value?.liquid ?? null);
       t.push(value?.total ?? null);
+      n.push(value?.netWorth ?? null);
       r.push({
         date: row.date,
         liquid: value?.liquid ?? null,
         total: value?.total ?? null,
+        liabilities: value?.liabilities ?? null,
+        netWorth: value?.netWorth ?? null,
         notes: value?.notes ?? [],
       });
     }
-    return { dates: d, liquid: l, total: t, rows: r };
+    // A path that owes nothing has a net worth equal to its total.
+    return { dates: d, liquid: l, total: t, netWorth: pathOwes(shown.rows, index) ? n : undefined, rows: r };
   }, [shown.rows, index]);
 
   return (
@@ -407,8 +414,9 @@ export function ResultsView({
             <div class="results__projection">
               <div class="results__section-heading">
                 <h3>Net worth over time</h3>
+                {netWorth ? <p class="results__networth">{HELP.netWorth}</p> : null}
               </div>
-              <Chart dates={dates} liquid={liquid} total={total} scenarioName={scenarioName} />
+              <Chart dates={dates} liquid={liquid} total={total} netWorth={netWorth} scenarioName={scenarioName} />
             </div>
             <SummaryPanel
               metrics={shown.metrics[index]}

@@ -47,6 +47,8 @@ export interface KeyFigureMetrics {
   lowestCashDate: string;
   endingCash: number;
   endingTotal: number;
+  /** Total less what is owed, in the last month. */
+  endingNetWorth?: number;
 }
 
 /**
@@ -94,6 +96,7 @@ export interface ScenarioComparison {
   against: number;
   cash: SeriesComparison;
   total: SeriesComparison;
+  netWorth?: SeriesComparison;
 }
 
 /** What to flip: an active scenario, one of the plan's choices, and the option to switch it to. */
@@ -126,6 +129,7 @@ export interface FlipComparison {
   name: string;
   cash: FlipSeries;
   total: FlipSeries;
+  netWorth?: FlipSeries;
   /** The flipped path's own guardrail results; absent when the plan has none. */
   guardrails?: GuardrailResult[] | null;
 }
@@ -173,9 +177,15 @@ export interface EarliestAnswer {
   atEarliest?: GuardrailResult[] | null;
 }
 
+/**
+ * One month of one scenario. `liabilities` is what its loans still owe, and
+ * `netWorth` is `total` less that.
+ */
 export interface ScenarioValue {
   liquid?: number | null;
   total?: number | null;
+  liabilities?: number | null;
+  netWorth?: number | null;
   notes?: string[] | null;
 }
 
