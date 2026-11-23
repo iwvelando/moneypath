@@ -85,10 +85,12 @@ Beyond what the entry states, every month's difference must equal the difference
 pair's `expected.csv` columns, within the case's `tolerance` for each of the two cells.
 When `expected.csv` has today's-dollars columns, the pair's comparison in today's
 dollars must also have the same break-even months as the nominal one, and every
-month's difference must equal the difference of those columns by the same rule.
-`expected.csv` itself carries no comparison columns, and no net-worth column (chapter
-05), so a `netWorth` pin is checked for its break-even months, in both readings, and its
-ending difference only.
+month's difference must equal the difference of those columns by the same rule. The
+columns are found by the number of series a scenario has: two, or six when the plan
+lists an asset (chapter 05). `expected.csv` itself carries no comparison columns. A
+`netWorth` pin is checked for its break-even months, in both readings, and its ending
+difference; when `expected.csv` has net-worth columns (a plan with an asset), every
+month's difference is also checked against them, in both readings.
 
 An `earliest` entry asks one question of the case's plan, run as the manifest says,
 and pins its whole answer (chapter 02, Results JSON, `earliest`). `month` is absent when

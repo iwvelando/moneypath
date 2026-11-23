@@ -1,0 +1,14 @@
+description: >
+  loan-payoff-date-sell with the house listed as an asset worth 210,000.00 and
+  the mortgage secured on it. The asset's sale in 2026-09 pays the mortgage off
+  and settles as one payment, so cash, total and the emergency fund are those of
+  the legacy case to the cent. Net worth now counts the house: 104,406.68 the
+  month before the sale and 97,218.72 in it, where the legacy case jumps from
+  -105,593.32.
+normative: true
+optimize: false
+tolerance: 0.01
+expectedMetrics:
+  - scenario: sell the house
+    keyFigures: {lowestCash: 21386.1355, lowestCashDate: "2025-06", endingCash: 164718.7239, endingTotal: 164718.7239, endingNetWorth: 164718.7239}
+    emergencyFund: {targetMonths: 6, averageMonthlyExpenses: 2613.8645, targetAmount: 15683.1868}

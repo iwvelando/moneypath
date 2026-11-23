@@ -1,0 +1,30 @@
+# The date sale of loan-payoff-date-sell, with the house listed as an asset
+# (spec chapter 03, Asset; chapter 04 §3.5). The house is worth 210,000.00 and
+# stays at that value; its selling costs, 12,000.00, are written as a percent
+# of it. Cash and total match the legacy case to the cent.
+version: 2
+simulation:
+  startDate: 2025-06
+  endDate: 2028-12
+  startingCash: 20000.00
+scenarios:
+  - name: sell the house
+    events:
+      - name: Income
+        amount: 4000.00
+      - name: Spending
+        amount: -1500.00
+    loans:
+      - name: Mortgage
+        asset: House
+        principal: 180000.00
+        downPayment: 20000.00
+        interestRate: 4.00
+        term: 360
+        startDate: 2022-03
+        escrow: 350.00
+    assets:
+      - name: House
+        value: 210000.00
+        sellDate: 2026-09
+        sellCosts: 5.714285714285714

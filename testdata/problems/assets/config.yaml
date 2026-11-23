@@ -1,0 +1,79 @@
+# Every rule about assets and the loans secured on them (spec chapter 03,
+# Asset), on a plan with a choice whose option takes the house away.
+version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2030-12
+  startingCash: 10000.00
+common:
+  loans:
+    - name: Mortgage
+      asset: House
+      principal: 300000.00
+      interestRate: 4.0
+      term: 360
+      startDate: 2020-01
+      earlyPayoffDate: 2029-01
+      sellProperty: true
+      sellPrice: 350000.00
+      sellCostsNet: 1000.00
+    - name: Boat loan
+      asset: Boat
+      principal: 20000.00
+      interestRate: 6.0
+      term: 60
+      startDate: 2026-01
+    - name: Cabin loan
+      asset: Cabin
+      principal: 100000.00
+      interestRate: 5.0
+      term: 240
+      startDate: 2027-01
+    - name: Late loan
+      asset: House
+      principal: 10000.00
+      interestRate: 5.0
+      term: 12
+      startDate: 2028-06
+  assets:
+    - name: House
+      value: 400000.00
+      appreciation: inflation
+      sellDate: 2028-06
+      sellCosts: 6.0
+    - name: Cabin
+      value: 150000.00
+      startDate: 2027-06
+      sellDate: 2032-01
+    - value: 0
+    - name: Cabin
+      value: 1000.00
+      appreciation: -100
+      sellCosts: 100
+    - name: Land
+      value: 50000.00
+      startDate: 2031-03
+    - name: Car
+      value: 20000.00
+      startDate: 2026-1x
+      wheels: 4
+    - name: Shed
+      value: 500.00
+      sellDate: 2026-01
+choices:
+  - name: Housing
+    options:
+      - name: Keep
+      - name: Sell early
+        remove:
+          assets: [House]
+        change:
+          assets:
+            - name: Land
+              set:
+                sellCosts: lots
+scenarios:
+  - name: keep
+    select: {Housing: Keep}
+  - name: sell
+    select: {Housing: Sell early}

@@ -1,0 +1,94 @@
+description: >
+  Assets and the loans secured on them. An asset needs a name, unique on its
+  path, and a value above 0; its appreciation is a growth; its sale month comes
+  after its first month, and its selling costs are a percent below 100. A loan
+  names an asset on its path, has no sale of its own, and starts before the
+  asset is sold. Removing the asset that a loan is secured on is placed at the
+  option's removal. Warnings: appreciation with inflation at a rate of 0, an
+  early payoff month the sale makes moot, a loan that starts before its asset
+  is bought, and an asset bought or sold after the plan ends.
+problems:
+  - level: warning
+    path: common.assets.5.wheels
+    where: Baseline, asset “Car”
+    message: “wheels” is not a setting moneypath knows, so it is ignored.
+  - level: error
+    path: common.loans.0.sellProperty
+    where: Baseline, loan “Mortgage”
+    message: This loan is secured on an asset, and the asset’s sale pays it off, so it cannot have a sale of its own.
+  - level: error
+    path: common.loans.0.sellPrice
+    where: Baseline, loan “Mortgage”
+    message: This loan is secured on an asset, and the asset’s sale pays it off, so it cannot have a sale of its own.
+  - level: error
+    path: common.loans.0.sellCostsNet
+    where: Baseline, loan “Mortgage”
+    message: This loan is secured on an asset, and the asset’s sale pays it off, so it cannot have a sale of its own.
+  - level: warning
+    path: common.assets.0.appreciation
+    where: Baseline, asset “House”
+    message: This follows the plan’s inflation rate, which is 0, so it stays the same.
+  - level: warning
+    path: common.assets.1.sellDate
+    where: Baseline, asset “Cabin”
+    message: This is sold after the simulation ends (2030-12), so the sale is not counted.
+  - level: error
+    path: common.assets.2.name
+    where: Baseline, asset 3
+    message: The asset needs a name.
+  - level: error
+    path: common.assets.2.value
+    where: Baseline, asset 3
+    message: The value must be more than 0.
+  - level: error
+    path: common.assets.3.appreciation
+    where: Baseline, asset “Cabin”
+    message: The yearly appreciation must be more than -100.
+  - level: error
+    path: common.assets.3.sellCosts
+    where: Baseline, asset “Cabin”
+    message: The selling costs must be at least 0 and less than 100.
+  - level: warning
+    path: common.assets.4.startDate
+    where: Baseline, asset “Land”
+    message: This is bought after the simulation ends (2030-12), so it is never held.
+  - level: error
+    path: common.assets.5.startDate
+    where: Baseline, asset “Car”
+    message: The purchase month, “2026-1x”, is not a month. Write the year and the month, like 2030-01.
+  - level: error
+    path: common.assets.6.sellDate
+    where: Baseline, asset “Shed”
+    message: The sale month (2026-01) must be after the asset’s first month in the plan (2026-01).
+  - level: error
+    path: choices.0.options.1.change.assets.0.set.sellCosts
+    where: Choice “Housing”, option “Sell early”, changed asset “Land”
+    message: This must be a number.
+  - level: error
+    path: common.assets.3.name
+    where: Baseline, asset “Cabin”
+    message: Another asset on this path is already named “Cabin”. Give each asset its own name.
+  - level: warning
+    path: common.loans.0.earlyPayoffDate
+    where: Baseline, loan “Mortgage”
+    message: “House” is sold in 2028-06, and the sale pays this loan off, so the early payoff month has no effect.
+  - level: error
+    path: common.loans.1.asset
+    where: Baseline, loan “Boat loan”
+    message: No asset named “Boat” is on the same path as this loan.
+  - level: warning
+    path: common.loans.2.startDate
+    where: Baseline, loan “Cabin loan”
+    message: The first payment (2027-01) is before “Cabin” is bought (2027-06), so until then the loan has no asset against it.
+  - level: error
+    path: common.loans.3.startDate
+    where: Baseline, loan “Late loan”
+    message: The first payment (2028-06) must be before “House” is sold (2028-06), since the sale pays this loan off.
+  - level: error
+    path: choices.0.options.1.remove.assets.0
+    where: Choice “Housing”, option “Sell early”, removed asset “House”
+    message: The loan “Mortgage” is secured on this asset, so this option must also change or remove that loan.
+  - level: error
+    path: choices.0.options.1.remove.assets.0
+    where: Choice “Housing”, option “Sell early”, removed asset “House”
+    message: The loan “Late loan” is secured on this asset, so this option must also change or remove that loan.

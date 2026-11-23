@@ -16,8 +16,8 @@ import (
 )
 
 // withGrowth rewrites a plan so that every amount that can grow carries
-// growth, every escrow escrowGrowth, and the simulation the given inflation
-// rate (none when empty).
+// growth, every escrow escrowGrowth, every asset that appreciation, and the
+// simulation the given inflation rate (none when empty).
 func withGrowth(t *testing.T, data []byte, inflationRate, growth string) []byte {
 	t.Helper()
 	var doc yaml.Node
@@ -47,6 +47,10 @@ func withGrowth(t *testing.T, data []byte, inflationRate, growth string) []byte 
 			}
 			if has["escrow"] && !has["escrowGrowth"] {
 				n.Content = append(n.Content, scalar("escrowGrowth"), scalar(growth))
+			}
+			// An asset's appreciation takes the values growth takes.
+			if has["value"] && !has["appreciation"] {
+				n.Content = append(n.Content, scalar("appreciation"), scalar(growth))
 			}
 		}
 	}

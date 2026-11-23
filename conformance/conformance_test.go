@@ -293,10 +293,16 @@ func compareComparisons(t *testing.T, want []pairComparison, res *engine.Result,
 		index[sc.Name] = i
 	}
 	rows := parseCSV(t, wantCSV)
-	// Three columns a scenario, or five with today's dollars (spec chapter 05).
+	// A scenario's columns are its series, then the same in today's dollars
+	// when the plan has an inflation rate, then its notes. It has two series,
+	// or six when the plan lists an asset (spec chapter 05).
 	stride := 3
 	if len(res.Scenarios) > 0 {
 		stride = (len(rows[0]) - 1) / len(res.Scenarios)
+	}
+	series := stride - 1
+	if res.Deflator() != nil {
+		series /= 2
 	}
 	for _, wp := range want {
 		pair := wp.Scenario + " minus " + wp.Against
@@ -316,8 +322,8 @@ func compareComparisons(t *testing.T, want []pairComparison, res *engine.Result,
 				nominal, today engine.SeriesComparison
 				column         int
 			}{
-				{"cash", got.Cash, today.Cash, 3},
-				{"total", got.Total, today.Total, 4},
+				{"cash", got.Cash, today.Cash, 1 + series},
+				{"total", got.Total, today.Total, 2 + series},
 			} {
 				if !reflect.DeepEqual(s.nominal.BreakEven, s.today.BreakEven) {
 					t.Errorf("%s: %s break-even in today's dollars %v, nominal %v", pair, s.name, s.today.BreakEven, s.nominal.BreakEven)
@@ -362,14 +368,21 @@ func compareComparisons(t *testing.T, want []pairComparison, res *engine.Result,
 		}
 		if wp.NetWorth != nil {
 			compareNetWorth(t, pair, wp, got, res.Deflator())
+			if series == 6 {
+				// The CSV carries net worth, the fifth series: check every month.
+				compareDifferences(t, pair, "netWorth", got.NetWorth.Difference, rows, a, b, stride, 5, tol)
+				if d := res.Deflator(); d != nil {
+					compareDifferences(t, pair+" in today's dollars", "netWorth", d.Comparison(got).NetWorth.Difference, rows, a, b, stride, 5+series, tol)
+				}
+			}
 		}
 	}
 }
 
 // compareNetWorth checks a pinned net-worth comparison: its break-even months,
-// the same in today's dollars, and its ending difference. expected.csv has no
-// net-worth column, so its months are not checked one by one (spec chapter
-// 08).
+// the same in today's dollars, and its ending difference. Its months are
+// checked one by one only where expected.csv has net-worth columns, which a
+// plan without an asset does not (spec chapter 08).
 func compareNetWorth(t *testing.T, pair string, wp pairComparison, got engine.Comparison, d *engine.Deflator) {
 	t.Helper()
 	gotMonths := []breakEvenMonth{}

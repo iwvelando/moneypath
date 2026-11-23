@@ -1,0 +1,80 @@
+# examples/choices.yaml with the house listed as an asset (spec chapter 03,
+# Asset and Choices). The house is worth 300,000.00 in 2026-01 and appreciates
+# 3 % a year; the mortgage is secured on it. "Sell and rent" changes the
+# house's sale month and costs, so the sale pays the mortgage off and the
+# option no longer touches the loan.
+version: 2
+simulation:
+  startDate: 2026-01
+  endDate: 2031-01
+  startingCash: 20000.00
+guardrails:
+  - name: Cushion
+    kind: cashFloor
+    amount: 15000.00
+  - name: Mortgage gone by 2030
+    kind: debtFree
+    startDate: 2030-01
+    loans: [Mortgage]
+common:
+  events:
+    - name: Salary
+      amount: 5200.00
+    - name: Living costs
+      amount: -3100.00
+    - name: Gym
+      amount: -60.00
+  loans:
+    - name: Mortgage
+      asset: House
+      principal: 240000.00
+      interestRate: 4.0
+      term: 360
+      startDate: 2021-01
+      escrow: 450.00
+  investments:
+    - name: Brokerage
+      startingValue: 40000.00
+      annualReturnRate: 6.0
+      contributionsFromCash: true
+      contributions:
+        - amount: 400.00
+  assets:
+    - name: House
+      value: 300000.00
+      appreciation: 3.0
+choices:
+  - name: Housing
+    options:
+      - name: Keep the house
+      - name: Sell and rent
+        events:
+          - name: Rent
+            amount: -1900.00
+            startDate: 2027-06
+        change:
+          assets:
+            - name: House
+              set:
+                sellDate: 2027-06
+                sellCosts: 6.0
+  - name: Job
+    options:
+      - name: Stay
+      - name: Go freelance
+        remove:
+          events: [Salary, Gym]
+        events:
+          - name: Salary until I leave
+            amount: 5200.00
+            endDate: 2026-12
+          - name: Freelance income
+            amount: 6100.00
+            startDate: 2027-03
+scenarios:
+  - name: as we are
+    select: {Housing: Keep the house, Job: Stay}
+  - name: sell
+    select: {Housing: Sell and rent, Job: Stay}
+  - name: sell and freelance
+    select: {Housing: Sell and rent, Job: Go freelance}
