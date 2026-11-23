@@ -178,14 +178,19 @@ export interface EarliestAnswer {
 }
 
 /**
- * One month of one scenario. `liabilities` is what its loans still owe, and
- * `netWorth` is `total` less that.
+ * One month of one scenario. `liabilities` is what its loans still owe,
+ * `assets` what its listed assets are worth, `netWorth` is `total` plus
+ * assets less liabilities, and `equity` each asset's value less what its
+ * loans owe. `assets` and `equity` are present only when the plan lists an
+ * asset.
  */
 export interface ScenarioValue {
   liquid?: number | null;
   total?: number | null;
+  assets?: number | null;
   liabilities?: number | null;
   netWorth?: number | null;
+  equity?: number | null;
   notes?: string[] | null;
 }
 

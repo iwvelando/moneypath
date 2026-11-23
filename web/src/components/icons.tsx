@@ -112,6 +112,17 @@ export function IconPercent() {
   );
 }
 
+/** A house — assets, the things a plan owns. */
+export function IconHome() {
+  return (
+    <Icon>
+      <path d="M2.5 7.6 8 3l5.5 4.6" />
+      <path d="M4 6.6V13h8V6.6" />
+      <path d="M6.6 13V9.8h2.8V13" />
+    </Icon>
+  );
+}
+
 /** Rising bars — invested balances growing. */
 export function IconGrowth() {
   return (

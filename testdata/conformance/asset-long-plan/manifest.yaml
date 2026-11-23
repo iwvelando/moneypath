@@ -1,0 +1,34 @@
+description: >
+  Assets over twelve years at 3 % inflation. The house follows inflation, so it
+  reads 450,000.00 in today's dollars in every month it is held. Its mortgage
+  matures in 2035-05; escrow is billed each December while the house is held,
+  and the sale in 2037-03 bills three months of it and no December after. The
+  car, bought for cash, loses 15 % a year from 2030-01; the cabin, bought in
+  2032-07 with a loan secured on it, gains 2.5 %. Both purchases charge
+  nothing beyond the cash the plan writes for them. By cash, selling leads from
+  the sale on; by net worth, keeping does.
+normative: true
+optimize: false
+tolerance: 0.01
+expectedMetrics:
+  - scenario: sell the house
+    keyFigures: {lowestCash: 42640.5881, lowestCashDate: "2026-06", endingCash: 991367.2893, endingTotal: 991367.2893, endingNetWorth: 1105683.2174}
+    emergencyFund: {targetMonths: 6, averageMonthlyExpenses: 6359.4119, targetAmount: 38156.4715}
+    todaysDollars:
+      keyFigures: {lowestCash: 42640.5881, lowestCashDate: "2026-06", endingCash: 685124.1499, endingTotal: 685124.1499, endingNetWorth: 764126.7596}
+  - scenario: keep the house
+    keyFigures: {lowestCash: 42640.5881, lowestCashDate: "2026-06", endingCash: 468891.6040, endingTotal: 468891.6040, endingNetWorth: 1234352.7008}
+    todaysDollars:
+      keyFigures: {lowestCash: 42640.5881, lowestCashDate: "2026-06", endingCash: 324046.3601, endingTotal: 324046.3601, endingNetWorth: 853048.9698}
+expectedComparisons:
+  - scenario: sell the house
+    against: keep the house
+    cash:
+      breakEven: []
+      endingDifference: 522475.6853
+    total:
+      breakEven: []
+      endingDifference: 522475.6853
+    netWorth:
+      breakEven: []
+      endingDifference: -128669.4834

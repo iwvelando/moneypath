@@ -75,6 +75,7 @@ type Section struct {
 	Events      []*Event      `yaml:"events,omitempty"`
 	Loans       []*Loan       `yaml:"loans,omitempty"`
 	Investments []*Investment `yaml:"investments,omitempty"`
+	Assets      []*Asset      `yaml:"assets,omitempty"`
 }
 
 type Scenario struct {
@@ -130,7 +131,10 @@ func (e *Event) OccursAt(m Month) bool {
 }
 
 type Loan struct {
-	Name                    string   `yaml:"name"`
+	Name string `yaml:"name"`
+	// Asset names the asset the loan is secured on, on the same path; empty
+	// for none (spec chapter 03, Loan and Asset).
+	Asset                   string   `yaml:"asset,omitempty"`
 	Principal               float64  `yaml:"principal"`
 	DownPayment             float64  `yaml:"downPayment,omitempty"`
 	InterestRate            float64  `yaml:"interestRate"`
@@ -150,6 +154,9 @@ type Loan struct {
 	ResolvedStart           Month   `yaml:"-"`
 	ResolvedEarlyPayoffDate Month   `yaml:"-"` // -1 when unset
 	ResolvedSellPrice       float64 `yaml:"-"` // defaults to Principal
+
+	// started says ResolvedStart was read from a month that parses.
+	started bool
 }
 
 type Investment struct {
@@ -162,6 +169,27 @@ type Investment struct {
 	FundLoanPayoffs       bool     `yaml:"fundLoanPayoffs,omitempty"`
 	Contributions         []*Event `yaml:"contributions,omitempty"`
 	Withdrawals           []*Event `yaml:"withdrawals,omitempty"`
+}
+
+// Asset is something owned that has a value and no cash flow until it is
+// sold (spec chapter 03, Asset; chapter 04 §1.2).
+type Asset struct {
+	Name         string   `yaml:"name"`
+	Value        *float64 `yaml:"value,omitempty"`
+	Appreciation Growth   `yaml:"appreciation,omitempty"`
+	StartDate    string   `yaml:"startDate,omitempty"`
+	SellDate     string   `yaml:"sellDate,omitempty"`
+	SellCosts    float64  `yaml:"sellCosts,omitempty"`
+
+	// ResolvedFirst is the asset's first month in the plan: its startDate, or
+	// the plan's start when it has none or one before the start.
+	ResolvedFirst Month `yaml:"-"`
+	// ResolvedSell is the sale month; -1 when the asset is kept.
+	ResolvedSell Month `yaml:"-"`
+
+	// dated says both months were read from months that parse, in a plan
+	// whose own months are known.
+	dated bool
 }
 
 // Optimize marks one event field for the optimizer (spec chapter 03).

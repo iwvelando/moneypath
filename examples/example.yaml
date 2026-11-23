@@ -46,6 +46,7 @@ common:
       amount: -35.00      # monthly (frequency defaults to 1)
   loans:
     - name: Auto loan
+      asset: Car              # the asset this loan is secured on (see assets below)
       principal: 30000.00     # original principal before the down payment
       downPayment: 5000.00    # paid at startDate
       interestRate: 3.1       # APR (annual percentage rate)
@@ -78,6 +79,14 @@ common:
           frequency: 12
           startDate: 2035-01
           endDate: 2065-12
+
+  # Assets are things owned that have a value but no cash flow until they are
+  # sold. Their value counts toward net worth, never toward liquid or total.
+  assets:
+    - name: Car
+      value: 16000.00         # worth this in its first month in the plan
+      appreciation: -15       # yearly percent, drifting month by month; fixed
+                              # (default), inflation, or a number like this one
 
 scenarios:
   - name: current path
@@ -156,6 +165,7 @@ scenarios:
         sellPrice: 195000.00    # defaults to `principal` when omitted
         sellCostsNet: 9500.00   # positive = closing costs paid at sale
       - name: 5678 Street Address
+        asset: Smaller home     # secured on the asset listed below
         principal: 200000.00
         downPayment: 40000.00
         interestRate: 2.75
@@ -178,3 +188,11 @@ scenarios:
         contributions:
           - amount: 750.00
             startDate: 2025-07
+    assets:
+      # Bought when its loan starts. The down payment is the loan's; the
+      # asset itself charges nothing. With a sellDate it would be sold at its
+      # value then, paying off the loans secured on it (sellCosts: a percent).
+      - name: Smaller home
+        value: 200000.00
+        appreciation: inflation
+        startDate: 2026-06

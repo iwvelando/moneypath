@@ -9,6 +9,7 @@
 
 import { ENTRY_KINDS, SET_FIELDS } from '../config/choices';
 import {
+  emptyAsset,
   emptyChoice,
   emptyEvent,
   emptyGuardrail,
@@ -18,6 +19,7 @@ import {
   emptyOption,
   emptyScenario,
   emptySimulation,
+  type AssetModel,
   type ChoiceModel,
   type CommonModel,
   type ConfigModel,
@@ -74,7 +76,7 @@ function listsAreArrays(section: unknown, keys: readonly string[]): boolean {
   return keys.every((key) => record[key] === undefined || Array.isArray(record[key]));
 }
 
-const SECTION_LISTS = ['events', 'loans', 'investments'] as const;
+const SECTION_LISTS = ['events', 'loans', 'investments', 'assets'] as const;
 
 /**
  * The structure withModelDefaults can rely on. Missing lists and fields are
@@ -122,11 +124,17 @@ function withInvestmentDefaults(saved: Saved<InvestmentModel>): InvestmentModel 
   };
 }
 
+function withAssetDefaults(saved: Saved<AssetModel>): AssetModel {
+  return { ...emptyAsset(), ...saved };
+}
+
 function withSectionDefaults(saved: Saved<CommonModel>): CommonModel {
   return {
     events: (saved.events ?? []).map(withEventDefaults),
     loans: (saved.loans ?? []).map(withLoanDefaults),
     investments: (saved.investments ?? []).map(withInvestmentDefaults),
+    // A draft saved before assets existed has none.
+    assets: (saved.assets ?? []).map(withAssetDefaults),
   };
 }
 

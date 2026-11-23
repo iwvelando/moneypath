@@ -1,0 +1,78 @@
+# Assets over a long plan with an inflation rate of 3 % (spec chapter 04 §1.2,
+# §3.5, §3.6, §12). A house that follows inflation, on a mortgage that matures
+# in 2035-05; one path sells it in 2037-03, after the payoff, and the other
+# keeps it. A car bought for cash in 2030-01 that loses 15 % a year, and a
+# cabin bought in 2032-07 with a loan, on both paths.
+version: 2
+simulation:
+  startDate: 2026-06
+  endDate: 2038-12
+  startingCash: 40000.00
+  inflationRate: 3.0
+common:
+  events:
+    - name: Salary
+      amount: 9000.00
+      growth: inflation
+    - name: Living
+      amount: -4200.00
+      growth: inflation
+    - name: Car purchase
+      amount: -30000.00
+      startDate: 2030-01
+      endDate: 2030-01
+  loans:
+    - name: Cabin loan
+      asset: Cabin
+      principal: 200000.00
+      downPayment: 40000.00
+      interestRate: 6.0
+      term: 240
+      startDate: 2032-07
+  assets:
+    - name: Car
+      value: 30000.00
+      appreciation: -15
+      startDate: 2030-01
+    - name: Cabin
+      value: 200000.00
+      appreciation: 2.5
+      startDate: 2032-07
+scenarios:
+  - name: sell the house
+    events:
+      - name: Rent
+        amount: -2500.00
+        growth: inflation
+        startDate: 2037-03
+    loans:
+      - name: Mortgage
+        asset: House
+        principal: 400000.00
+        downPayment: 80000.00
+        interestRate: 3.25
+        term: 300
+        startDate: 2010-06
+        escrow: 600.00
+        escrowGrowth: inflation
+    assets:
+      - name: House
+        value: 450000.00
+        appreciation: inflation
+        sellDate: 2037-03
+        sellCosts: 6.0
+  - name: keep the house
+    loans:
+      - name: Mortgage
+        asset: House
+        principal: 400000.00
+        downPayment: 80000.00
+        interestRate: 3.25
+        term: 300
+        startDate: 2010-06
+        escrow: 600.00
+        escrowGrowth: inflation
+    assets:
+      - name: House
+        value: 450000.00
+        appreciation: inflation

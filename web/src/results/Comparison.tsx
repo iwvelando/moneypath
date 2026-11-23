@@ -6,7 +6,7 @@ import { formatMoney, isNegativeMoney } from '../util/format';
 import { ChartAxes, plotOf, useChartWidth, useMonthCursor } from './chartParts';
 import { extentOf, segments, valueScale, type Series } from './chartScale';
 import { GuardrailTable } from './Guardrails';
-import { runOwes } from './balance';
+import { runHasBalance } from './balance';
 import { KeyFigures } from './KeyFigures';
 import { SCENARIO_COLORS, ScenarioSample, styleOf } from './scenarioStyle';
 
@@ -37,7 +37,7 @@ interface ComparisonProps {
 export function Comparison({ results, onOpenScenario }: ComparisonProps) {
   const [chosenKey, setSeriesKey] = useState<SeriesKey>('total');
   // Net worth is offered once something is owed; until then it is the total.
-  const owes = useMemo(() => runOwes(results), [results]);
+  const owes = useMemo(() => runHasBalance(results), [results]);
   const offered = owes ? SERIES : SERIES.filter((series) => series.key !== 'netWorth');
   const seriesKey = offered.some((series) => series.key === chosenKey) ? chosenKey : 'total';
   const seriesLabel = SERIES.find((series) => series.key === seriesKey)?.label ?? '';

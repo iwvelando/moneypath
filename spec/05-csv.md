@@ -8,10 +8,11 @@ The web app's "Download CSV" serves this text exactly as the engine renders it (
 
 ## Format (normative — conformance fixtures match byte-for-byte)
 
-All fields double-quoted. Dates ascending. One column triple per scenario (five columns
-with today's dollars, below), ordered as scenarios appear in the config (inactive
-scenarios omitted entirely). A scenario defined by a `select` is a column triple like
-any other; choices and options do not appear:
+All fields double-quoted. Dates ascending. One group of columns per scenario, ordered as
+scenarios appear in the config (inactive scenarios omitted entirely): its series in
+nominal dollars, then the same series in today's dollars when the plan has an inflation
+rate, then its notes. Without assets and inflation a group is a triple. A scenario
+defined by a `select` is a group like any other; choices and options do not appear:
 
 ```
 "date","liquid (<scenario1>)","total (<scenario1>)","notes (<scenario1>)",…
@@ -37,11 +38,27 @@ any other; choices and options do not appear:
 
   The nominal columns and their headers are the same as without the rate. A plan whose
   rate is absent or 0 has no such columns.
+- **Balance sheet.** When the plan lists at least one asset (chapter 03, Asset),
+  anywhere — in `common`, an option or a scenario, active or not — each scenario's
+  series are `liquid`, `total`, `assets`, `liabilities`, `net worth` and `equity`
+  (chapter 04 §1), in that order, so `total + assets − liabilities = net worth` reads
+  left to right:
+
+  ```
+  "date","liquid (Base)","total (Base)","assets (Base)","liabilities (Base)","net worth (Base)","equity (Base)","notes (Base)",…
+  ```
+
+  With an inflation rate, the same six follow in today's dollars before the notes,
+  named as above: `liquid in 2026-06 dollars (Base)`, `total in 2026-06 dollars
+  (Base)`, `assets in 2026-06 dollars (Base)`, `liabilities in 2026-06 dollars
+  (Base)`, `net worth in 2026-06 dollars (Base)`, `equity in 2026-06 dollars (Base)`.
+  The condition is plan-wide, so every scenario has the same columns, and a scenario
+  without assets reports `0.00` for `assets` and `equity`.
 - If there are no results, the CSV is just the literal header
   `Date,Scenario,Liquid,Total,Notes`.
 
 The CSV carries the forecast only. Comparisons between scenarios, a flipped path and
 guardrail results (chapter 02, Results JSON) are not part of it, so a plan with
-guardrails renders the same CSV as the plan without them. Liabilities and net worth
-(chapter 04 §1) are in the results, not the CSV, so a plan with loans renders the same
-columns as it always has.
+guardrails renders the same CSV as the plan without them. A plan that lists no asset
+renders the same columns as it always has: its liabilities and net worth (chapter 04
+§1) are in the results, not the CSV.

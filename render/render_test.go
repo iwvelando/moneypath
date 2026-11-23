@@ -104,3 +104,31 @@ func TestCSVTodaysDollarsColumns(t *testing.T) {
 		t.Errorf("a rate of 0 has today's-dollars columns:\n%s", got)
 	}
 }
+
+// Spec chapter 05, balance sheet: a plan that lists an asset reports six
+// series a scenario, then the same six in today's dollars with an inflation
+// rate, then its notes.
+func TestCSVBalanceSheetColumns(t *testing.T) {
+	start, _ := config.ParseMonth("2026-06")
+	sc := &engine.ScenarioResult{
+		Name:        "Base",
+		Liquid:      []float64{1},
+		Total:       []float64{2},
+		Assets:      []float64{3},
+		Liabilities: []float64{4},
+		NetWorth:    []float64{1},
+		Equity:      []float64{-1},
+		Notes:       [][]string{{"n"}},
+	}
+	res := &engine.Result{Start: start, End: start, Scenarios: []*engine.ScenarioResult{sc}, HasAssets: true}
+	want := `"date","liquid (Base)","total (Base)","assets (Base)","liabilities (Base)","net worth (Base)","equity (Base)","notes (Base)"` + "\n" +
+		`"2026-06","1.00","2.00","3.00","4.00","1.00","-1.00","n"` + "\n"
+	if got := CSV(res); got != want {
+		t.Errorf("CSV:\n%s\nwant:\n%s", got, want)
+	}
+	res.InflationRate = 3
+	header := strings.Split(CSV(res), "\n")[0]
+	if want := `"equity (Base)","liquid in 2026-06 dollars (Base)","total in 2026-06 dollars (Base)","assets in 2026-06 dollars (Base)","liabilities in 2026-06 dollars (Base)","net worth in 2026-06 dollars (Base)","equity in 2026-06 dollars (Base)","notes (Base)"`; !strings.HasSuffix(header, want) {
+		t.Errorf("header %s, want it to end %s", header, want)
+	}
+}

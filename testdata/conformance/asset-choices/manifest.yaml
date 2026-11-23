@@ -1,0 +1,54 @@
+description: >
+  A plan with choices in which an option sells the house by changing the asset.
+  At 2031-01 selling is 72,523.81 ahead by total but 86,692.44 behind by net
+  worth: the house's appreciation, the selling costs and the rent. In the sale
+  month, 2027-06, the house sells for 312,829.23 with 18,769.75 in costs, and
+  the sale clears the mortgage for the debt-free guardrail. The baseline asset
+  appears in every path, so every scenario has the balance-sheet columns.
+normative: true
+optimize: false
+tolerance: 0.01
+expectedMetrics:
+  - scenario: as we are
+    keyFigures: {lowestCash: 20044.2033, lowestCashDate: "2026-01", endingCash: 22696.4007, endingTotal: 105367.7291, endingNetWorth: 264583.9744}
+    guardrails:
+      - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2026-01", margin: 5044.2033}
+      - {name: Mortgage gone by 2030, kind: debtFree, result: breaks, firstBreachDate: "2030-01", owed: 194640.4813}
+  - scenario: sell
+    keyFigures: {lowestCash: 20044.2033, lowestCashDate: "2026-01", endingCash: 95220.2079, endingTotal: 177891.5363, endingNetWorth: 177891.5363}
+    guardrails:
+      - {name: Cushion, kind: cashFloor, result: holds, tightestDate: "2026-01", margin: 5044.2033}
+      - {name: Mortgage gone by 2030, kind: debtFree, result: holds, tightestDate: "2027-06", marginMonths: 31}
+  - scenario: sell and freelance
+    keyFigures: {lowestCash: 11058.8461, lowestCashDate: "2027-02", endingCash: 130780.2079, endingTotal: 213451.5363, endingNetWorth: 213451.5363}
+    guardrails:
+      - {name: Cushion, kind: cashFloor, result: breaks, firstBreachDate: "2027-02", tightestDate: "2027-02", margin: -3941.1539}
+      - {name: Mortgage gone by 2030, kind: debtFree, result: holds, tightestDate: "2027-06", marginMonths: 31}
+expectedComparisons:
+  - scenario: as we are
+    against: sell
+    cash:
+      breakEven: []
+      endingDifference: -72523.8071
+    total:
+      breakEven: []
+      endingDifference: -72523.8071
+    netWorth:
+      breakEven: []
+      endingDifference: 86692.4381
+  - scenario: as we are
+    against: sell and freelance
+    cash:
+      breakEven:
+        - {date: "2027-01", leader: as we are}
+        - {date: "2027-06", leader: sell and freelance}
+      endingDifference: -108083.8071
+    total:
+      breakEven:
+        - {date: "2027-01", leader: as we are}
+        - {date: "2027-06", leader: sell and freelance}
+      endingDifference: -108083.8071
+    netWorth:
+      breakEven:
+        - {date: "2027-01", leader: as we are}
+      endingDifference: 51132.4381

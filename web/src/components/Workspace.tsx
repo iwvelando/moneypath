@@ -27,6 +27,8 @@ import { EventList } from './editor/EventList';
 import { GuardrailList, entryNames, guardrailNames } from './editor/GuardrailList';
 import { InvestmentList } from './editor/InvestmentList';
 import { LoanList } from './editor/LoanList';
+import { AssetList } from './editor/AssetList';
+import { AssetNames, assetNames } from './editor/assetNames';
 import { OptionList } from './editor/OptionList';
 import { SectionNav, type SectionRef } from './SectionNav';
 
@@ -319,6 +321,7 @@ export function Workspace({
     });
 
   return (
+    <AssetNames.Provider value={assetNames(config)}>
     <div class="workspace" ref={workspaceRef}>
       <div class="workbar" ref={workbarRef}>
         <SectionNav
@@ -560,7 +563,7 @@ export function Workspace({
       <Section
         id="section-common"
         title="Baseline"
-        description="Events, loans and investments that hold on every path, unless an option a scenario picks changes or removes them."
+        description="Events, loans, investments and assets that hold on every path, unless an option a scenario picks changes or removes them."
         highlighted={highlightId === 'section-common'}
         icon={<IconLayers />}
       >
@@ -584,6 +587,7 @@ export function Workspace({
           simulation={config.simulation}
           onChange={(investments) => patchCommon({ investments })}
         />
+        <AssetList assets={config.common.assets} onChange={(assets) => patchCommon({ assets })} />
         </At>
       </Section>
 
@@ -817,10 +821,12 @@ export function Workspace({
               simulation={config.simulation}
               onChange={(investments) => patch({ investments })}
             />
+            <AssetList assets={scenario.assets} onChange={(assets) => patch({ assets })} />
             </At>
           </Section>
         );
       })}
     </div>
+    </AssetNames.Provider>
   );
 }

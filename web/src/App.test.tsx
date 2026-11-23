@@ -11,6 +11,7 @@ import {
   emptyGuardrail,
   emptyInvestment,
   emptyLoan,
+  emptyAsset,
   emptyOption,
   newId,
   type ConfigModel,
@@ -831,6 +832,16 @@ describe('the app', () => {
     config.common.events.push({ ...emptyEvent(), frequency: 1.5, startDate: '2030-01', endDate: '2029-01' });
     config.common.events.push({ ...emptyEvent(), name: 'Grows', amount: -1, growth: { mode: 'rate', rate: -150 } });
     config.common.events.push({ ...emptyEvent(), name: 'Blank rate', amount: -1, growth: { mode: 'rate', rate: null } });
+    // Assets: every rule about one, and the loans secured on them.
+    config.common.assets = [
+      { ...emptyAsset(), name: 'House', value: 300000, sellDate: '2027-06' },
+      { ...emptyAsset(), value: 0, appreciation: { mode: 'rate', rate: -100 }, sellCosts: 100, startDate: 'soon' },
+      { ...emptyAsset(), name: 'House', value: 1, sellDate: '2020-01', appreciation: { mode: 'odd', rate: null } },
+      { ...emptyAsset(), name: 'Shed', value: 1 },
+    ];
+    config.common.loans.push({ ...emptyLoan(), name: 'Secured', asset: 'House', principal: 10, interestRate: 1, term: 12, startDate: '2027-06', sellProperty: true, sellPrice: 5, sellCostsNet: 1 });
+    config.common.loans.push({ ...emptyLoan(), name: 'Unsecured', asset: 'Yacht', principal: 10, interestRate: 1, term: 12, startDate: '2026-01' });
+    config.common.loans.push({ ...emptyLoan(), name: 'On the shed', asset: 'Shed', principal: 10, interestRate: 1, term: 12, startDate: '2026-01' });
     config.guardrails = [
       { ...emptyGuardrail(), amount: 100 },
       { ...emptyGuardrail(), name: 'Twice', amount: 100 },
@@ -854,12 +865,18 @@ describe('the app', () => {
     move.change.loans = [{ id: newId('cg'), targetId: car.id, targetName: car.name, set: { term: 0, escrowGrowth: { mode: 'rate', rate: -100 } } }];
     const grows = config.common.events.find((e) => e.name === 'Grows')!;
     move.change.events = [{ id: newId('cg'), targetId: grows.id, targetName: grows.name, set: { growth: { mode: 'odd', rate: null } } }];
+    const house = config.common.assets[0]!;
+    const shed = config.common.assets[3]!;
+    move.change.assets = [{ id: newId('cg'), targetId: house.id, targetName: house.name, set: { value: -1, sellCosts: -1 } }];
+    move.remove.assets = [{ id: newId('rm'), targetId: shed.id, targetName: shed.name }];
+    move.assets = [{ ...emptyAsset(), value: 1 }];
     const home = { ...emptyChoice(''), options: [stay, move] };
     config.choices = [home];
 
     const [first, second] = config.scenarios;
     second!.name = first!.name;
-    first!.select = { [home.id]: stay.id };
+    first!.select = { [home.id]: move.id };
+    second!.assets = [{ ...emptyAsset(), name: 'Boat', value: -1 }];
     first!.events = [
       {
         ...emptyEvent(),

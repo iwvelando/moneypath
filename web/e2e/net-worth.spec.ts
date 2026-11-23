@@ -32,7 +32,7 @@ test('a scenario that owes shows its debt and net worth, in both readings', asyn
   await uploadAndRun(page, NET_WORTH_PLAN);
 
   await page.getByRole('tab', { name: /^own and sell/ }).click();
-  await expect(page.locator('.results__networth')).toContainText('It counts no home, car or other property.');
+  await expect(page.locator('.results__networth')).toContainText('Net worth is cash, investments and the assets you list');
   await expect(page.locator('.chart__line--networth')).toHaveCount(1);
   const table = page.locator('.results-table');
   await expect(table.locator('thead th')).toHaveText(['Date', 'Liquid', 'Total', 'Debt', 'Net worth']);

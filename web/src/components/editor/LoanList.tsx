@@ -4,7 +4,8 @@ import { CardScope } from './scope';
 import { loanSummary } from './summaries';
 import { HELP } from '../../config/help';
 import { cloneLoan, emptyLoan, type LoanModel, type SimulationModel } from '../../config/types';
-import { CheckField, MonthField, NumberField, TextField } from '../fields';
+import { CheckField, MonthField, NumberField, SelectField, TextField } from '../fields';
+import { AssetNames } from './assetNames';
 import { At } from '../problems';
 import { GrowthField } from '../GrowthField';
 import { IconPercent } from '../icons';
@@ -21,6 +22,17 @@ interface LoanFieldsProps {
 /** A loan's fields and its extra payments. */
 export function LoanFields({ loan, simulation, showName = true, onChange }: LoanFieldsProps) {
   const patch = (changes: Partial<LoanModel>) => onChange({ ...loan, ...changes });
+  const names = useContext(AssetNames);
+  const asset = loan.asset.trim();
+  // A name the plan does not list stays on screen, for the engine's error.
+  const assetOptions = [
+    { value: '', label: 'No asset' },
+    ...names.map((name) => ({ value: name, label: name })),
+    ...(asset !== '' && !names.includes(asset) ? [{ value: loan.asset, label: loan.asset, disabled: true }] : []),
+  ];
+  // A secured loan is sold with its asset. Its own sale fields stay on
+  // screen only while they hold something, for the engine's error.
+  const ownSale = asset === '' || loan.sellProperty || loan.sellPrice !== null || loan.sellCostsNet !== null;
   return (
     <>
       <EditorFields title="Loan terms">
@@ -65,6 +77,13 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
             value={loan.startDate}
             required
             onChange={(startDate) => patch({ startDate })}
+          />
+          <SelectField<string> field="asset"
+            label="Secured on"
+            help={HELP.loanAsset}
+            value={loan.asset}
+            options={assetOptions}
+            onChange={(next) => patch({ asset: next })}
           />
         </div>
       </EditorFields>
@@ -123,14 +142,18 @@ export function LoanFields({ loan, simulation, showName = true, onChange }: Loan
           />
         </div>
 
-        <CheckField field="sellProperty"
-          label="Sell the property at payoff"
-          help={HELP.loanSellProperty}
-          checked={loan.sellProperty}
-          onChange={(sellProperty) => patch({ sellProperty })}
-        />
+        {ownSale ? (
+          <CheckField field="sellProperty"
+            label="Sell the property at payoff"
+            help={HELP.loanSellProperty}
+            checked={loan.sellProperty}
+            onChange={(sellProperty) => patch({ sellProperty })}
+          />
+        ) : (
+          <p class="list-block__hint">This loan is paid off when {asset} is sold, at that asset’s sale month.</p>
+        )}
 
-        {loan.sellProperty ? (
+        {loan.sellProperty || (asset !== '' && (loan.sellPrice !== null || loan.sellCostsNet !== null)) ? (
           <div class="field-grid">
             <NumberField field="sellPrice"
               label="Sale price"

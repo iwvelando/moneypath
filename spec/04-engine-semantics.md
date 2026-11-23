@@ -43,7 +43,8 @@ For each **active** scenario, independently:
   before `start`** (chapter 03); `r_cash` = the monthly rate derived from
   `simulation.cashInterestRate` (0 when unset); per-investment states (§4), whose
   `startingValue` is read the same way; loan schedules precomputed (§3) for the loans of
-  the resolved scenario list and of the resolved shared list.
+  the resolved scenario list and of the resolved shared list; and the assets of both
+  lists, in the same order (§1.2).
 - The month before `start` is not recorded. `startingCash` and the starting values are
   where the first simulated month begins, so everything dated in `start` — an event
   occurrence, a loan's down payment and payment, an investment contribution, a month of
@@ -68,18 +69,23 @@ For each **active** scenario, independently:
      (the proceeds and value changes join `withdrawalCash` and `investmentDelta` for
      steps 5–6). Before the next loan's check, `projectedLiquid` is updated by the
      fired payoff's net cash effect (liquidation proceeds minus the payoff payment).
-  4. **Loans**: `loanDelta` = −Σ of every loan's scheduled payment amount at `m`
-     (a schedule is a sparse date→payment map; months without entries contribute 0).
+  4. **Loans and sales**: `loanDelta` = −Σ of every loan's scheduled payment amount at
+     `m` (a schedule is a sparse date→payment map; months without entries contribute
+     0), and of the settlement of every asset sold at `m` (§3.5).
   5. **Update cash**:
      `cash += cashInterest + eventDelta + loanDelta − cashContributions + withdrawalCash`.
   6. **Record**: `liquid[m] = cash`;
      `total[m] = cash + (running sum of investment values)`;
+     `assets[m]` = Σ `value[m]` over the path's assets (§1.2);
      `liabilities[m] = owed[m]` on every loan of the path, as §10 defines `owed` and
-     sums it for a debtFree that lists no loans; `netWorth[m] = total[m] − liabilities[m]`.
+     sums it for a debtFree that lists no loans;
+     `netWorth[m] = total[m] + assets[m] − liabilities[m]`;
+     `equity[m]` = Σ over the path's assets of `value[m]` less `owed[m]` on the loans
+     secured on it.
   7. Accumulate emergency-fund expense stats (§5) for the first 12 simulated months.
 
-Results per scenario: the date→liquid, date→total, date→liabilities and date→netWorth
-series, date→notes lists, and metrics (§5, §7).
+Results per scenario: the date→liquid, date→total, date→assets, date→liabilities,
+date→netWorth and date→equity series, date→notes lists, and metrics (§5, §7).
 
 `liabilities` is the principal the path still owes at the end of `m`, after that
 month's payments. A loan owes nothing before its `startDate` and nothing from the
@@ -87,10 +93,17 @@ month it ends (§10), so a loan that starts inside the plan adds to it from its
 `startDate`, and one that began before the plan from `start`, at the balance its own
 schedule has reached after its payment in `start` (§3.2). Escrow, including escrow that continues after a payoff (§3.6),
 is a cost and not a debt. Negative cash is not a liability: it already lowers `liquid`
-and `total`. A plan with no loans has `liabilities` of 0 and `netWorth` equal to
-`total` in every month. `netWorth` counts no property: a loan's balance is subtracted,
-but what it bought is not added, so a sale (§3.5) raises `netWorth` by about the
-proceeds in its month.
+and `total`. A plan with no loans and no assets has `liabilities` and `assets` of 0
+and `netWorth` equal to `total` in every month.
+
+`netWorth` counts the assets the plan lists (chapter 03, Asset), and only those. A
+loan's balance is subtracted whether or not it is secured on a listed asset. So when a
+loan with `sellProperty` sells a property that is not listed, `netWorth` rises by
+about the proceeds in the sale month, while the sale of a listed asset (§3.5) moves it
+only by the month's flows, the selling costs, the escrow refund and the month's
+interest. `equity` is the part of `netWorth` that the listed assets hold: unsecured
+loans lower `netWorth` but not `equity`, and an asset worth less than its loans owe
+has negative equity.
 
 ### 1.1 Cash interest
 
@@ -116,6 +129,27 @@ balance the next month earns on.
 - The first interest accrues in month `start`, on `startingCash`: that is the balance at
   the end of the month before `start`.
 - Unrounded, like investment growth; only the rendered CSV rounds to cents.
+
+### 1.2 Assets
+
+An asset (chapter 03, Asset) has a value in every month and no cash flow until it is
+sold.
+
+- Its **first month** `first` is `max(startDate, start)`, or `start` when it has no
+  `startDate`. Its sale month `s` is its `sellDate`, when it has one.
+- **Appreciation factor.** For a month `m` with `m − first = 12k + j` and `0 ≤ j < 12`,
+  and `a` the asset's yearly rate (its own, `simulation.inflationRate` for
+  `inflation`, 0 for `fixed`): `A(m) = (1 + a/100)^k · ρ^j`, where `ρ` is the twelfth
+  root of `1 + a/100`. It is computed exactly as §12 computes `D`: `ρ` as
+  `√(√(∛(1 + a/100)))`, and the powers by repeated multiplication. So every build
+  computes the same bits, and an asset that follows inflation and is owned from `start`
+  has `A(m) = D(m)` exactly. `A(first) = 1`, and `A` is exactly 1 in every month when
+  `a` is 0.
+- **Value.** `value[m] = value · A(m)` from `first` up to, but not including, `s`. It
+  is 0 before `first`, and from `s` on. It is unrounded, like every reported number.
+- An asset charges nothing when it is bought and moves no cash while it is held. Its
+  first month adds its `value` to `assets` and to `netWorth`; the cash of a purchase
+  is whatever the plan writes for it, such as a loan's down payment or a one-off event.
 
 ## 2. Event occurrences
 
@@ -175,7 +209,9 @@ from the loan's `escrowGrowth` (§2.1); it is what each payment below includes, 
   first extra payment ends the loan immediately.
 
 **Each subsequent month, `monthIndex` = 2 … term** (stop early on payoff/maturity/endDate):
-- If the month equals `earlyPayoffDate` → §3.5 payoff, then stop.
+- If the month is the sale month of the asset the loan is secured on → §3.5 payoff by
+  sale, then stop. Otherwise, if it equals `earlyPayoffDate` → §3.5 payoff by date,
+  then stop.
 - `interest = remaining·r`; `extra` per §3.3;
   `principalPaid = min(M − interest + extra, remaining)`.
 - `payment = interest + principalPaid + escrow(m) + MI(§3.4)`.
@@ -221,11 +257,32 @@ left after the previous month plus the interest it has accrued since. That inter
 exactly what a regular payment in `m` would have carried (§3.1), so retiring a loan
 never skips a month of interest.
 
+**By the sale of its asset** (a loan with `asset`, chapter 03): in the month `s` of
+that asset's `sellDate`, when `s` is inside the simulated window, the loan is paid off
+during schedule generation, if it is still owed at the end of `s − 1`. Its payment at
+`s` is `payoff − refund` (§3.6 escrow refund), its later payments are removed, and no
+post-loan escrow follows it (§3.6). The sale comes before every other way of ending the
+loan in that month: an `earlyPayoffDate` at or after `s` has no effect, and a threshold
+payoff (below) does not fire in `s`. A loan that ended before `s` (maturity, an
+earlier `earlyPayoffDate` or a threshold) is not touched by the sale.
+
+The asset is sold at `s` for `price = value · A(s)` (§1.2), and `costs = price ·
+sellCosts / 100` are paid. The sale settles as **one payment**, billed in step 4 of §1:
+
+`settlement = Σ (payoff − refund) − price + costs`
+
+summed over the loans secured on the asset that the sale pays off. It is negative for
+cash in. With one loan, it is exactly the legacy sale payment below with `sellPrice`
+the price and `sellCostsNet` the costs. The emergency fund counts it only when it is
+positive (§5). The asset's `value` and the paid-off loans' `owed` are 0 from `s`
+(§1.2, §10), and the note of §6 is emitted.
+
 **By date** (`earlyPayoffDate`, evaluated during schedule generation): at that month,
 instead of a regular payment:
-- With `sellProperty: true`: `payment = payoff − sellPrice + sellCostsNet − refund`
-  (§3.6 escrow refund; `sellPrice` defaults to `principal`; a negative payment is cash
-  **in**). The asset is gone: no further payments, no post-sale escrow.
+- With `sellProperty: true` (a loan with no `asset`): `payment = payoff − sellPrice +
+  sellCostsNet − refund` (§3.6 escrow refund; `sellPrice` defaults to `principal`; a
+  negative payment is cash **in**). The property is gone: no further payments, no
+  post-sale escrow.
 - Without sale: `payment = payoff − refund` (§3.6). Then §3.6 post-loan escrow
   applies.
 
@@ -241,7 +298,8 @@ liquidation would incur per §4 step 4:
 `value − withdrawalTaxRate/100 · min(value, growthBalance)`.
 
 In month `m`, if the loan started before `m`, still has `round2(remaining) > 0` as of
-the end of `m−1`, and `round2(eligible − payoff) ≥ T`, the loan is paid off at
+the end of `m−1`, `m` is not the sale month of the asset it is secured on, and
+`round2(eligible − payoff) ≥ T`, the loan is paid off at
 `m`: the scheduled payment at `m` (if any) is replaced by the same payoff payment as the
 by-date rule (sale and no-sale variants identical), all later scheduled payments are
 removed, §3.6 applies (refund always; post-loan escrow when not selling), and a note is
@@ -290,6 +348,16 @@ month that is itself a December both refunds the year's accrual and bills that
 December's `12 · escrow · G(d)`). With fixed escrow that is `12 · escrow`. When the asset is **sold**, nothing
 continues — the refund still applies.
 
+**Escrow while a listed asset is held.** A loan secured on an asset that is sold later
+(§3.5) and that ends before the sale is a kept-property ending, but the asset is held
+only until the sale. Post-loan escrow is billed every December `d` from the loan's end
+month inclusive and **before** the sale month `s`. In `s`, the months of that calendar
+year are billed: `n · escrow · G(s)`, where `n` is the number of `s`'s month (January
+is 1), as a payment of the loan at `s`, apart from the sale's settlement. No December
+from `s` on is billed. So every month the asset is held costs one month's escrow, and a
+sale in December bills that December's `12 · escrow · G(s)` once. A loan the sale
+itself pays off continues nothing.
+
 Real-world closing mechanics (prorated property-tax settlement between buyer and
 seller, insurer premium refunds) are deliberately out of scope; model them with
 `sellCostsNet` if they matter.
@@ -333,7 +401,8 @@ Skipped when the target `N` months is 0 (config default 6).
 - `monthlyExpenses(m)` = Σ|amount| over **negative** event occurrences at `m` (scenario
   and common, counted individually — income never nets against expenses) + Σ loan
   payments billed at `m` (only positive payments; a cash-in sale month contributes 0)
-  + `cashContributions(m)`.
+  + Σ asset sale settlements at `m` (§3.5; only positive ones, each counted as one
+  payment with the payoffs of the loans it settles) + `cashContributions(m)`.
 - `avg` = mean of `monthlyExpenses` over the first `min(12, monthsSimulated)` simulated
   months, `start` included. Those months are the plan's first year, in which every
   growth factor is 1 (§2.1), so growth never changes the recommendation: it is already
@@ -351,6 +420,10 @@ Skipped when the target `N` months is 0 (config default 6).
 Notes are per-scenario, per-month string lists, emitted in processing order. Formats are
 normative (conformance fixtures include them in CSV):
 
+- Sale of an asset (§3.5), placed before the month's other notes, one per asset sold,
+  in the order the assets are processed (the resolved scenario list, then the resolved
+  shared list):
+  `selling asset <name> for <price:%.2f> with <costs:%.2f> selling costs`
 - Threshold payoff, no sale: `paying off asset <name> for <payoff:%.2f>`
 - Threshold payoff with sale:
   `paying off asset <name> for <payoff:%.2f> and selling for <sellPrice:%.2f> with <sellCostsNet:%.2f> selling costs`
@@ -373,7 +446,8 @@ normative (conformance fixtures include them in CSV):
   - `tax %.2f`
   - `withdrawal tax %.2f`
 
-Date-based early payoffs emit no note (the configured date is the user's own doing).
+Date-based early payoffs emit no note (the configured date is the user's own doing),
+nor do the payoffs a sale makes: the sale's own note stands for them.
 
 ## 7. Optimizer
 
@@ -677,7 +751,8 @@ it, with `m` written into the entry's field on that path and nothing else change
   has on the path, whether or not the change sets that field.
 
 A month that makes the path invalid by the rules of chapter 03 (an event that would
-start after it ends) is not a candidate. The question is then refused, naming the
+start after it ends, or a secured loan whose first payment would not be before its
+asset's sale) is not a candidate. The question is then refused, naming the
 first such month in the range and what is wrong with it, and nothing is answered.
 What chapter 03 only warns about (a loan whose early payoff month is not after its
 first payment) does not refuse it.
@@ -745,8 +820,10 @@ whose rate is absent or 0 has no today's-dollars reading.
 
 **What is converted.**
 
-- **Series.** `liquid`, `total`, `liabilities` and `netWorth` (§1), and the
-  differences of a comparison (§9), are divided by `D(m)` month by month.
+- **Series.** `liquid`, `total`, `assets`, `liabilities`, `netWorth` and `equity`
+  (§1), and the differences of a comparison (§9), are divided by `D(m)` month by month.
+  An asset that follows inflation and is owned from `start` reads its `value` in every
+  month it is held.
 - **Key figures** (§8). `endingCash`, `endingTotal` and `endingNetWorth` are divided by
   `D(end)`.
   `lowestCash` and `lowestCashDate` are read by §8's rule from the converted `liquid`,

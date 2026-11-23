@@ -68,6 +68,7 @@ common:               # optional; shared by every scenario (the baseline)
   events: []
   loans: []
   investments: []
+  assets: []          # see Asset
 
 choices: []           # optional; decisions with named options — see Choices
 
@@ -78,6 +79,7 @@ scenarios:            # required; at least one
     events: []
     loans: []
     investments: []
+    assets: []
 ```
 
 Validation (hard errors): missing/wrong `version`; missing `simulation.endDate`;
@@ -158,7 +160,8 @@ follows inflation, whenever it occurs. Growth adds no note to the results.
 What can grow: every event's `amount` (above), a loan's `escrow` (`escrowGrowth`) and a
 guardrail's `amount` (Guardrails). Nothing else does: not a loan's principal, payment,
 down payment or mortgage insurance, a sale price, a starting balance, a threshold or a
-percentage withdrawal.
+percentage withdrawal. An asset's `appreciation` takes the same three values but drifts
+month by month (Asset).
 
 User-facing help for `inflationRate`, for every `growth` and `escrowGrowth`, MUST state
 what the simulation assumes: amounts are written in the start month's prices; an amount
@@ -191,6 +194,7 @@ amount fixed. The format stays at version 2.
 
 ```yaml
 - name: 1234 Street Address   # required, non-empty
+  asset: House                # optional; the asset this loan is secured on — see Asset
   principal: 150000.00        # required; original principal before down payment
   downPayment: 10000.00       # optional; default 0; paid at startDate
   interestRate: 3.75          # required; APR (annual percentage rate); 0 is allowed
@@ -220,6 +224,11 @@ present, must parse and SHOULD be warned about if it is not after `startDate`. `
 mechanism is a warning (it has no effect). `mortgageInsurance > 0` with no
 `mortgageInsuranceCutoff` means MI applies for the whole life of the loan (warning).
 `escrowGrowth` with no escrow (absent or 0) is a warning: there is nothing to grow.
+
+`asset` names the asset the loan is secured on (Asset, below). A loan with an `asset`
+is paid off when that asset is sold, so it cannot also carry `sellProperty`,
+`sellPrice` or `sellCostsNet`. Those fields keep their meaning, unchanged, on a loan
+with no `asset`.
 
 ## Investment
 
@@ -252,6 +261,86 @@ Validation: `taxRate` and `withdrawalTaxRate` must be in `[0, 100)` (the payoff-
 gross-up in chapter 04 divides by `1 − withdrawalTaxRate/100`); `annualReturnRate` may
 be negative; `startingValue ≥ 0`.
 
+## Asset
+
+An asset is something owned that has a value but no cash flow of its own, such as a
+home or a car. It is listed in `assets`, beside `events`, `loans` and `investments`:
+in `common`, in an option and in a scenario. A loan names the asset it is secured on
+with `asset` (Loan), so an asset can have no loan or several, and a loan has at most
+one asset.
+
+```yaml
+assets:
+  - name: House              # required; unique among the assets of a path
+    value: 450000.00         # required; more than 0; worth in its first month
+    appreciation: inflation  # optional; default fixed; fixed | inflation | a yearly percent
+    startDate: 2028-06       # optional; the month it is bought; default: owned at the start
+    sellDate: 2045-06        # optional; the month it is sold; default: kept
+    sellCosts: 6.0           # optional; default 0; percent of the value at sale
+```
+
+- An asset's **first month** in the plan is its `startDate`, or the plan's start month
+  when the asset has no `startDate` or one before the start. `value` is what it is
+  worth in that month, in that month's prices.
+- `appreciation` takes the values `growth` takes (Growth): `fixed`, the default, keeps
+  the value the same in nominal dollars; `inflation` follows `simulation.inflationRate`;
+  a number is the asset's own yearly change in percent, which may be negative for
+  something that loses value and must be more than −100. It is a yearly change, as
+  house prices are quoted, but it is applied as a smooth drift from month to month,
+  counted from the asset's first month (chapter 04 §1.2), because a value is read
+  every month and has no billing date. So an asset that follows inflation keeps its
+  `value` in today's dollars.
+- An asset charges nothing when it is bought and adds nothing to cash while it is held.
+  A purchase's cash is written where it is today: a loan's down payment, or a one-off
+  event for a cash purchase.
+- `sellDate` sells the asset at its value in that month (chapter 04 §3.5). `sellCosts`
+  is paid at the sale, as a percent of that value. A fixed closing cost is a one-off
+  event in the sale month. Every loan secured on the asset is paid off by the sale.
+- The asset's value is reported, with the equity of the loans secured on it, beside
+  liquid and total (chapter 04 §1). It is never part of `liquid` or `total`.
+
+Validation, hard errors:
+
+- An asset with no name, or with a name another asset on the same path has: in the
+  scenario's own entries, those its selected options add, or the baseline as they
+  leave it (Choices). A loan names its asset by name, so the name is unique per path.
+  The problem is placed at the later asset's `name`.
+- `value` missing, or not more than 0.
+- `appreciation` as Growth refuses a `growth`, including a number of −100 or less.
+- A `startDate` or `sellDate` that does not parse, or a `sellDate` that is not after
+  the asset's first month.
+- `sellCosts` below 0, or 100 or more.
+- A loan whose `asset` names no asset on its path. The problem is placed at the loan's
+  `asset`, or at an option's `remove` entry when a selected option takes the asset
+  away.
+- A loan with an `asset` that also has `sellProperty`, `sellPrice` or `sellCostsNet`,
+  placed at each of those fields.
+- A secured loan whose first payment is not before its asset's `sellDate`, placed at
+  the loan's `startDate`.
+- The usual wrong-type rules, including inside `change` → `set`.
+
+Warnings:
+
+- `appreciation: inflation` when the plan's inflation rate is absent or 0 (Growth).
+- A secured loan's `earlyPayoffDate` at or after its asset's `sellDate`: the sale pays
+  the loan off first, so the date has no effect.
+- A secured loan whose first payment is before its asset's first month, when the asset
+  is bought inside the plan (its `startDate` is after the plan's start). Until the asset
+  is owned, the loan's balance has no value against it. A loan that began before the
+  plan on an asset owned from the start is not warned about.
+- An asset whose `startDate` or `sellDate` is after `simulation.endDate`, placed at
+  that field: it is bought, or sold, after the plan ends.
+- Unknown keys, as everywhere.
+
+Canonical form: `assets` is written after `investments`, in `common`, in an option
+and in a scenario. An asset's keys are written `name`, `value`, `appreciation`,
+`startDate`, `sellDate`, `sellCosts`, and `fixed` is written by leaving the key out.
+A loan's `asset` is written after its `name`.
+
+A moneypath build that predates assets warns about the unknown keys and computes
+without them, so a secured loan is not paid off at the sale. The format stays at
+version 2.
+
 ## Choices
 
 A choice is a decision the plan faces, and its options are the ways it can go. A scenario
@@ -268,6 +357,7 @@ choices:
         events: []         # entries this option adds
         loans: []
         investments: []
+        assets: []
         change:            # common entries this option alters
           loans:
             - name: Mortgage        # which common loan
@@ -286,12 +376,13 @@ scenarios:
 
 - `common` is the baseline: what holds on every path unless an option says otherwise.
 - An option with no key but its `name` is valid. It is the option that changes nothing.
-- An option's `events`, `loans` and `investments` take the same entries, under the same
-  rules, as a scenario's, except that an event cannot carry an `optimize` block.
+- An option's `events`, `loans`, `investments` and `assets` take the same entries, under
+  the same rules, as a scenario's, except that an event cannot carry an `optimize`
+  block.
 - `select` maps a choice's name to the name of one of its options. Names match exactly.
   A choice named twice in one `select` is an error.
-- A scenario keeps its own `events`, `loans` and `investments` for what belongs to that
-  path alone.
+- A scenario keeps its own `events`, `loans`, `investments` and `assets` for what
+  belongs to that path alone.
 
 ### Resolution
 
@@ -315,8 +406,8 @@ of options.
 
 ### `change` and `remove`
 
-Both name a `common` entry by its kind (`events`, `loans`, `investments`) and its
-`name`. Nothing is overridden by a matching name alone: an entry an option adds never
+Both name a `common` entry by its kind (`events`, `loans`, `investments`, `assets`) and
+its `name`. Nothing is overridden by a matching name alone: an entry an option adds never
 replaces a baseline entry, whatever it is called.
 
 - **`remove`** drops the entry for the scenarios that select the option.
@@ -359,9 +450,9 @@ Hard errors:
   checked once for the plan, whatever the scenarios select.
 - A `change` without a `set`, or one that sets `name` or `optimize`.
 - An `optimize` block on an option's event.
-- Every rule for an event, loan or investment, applied to each option's added entries
-  and to each baseline entry **as changed**, whether or not any scenario selects the
-  option.
+- Every rule for an event, loan, investment or asset, applied to each option's added
+  entries and to each baseline entry **as changed**, whether or not any scenario selects
+  the option.
 - Every rule for a scenario's lists, applied to each resolved scenario list, active or
   not. An investment's name is unique within its list, so a scenario's own investments
   and those its selected options add cannot share a name. Two options of one choice

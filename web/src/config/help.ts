@@ -218,12 +218,56 @@ export const HELP = {
     'Optional. Pay the loan off at this month, for the remaining principal plus that month’s interest.',
     'It should be after the loan start month.',
   ),
-  loanSellProperty:
+  loanAsset: tiered(
+    'Optional. The asset this loan is secured on, from the assets your plan lists.',
+    'The asset must be on the same path as the loan. Its sale pays the loan off, so a secured loan has ' +
+      'no sale of its own, and its first payment must come before the sale. The asset’s equity is its ' +
+      'value less what its loans still owe.',
+  ),
+  loanSellProperty: tiered(
     'Optional. Only meaningful together with an early payoff — on its own it has no effect and raises a warning.',
+    'For a property you list as an asset, secure this loan on it and set the asset’s sale month instead. ' +
+      'A property you do not list adds nothing to net worth until its sale, when net worth rises by about the price.',
+  ),
   loanSellPrice: 'Optional. Defaults to the loan principal when omitted.',
   loanSellCostsNet: 'Optional and signed: positive means closing costs paid at the sale.',
   loanExtraPrincipalPayments:
     'Optional list of events, each with an amount greater than zero, paid toward principal.',
+
+  /* asset */
+  assetName: 'Required, and unique on each path. A loan names it under “Secured on”.',
+  assetValue: tiered(
+    'Required, more than 0. Its worth in its first month: the plan’s start, or the month it is bought.',
+    'Write it in that month’s prices; from there it changes by its appreciation. The value counts toward ' +
+      'net worth, never toward liquid or total.',
+  ),
+  appreciation: tiered(
+    'How the value changes each year: it stays the same, follows inflation, or changes at its own rate.',
+    'It is a yearly change, as house prices are quoted, not an APR. It is applied a little each month, ' +
+      'counted from the asset’s first month, so the value never jumps on an anniversary, and an asset that ' +
+      'follows inflation keeps its value in today’s dollars. A value that stays the same keeps the dollars ' +
+      'written, so rising prices wear it down.',
+  ),
+  appreciationRate: tiered(
+    'The percent the value changes each year: 3 means 3% more a year later. A negative rate is a loss.',
+    'It must be more than -100; a car might lose 15 a year. It is a yearly change, not an APR, applied a ' +
+      'little each month from the asset’s first month.',
+  ),
+  assetStartDate: tiered(
+    'Optional. The month it is bought. Leave it empty for something owned from the start.',
+    'Buying it charges nothing to cash: write the down payment on its loan, or a one-off event for a ' +
+      'cash purchase. A month before the plan’s start means it is owned from the start.',
+  ),
+  assetSellDate: tiered(
+    'Optional. The month it is sold, at its value then. Leave it empty to keep it.',
+    'It must be after the asset’s first month. The sale pays off every loan secured on the asset, ' +
+      'refunds the year’s escrow and pays the selling costs, all as one payment. If a loan’s escrow ' +
+      'continued after it was paid off, the sale bills that escrow for each month of its year so far.',
+  ),
+  assetSellCosts: tiered(
+    'Optional, default 0. Selling costs as a percent of the value at the sale, at least 0 and below 100.',
+    'A fixed closing cost can be written as a one-off event in the sale month.',
+  ),
 
   /* investment */
   investmentName: 'Required, and unique within its list.',
@@ -286,7 +330,8 @@ export const HELP = {
   ),
 
   /* results */
-  netWorth: 'Net worth is cash and investments less what your loans still owe. It counts no home, car or other property.',
+  netWorth: 'Net worth is cash, investments and the assets you list, less what your loans still owe.',
+  equity: 'Equity is what your listed assets are worth, less what the loans secured on them still owe.',
 } satisfies Record<string, Help>;
 
 export type HelpKey = keyof typeof HELP;

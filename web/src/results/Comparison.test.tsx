@@ -318,7 +318,7 @@ describe('comparing net worth', () => {
       { name: 'renting', value: '$990.00' },
     ]);
     expect(host.querySelector('.comparison__month')?.textContent).toContain('Net worth in 2026-03');
-    expect(host.querySelector('.comparison__about')?.textContent).toMatch(/^Net worth is cash and investments/);
+    expect(host.querySelector('.comparison__about')?.textContent).toMatch(/^Net worth is cash, investments and the assets you list/);
   });
 
   it('is not offered when nothing is owed', () => {

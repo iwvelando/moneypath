@@ -4,13 +4,14 @@ import {
   fromConfigDocument,
   isFinanceForecastDocument,
   normalizeOptimizeField,
+  serializeAsset,
   serializeEvent,
   serializeInvestment,
   serializeLoan,
   toConfigDocument,
   toConfigYaml,
 } from './serialize';
-import { emptyEvent, emptyGuardrail, emptyInvestment, emptyLoan, type ConfigModel } from './types';
+import { emptyAsset, emptyEvent, emptyGuardrail, emptyInvestment, emptyLoan, type ConfigModel } from './types';
 import { starterConfig } from './starter';
 
 function model(): ConfigModel {
@@ -386,5 +387,57 @@ describe('growth', () => {
   it('leaves out an own rate not yet entered', () => {
     const event = { ...emptyEvent(), amount: 1, growth: { mode: 'rate', rate: null } };
     expect(serializeEvent(event, 'cashflow')).not.toHaveProperty('growth');
+  });
+});
+
+describe('assets', () => {
+  const doc = {
+    version: 2,
+    simulation: { startDate: '2026-01', endDate: '2040-12', startingCash: 0 },
+    common: {
+      loans: [{ name: 'Mortgage', asset: 'House', principal: 240000, interestRate: 4, term: 360, startDate: '2021-01' }],
+      assets: [
+        { name: 'House', value: 300000, appreciation: 3, sellDate: '2035-06', sellCosts: 6 },
+        { name: 'Car', value: 20000, appreciation: 'inflation', startDate: '2027-03' },
+      ],
+    },
+    choices: [
+      {
+        name: 'Housing',
+        options: [
+          { name: 'Keep' },
+          {
+            name: 'Sell',
+            assets: [{ name: 'Cabin', value: 90000 }],
+            change: { assets: [{ name: 'House', set: { sellDate: '2028-06', sellCosts: null } }] },
+            remove: { assets: ['Car'] },
+          },
+        ],
+      },
+    ],
+    scenarios: [{ name: 'a', active: true, select: { Housing: 'Sell' }, assets: [{ name: 'Boat', value: 5000 }] }],
+  };
+
+  it('reads assets everywhere and writes them back as written, after investments', () => {
+    const model = fromConfigDocument(doc);
+    expect(model.common.assets.map((a) => a.name)).toEqual(['House', 'Car']);
+    expect(model.common.assets[0]).toMatchObject({ value: 300000, appreciation: { mode: 'rate', rate: 3 }, sellDate: '2035-06', sellCosts: 6 });
+    expect(model.common.loans[0]!.asset).toBe('House');
+    const sell = model.choices[0]!.options[1]!;
+    expect(sell.change.assets[0]!.targetId).toBe(model.common.assets[0]!.id);
+    expect(sell.remove.assets[0]!.targetId).toBe(model.common.assets[1]!.id);
+    expect(toConfigDocument(model)).toEqual(doc);
+    const keys = Object.keys(toConfigDocument(model)['common'] as object);
+    expect(keys).toEqual(['loans', 'assets']);
+  });
+
+  it('writes a loan’s asset after its name, and leaves an unsecured loan without one', () => {
+    const loan = { ...emptyLoan(), name: 'Car loan', asset: 'Car', principal: 10 };
+    expect(Object.keys(serializeLoan(loan)).slice(0, 2)).toEqual(['name', 'asset']);
+    expect(serializeLoan({ ...loan, asset: '' })).not.toHaveProperty('asset');
+  });
+
+  it('writes a new asset with only what has been entered', () => {
+    expect(serializeAsset({ ...emptyAsset(), name: 'Car', value: 12000 })).toEqual({ name: 'Car', value: 12000 });
   });
 });

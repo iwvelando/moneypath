@@ -1,4 +1,4 @@
-import type { EventKind, EventModel, GuardrailModel, InvestmentModel, LoanModel, SimulationModel } from '../../config/types';
+import type { AssetModel, EventKind, EventModel, GuardrailModel, InvestmentModel, LoanModel, SimulationModel } from '../../config/types';
 import { monthIsError } from '../../config/month';
 import { formatMoney } from '../../util/format';
 import { growthLabel } from '../../config/choices';
@@ -46,6 +46,7 @@ export function loanSummary(loan: LoanModel): EditorSummary {
       : '',
     loan.mortgageInsurance !== null && loan.mortgageInsurance !== 0 ? 'Mortgage insurance' : '',
     loan.earlyPayoffDate || loan.earlyPayoffThreshold !== null ? 'Early payoff' : '',
+    loan.asset.trim() ? `Secured on ${loan.asset.trim()}` : '',
     loan.sellProperty ? 'Property sale' : '',
     loan.extraPrincipalPayments.length ? `${loan.extraPrincipalPayments.length} extra payment${loan.extraPrincipalPayments.length === 1 ? '' : 's'}` : '',
   ].filter(Boolean);
@@ -71,6 +72,18 @@ export function investmentSummary(investment: InvestmentModel): EditorSummary {
     attention: !investment.name.trim() || [...investment.contributions, ...investment.withdrawals].some(eventHasFieldErrors),
     primary: `${formatMoney(investment.startingValue ?? 0)} starting value · ${investment.annualReturnRate ?? 0}% annual return`,
     detail: details.join(' · '),
+  };
+}
+
+/** The value as entered, how it changes, and when it is bought and sold. */
+export function assetSummary(asset: AssetModel): EditorSummary {
+  const sale = asset.sellDate
+    ? `Sold ${asset.sellDate}${asset.sellCosts ? ` · ${asset.sellCosts}% selling costs` : ''}`
+    : 'Kept';
+  return {
+    attention: !asset.name.trim() || monthIsError(asset.startDate) || monthIsError(asset.sellDate),
+    primary: `${asset.value === null ? 'Value not set' : formatMoney(asset.value)}${grows(asset.appreciation)}`,
+    detail: [asset.startDate ? `Bought ${asset.startDate}` : 'Owned from the start', sale].join(' · '),
   };
 }
 

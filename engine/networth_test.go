@@ -25,11 +25,11 @@ func owedEverywhere(sr *ScenarioResult) []float64 {
 
 // assertBalanceSheet checks spec chapter 04 §1, step 6, in every month of a
 // path: liabilities are what a debtFree with no loans listed reads, to the
-// bit, and net worth is total less liabilities.
+// bit, and net worth is total plus assets less liabilities.
 func assertBalanceSheet(t *testing.T, sr *ScenarioResult) {
 	t.Helper()
 	n := len(sr.Liquid)
-	if len(sr.Liabilities) != n || len(sr.NetWorth) != n {
+	if len(sr.Liabilities) != n || len(sr.NetWorth) != n || len(sr.Assets) != n || len(sr.Equity) != n {
 		t.Fatalf("%s: %d liabilities and %d net worth for %d months", sr.Name, len(sr.Liabilities), len(sr.NetWorth), n)
 	}
 	owed := owedEverywhere(sr)
@@ -37,8 +37,8 @@ func assertBalanceSheet(t *testing.T, sr *ScenarioResult) {
 		if sr.Liabilities[i] != owed[i] {
 			t.Errorf("%s: liabilities[%d] = %v, owed on every loan %v", sr.Name, i, sr.Liabilities[i], owed[i])
 		}
-		if want := sr.Total[i] - sr.Liabilities[i]; sr.NetWorth[i] != want {
-			t.Errorf("%s: netWorth[%d] = %v, want total less liabilities %v", sr.Name, i, sr.NetWorth[i], want)
+		if want := sr.Total[i] + sr.Assets[i] - sr.Liabilities[i]; sr.NetWorth[i] != want {
+			t.Errorf("%s: netWorth[%d] = %v, want total plus assets less liabilities %v", sr.Name, i, sr.NetWorth[i], want)
 		}
 	}
 	if want := sr.NetWorth[n-1]; sr.KeyFigures.EndingNetWorth != want {

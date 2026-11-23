@@ -568,7 +568,7 @@ describe('net worth in a scenario’s own view', () => {
     showOwing();
     expect(host.querySelectorAll('.chart__line--networth')).toHaveLength(1);
     expect([...host.querySelectorAll('.results-table thead th')].map((th) => th.textContent)).toContain('Debt');
-    expect(host.querySelector('.results__networth')?.textContent).toMatch(/^Net worth is cash and investments/);
+    expect(host.querySelector('.results__networth')?.textContent).toMatch(/^Net worth is cash, investments and the assets you list/);
   });
 
   it('leaves them out for a path that owes nothing', () => {

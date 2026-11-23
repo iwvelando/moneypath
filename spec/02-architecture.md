@@ -129,7 +129,8 @@ Each entry has:
   "rows": [
     {"date": "2025-06",
      "values": [{"liquid": 30000.0, "total": 55000.0, "liabilities": 180000.0,
-                 "netWorth": -125000.0, "notes": ["…"]}, …]}
+                 "netWorth": 95000.0, "assets": 220000.0, "equity": 40000.0,
+                 "notes": ["…"]}, …]}
   ],
   "csv": "…engine-rendered CSV (chapter 05)…",
   "metrics": [
@@ -197,9 +198,11 @@ and each scenario's `select` (chapter 03, Canonical form), never the resolved li
 
 `rows` is sorted ascending by date; `values` and `metrics` are index-aligned with
 `scenarios`. `liquid`, `total`, `liabilities` and `netWorth` are the series of chapter 04
-§1, present in every plan: a plan with no loans reports `liabilities` of 0 and a
-`netWorth` equal to `total`. They are omitted (JSON `null` or absent) for dates a
-scenario has no value for. Numbers are raw float64 values; formatting is the
+§1, present in every plan: a plan with no loans and no assets reports `liabilities` of
+0 and a `netWorth` equal to `total`. `assets` and `equity` are present in every value
+when the plan lists at least one asset, anywhere (the condition that adds them to the
+CSV, chapter 05), and absent otherwise. They are omitted (JSON `null` or absent) for
+dates a scenario has no value for. Numbers are raw float64 values; formatting is the
 consumer's job.
 
 `keyFigures` (chapter 04 §8) is present for every scenario; `lowestCashDate` is a
@@ -292,7 +295,8 @@ month whose prices it holds, as a `YYYY-MM` string. `rows`, `metrics`, `comparis
 `flip` and `earliest` are present under the same rules. Each repeats its top-level
 counterpart exactly, every date, result, month count, break-even month, note,
 emergency-fund figure and optimizer value included, except for the amounts that chapter 04 §12
-converts: `liquid`, `total`, `liabilities` and `netWorth`, each `difference`, the
+converts: `liquid`, `total`, `assets`, `liabilities`, `netWorth` and `equity`, each
+`difference`, the
 `keyFigures` (with
 `lowestCashDate` read from the converted series), a guardrail's `margin` and `owed`, and
 an optimization's `floor`, `minimumCash` and `headroom`.

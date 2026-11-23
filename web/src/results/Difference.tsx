@@ -1,6 +1,6 @@
 import { useId, useState } from 'preact/hooks';
 import type { BreakEvenMonth, ForecastResults } from '../engine/types';
-import { runOwes } from './balance';
+import { runHasBalance } from './balance';
 import { Chart } from './Chart';
 
 interface DifferenceProps {
@@ -51,7 +51,7 @@ export function Difference({ results }: DifferenceProps) {
   if (!comparison) return null;
 
   // Net worth is the total until something is owed.
-  const netWorth = runOwes(results) ? comparison.netWorth : undefined;
+  const netWorth = runHasBalance(results) ? comparison.netWorth : undefined;
   const firstName = results.scenarios[first] ?? '';
   const secondName = results.scenarios[second] ?? '';
 

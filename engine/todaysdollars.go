@@ -72,7 +72,7 @@ func (d *Deflator) Result(r *Result) *Result {
 	if d == nil {
 		return nil
 	}
-	out := &Result{Start: r.Start, End: r.End, InflationRate: r.InflationRate}
+	out := &Result{Start: r.Start, End: r.End, InflationRate: r.InflationRate, HasAssets: r.HasAssets}
 	for _, sr := range r.Scenarios {
 		out.Scenarios = append(out.Scenarios, d.Path(sr))
 	}
@@ -87,6 +87,7 @@ func (d *Deflator) Path(sr *ScenarioResult) *ScenarioResult {
 	out := *sr
 	out.Liquid, out.Total = d.series(sr.Liquid), d.series(sr.Total)
 	out.Liabilities, out.NetWorth = d.series(sr.Liabilities), d.series(sr.NetWorth)
+	out.Assets, out.Equity = d.series(sr.Assets), d.series(sr.Equity)
 	out.KeyFigures = keyFigures(d.start, out.Liquid, out.Total, out.NetWorth)
 	out.Guardrails = d.Guardrails(sr.Guardrails)
 	out.Optimizations = nil

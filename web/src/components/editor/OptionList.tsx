@@ -24,6 +24,7 @@ import type {
   EntryKind,
   EventModel,
   InvestmentModel,
+  AssetModel,
   LoanModel,
   OptionModel,
   SimulationModel,
@@ -36,11 +37,12 @@ import { At, PathProblems } from '../problems';
 import { EditorCard, useEditorCards, type EditorCardState } from './EditorCard';
 import { EventFields, EventList } from './EventList';
 import { InvestmentFields, InvestmentList } from './InvestmentList';
+import { AssetFields, AssetList } from './AssetList';
 import { LoanFields, LoanList } from './LoanList';
 import { CardScope } from './scope';
 
-const KIND_NOUN: Record<EntryKind, string> = { events: 'event', loans: 'loan', investments: 'investment' };
-const KIND_LABEL: Record<EntryKind, string> = { events: 'Event', loans: 'Loan', investments: 'Investment' };
+const KIND_NOUN: Record<EntryKind, string> = { events: 'event', loans: 'loan', investments: 'investment', assets: 'asset' };
+const KIND_LABEL: Record<EntryKind, string> = { events: 'Event', loans: 'Loan', investments: 'Investment', assets: 'Asset' };
 
 interface Named {
   id: string;
@@ -134,6 +136,8 @@ function ChangeCard({ kind, change, entry, simulation, onChange, onRemove, open,
                 <EventFields event={effective as EventModel} kind="cashflow" showName={false} onChange={edit} />
               ) : kind === 'loans' ? (
                 <LoanFields loan={effective as LoanModel} simulation={simulation} showName={false} onChange={edit} />
+              ) : kind === 'assets' ? (
+                <AssetFields asset={effective as AssetModel} showName={false} onChange={edit} />
               ) : (
                 <InvestmentFields
                   investment={effective as InvestmentModel}
@@ -394,6 +398,7 @@ function OptionCard({ config, choice, option, index, onChange, onRemove, open, a
         simulation={config.simulation}
         onChange={(investments) => patch({ investments })}
       />
+      <AssetList assets={option.assets} onChange={(assets) => patch({ assets })} />
       <BaselineEffects config={config} choice={choice} option={option} onChange={onChange} />
     </EditorCard>
   );

@@ -107,6 +107,14 @@ describe('debt and net worth', () => {
     expect(host.querySelector('caption')?.textContent).toBe('Monthly liquid, total, debt and net worth for plan');
   });
 
+  it('adds assets and equity around them when the path holds an asset, even owing nothing', () => {
+    show(owing.map((row) => ({ ...row, liabilities: 0, assets: 300000, netWorth: row.total! + 300000, equity: 300000 })));
+    expect([...host.querySelectorAll('thead th')].map((el) => el.textContent)).toEqual([
+      'Date', 'Liquid', 'Total', 'Assets', 'Debt', 'Net worth', 'Equity',
+    ]);
+    expect(host.querySelector('caption')?.textContent).toBe('Monthly liquid, total, assets, debt, net worth and equity for plan');
+  });
+
   it('leaves them out when the path owes nothing', () => {
     show(owing.map((row) => ({ ...row, liabilities: 0, netWorth: row.total })));
     expect([...host.querySelectorAll('thead th')].map((el) => el.textContent)).toEqual(['Date', 'Liquid', 'Total']);

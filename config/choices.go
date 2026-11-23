@@ -28,18 +28,21 @@ type Option struct {
 	events      effect[Event]
 	loans       effect[Loan]
 	investments effect[Investment]
+	assets      effect[Asset]
 }
 
 type Change struct {
 	Events      []*EntryChange[Event]      `yaml:"events,omitempty"`
 	Loans       []*EntryChange[Loan]       `yaml:"loans,omitempty"`
 	Investments []*EntryChange[Investment] `yaml:"investments,omitempty"`
+	Assets      []*EntryChange[Asset]      `yaml:"assets,omitempty"`
 }
 
 type Remove struct {
 	Events      []string `yaml:"events,omitempty"`
 	Loans       []string `yaml:"loans,omitempty"`
 	Investments []string `yaml:"investments,omitempty"`
+	Assets      []string `yaml:"assets,omitempty"`
 }
 
 // EntryChange replaces the fields under Set on the common entry of kind T
@@ -281,6 +284,7 @@ func (c *checker) optionEffects(cfg *Config, ch *Choice, opt *Option, path strin
 	opt.events.reset()
 	opt.loans.reset()
 	opt.investments.reset()
+	opt.assets.reset()
 
 	touched := map[entryRef]bool{}
 	// claim finds the one common entry of that kind and name and records
@@ -341,6 +345,13 @@ func (c *checker) optionEffects(cfg *Config, ch *Choice, opt *Option, path strin
 		}
 	}
 
+	assetNames := make([]string, len(common.Assets))
+	for i, a := range common.Assets {
+		if a != nil {
+			assetNames[i] = a.Name
+		}
+	}
+
 	if rm := opt.Remove; rm != nil {
 		for k, name := range rm.Events {
 			if at, ok := claim(join(path, "remove", "events", k), "remove", "event", name, eventNames); ok {
@@ -355,6 +366,11 @@ func (c *checker) optionEffects(cfg *Config, ch *Choice, opt *Option, path strin
 		for k, name := range rm.Investments {
 			if at, ok := claim(join(path, "remove", "investments", k), "remove", "investment", name, investmentNames); ok {
 				opt.investments.removed[at] = true
+			}
+		}
+		for k, name := range rm.Assets {
+			if at, ok := claim(join(path, "remove", "assets", k), "remove", "asset", name, assetNames); ok {
+				opt.assets.removed[at] = true
 			}
 		}
 	}
@@ -381,6 +397,7 @@ func (c *checker) optionEffects(cfg *Config, ch *Choice, opt *Option, path strin
 			}
 			if changed := applyChange(c, change, common.Loans[at], p, (*checker).loan); changed != nil {
 				opt.loans.changed[at] = changed
+				c.written(changed, changedOrigin(&change.Set, join("common", "loans", at), p))
 			}
 		}
 		for k, change := range chg.Investments {
@@ -393,7 +410,28 @@ func (c *checker) optionEffects(cfg *Config, ch *Choice, opt *Option, path strin
 				opt.investments.changed[at] = changed
 			}
 		}
+		for k, change := range chg.Assets {
+			p := join(path, "change", "assets", k)
+			at, ok := claim(p, "change", "asset", nameOf(change), assetNames)
+			if !ok {
+				continue
+			}
+			if changed := applyChange(c, change, common.Assets[at], p, (*checker).asset); changed != nil {
+				opt.assets.changed[at] = changed
+				c.written(changed, changedOrigin(&change.Set, join("common", "assets", at), p))
+			}
+		}
 	}
+}
+
+// changedOrigin is where a baseline entry as changed is written: under the
+// change's set for the fields it lists, at base for the rest.
+func changedOrigin(set *yaml.Node, base, path string) entryOrigin {
+	keys := map[string]bool{}
+	for i := 0; i+1 < len(set.Content); i += 2 {
+		keys[set.Content[i].Value] = true
+	}
+	return entryOrigin{path: base, set: join(path, "set"), keys: keys}
 }
 
 func nameOf[T any](c *EntryChange[T]) string {
@@ -506,17 +544,21 @@ func (c *checker) resolveScenarios(cfg *Config) {
 			Events:      append([]*Event(nil), own.Events...),
 			Loans:       append([]*Loan(nil), own.Loans...),
 			Investments: append([]*Investment(nil), own.Investments...),
+			Assets:      append([]*Asset(nil), own.Assets...),
 		}
 		var evFx []*effect[Event]
 		var loanFx []*effect[Loan]
 		var invFx []*effect[Investment]
+		var assetFx []*effect[Asset]
 		for _, opt := range selected {
 			resolved.Events = append(resolved.Events, opt.Events...)
 			resolved.Loans = append(resolved.Loans, opt.Loans...)
 			resolved.Investments = append(resolved.Investments, opt.Investments...)
+			resolved.Assets = append(resolved.Assets, opt.Assets...)
 			evFx = append(evFx, &opt.events)
 			loanFx = append(loanFx, &opt.loans)
 			invFx = append(invFx, &opt.investments)
+			assetFx = append(assetFx, &opt.assets)
 		}
 		// Names repeated within the scenario's own list are already reported there.
 		names := map[string]bool{}
@@ -534,6 +576,7 @@ func (c *checker) resolveScenarios(cfg *Config) {
 			Events:      applyEffects(cfg.Common.Events, evFx),
 			Loans:       applyEffects(cfg.Common.Loans, loanFx),
 			Investments: applyEffects(cfg.Common.Investments, invFx),
+			Assets:      applyEffects(cfg.Common.Assets, assetFx),
 		}
 	}
 }
