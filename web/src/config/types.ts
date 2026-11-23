@@ -56,6 +56,8 @@ export interface EventModel {
 export interface LoanModel {
   id: string;
   name: string;
+  /** The name of the asset the loan is secured on; `''` for none. */
+  asset: string;
   principal: number | null;
   downPayment: number | null;
   interestRate: number | null;
@@ -86,8 +88,23 @@ export interface InvestmentModel {
   withdrawals: EventModel[];
 }
 
+/**
+ * Something owned with a value and no cash flow until it is sold (spec/03,
+ * Asset). `startDate` is the month it is bought (`''`: owned at the start),
+ * `sellDate` the month it is sold (`''`: kept).
+ */
+export interface AssetModel {
+  id: string;
+  name: string;
+  value: number | null;
+  appreciation: GrowthModel;
+  startDate: string;
+  sellDate: string;
+  sellCosts: number | null;
+}
+
 /** The lists an option can add to, and the kinds of baseline entry it can target. */
-export type EntryKind = 'events' | 'loans' | 'investments';
+export type EntryKind = 'events' | 'loans' | 'investments' | 'assets';
 
 /**
  * The fields an option changes on a baseline entry. A key that is present is
@@ -97,6 +114,7 @@ export type EntryKind = 'events' | 'loans' | 'investments';
 export type EventSet = Partial<Pick<EventModel, 'amount' | 'growth' | 'frequency' | 'startDate' | 'endDate'>>;
 export type LoanSet = Partial<Omit<LoanModel, 'id' | 'name'>>;
 export type InvestmentSet = Partial<Omit<InvestmentModel, 'id' | 'name'>>;
+export type AssetSet = Partial<Omit<AssetModel, 'id' | 'name'>>;
 
 /**
  * A baseline entry an option changes or removes. `targetId` is the entry's
@@ -117,6 +135,7 @@ export interface OptionChanges {
   events: ChangeModel<EventSet>[];
   loans: ChangeModel<LoanSet>[];
   investments: ChangeModel<InvestmentSet>[];
+  assets: ChangeModel<AssetSet>[];
 }
 
 export type OptionRemovals = Record<EntryKind, TargetRef[]>;
@@ -128,6 +147,7 @@ export interface OptionModel {
   events: EventModel[];
   loans: LoanModel[];
   investments: InvestmentModel[];
+  assets: AssetModel[];
   change: OptionChanges;
   remove: OptionRemovals;
 }
@@ -147,6 +167,7 @@ export interface ScenarioModel {
   events: EventModel[];
   loans: LoanModel[];
   investments: InvestmentModel[];
+  assets: AssetModel[];
 }
 
 export interface SimulationModel {
@@ -162,6 +183,7 @@ export interface CommonModel {
   events: EventModel[];
   loans: LoanModel[];
   investments: InvestmentModel[];
+  assets: AssetModel[];
 }
 
 /** The kinds of guardrail the engine can check. */
@@ -284,6 +306,7 @@ export function emptyLoan(): LoanModel {
   return {
     id: newId('ln'),
     name: '',
+    asset: '',
     principal: null,
     downPayment: null,
     interestRate: null,
@@ -317,6 +340,19 @@ export function emptyInvestment(): InvestmentModel {
   };
 }
 
+/** A new asset has nothing entered: owned from the start, kept, at a value that stays the same. */
+export function emptyAsset(): AssetModel {
+  return {
+    id: newId('as'),
+    name: '',
+    value: null,
+    appreciation: emptyGrowth(),
+    startDate: '',
+    sellDate: '',
+    sellCosts: null,
+  };
+}
+
 export function emptyOption(name: string): OptionModel {
   return {
     id: newId('op'),
@@ -324,8 +360,9 @@ export function emptyOption(name: string): OptionModel {
     events: [],
     loans: [],
     investments: [],
-    change: { events: [], loans: [], investments: [] },
-    remove: { events: [], loans: [], investments: [] },
+    assets: [],
+    change: { events: [], loans: [], investments: [], assets: [] },
+    remove: { events: [], loans: [], investments: [], assets: [] },
   };
 }
 
@@ -348,6 +385,7 @@ export function emptyScenario(name: string, choices: ChoiceModel[] = []): Scenar
     events: [],
     loans: [],
     investments: [],
+    assets: [],
   };
 }
 
@@ -379,6 +417,10 @@ export function cloneInvestment(investment: InvestmentModel): InvestmentModel {
   };
 }
 
+export function cloneAsset(asset: AssetModel): AssetModel {
+  return { ...asset, id: newId('as'), appreciation: { ...asset.appreciation } };
+}
+
 export function cloneScenario(scenario: ScenarioModel): ScenarioModel {
   return {
     ...scenario,
@@ -387,5 +429,6 @@ export function cloneScenario(scenario: ScenarioModel): ScenarioModel {
     events: scenario.events.map(cloneEvent),
     loans: scenario.loans.map(cloneLoan),
     investments: scenario.investments.map(cloneInvestment),
+    assets: scenario.assets.map(cloneAsset),
   };
 }

@@ -270,6 +270,35 @@ describe('editor state persistence', () => {
       expect(outcome.config.scenarios[0]!.select).toEqual({ [outcome.config.choices[0]!.id]: sell!.id });
     });
 
+    it('restores a draft saved before assets: no assets anywhere, and every loan unsecured', () => {
+      const draft = sparseDraft() as { version: number; config: Record<string, unknown> };
+      draft.config['choices'] = [{ id: 'c0', name: 'Housing', options: [{ id: 'o0', name: 'Keep', change: { loans: [] }, remove: { loans: [] } }] }];
+      const outcome = decodeEditorState(JSON.stringify(draft));
+      expect(outcome.source).toBe('restored');
+      const { common, scenarios, choices } = outcome.config;
+      expect(common.assets).toEqual([]);
+      expect(scenarios[0]!.assets).toEqual([]);
+      expect(scenarios[0]!.loans[0]!.asset).toBe('');
+      const option = choices[0]!.options[0]!;
+      expect(option.assets).toEqual([]);
+      expect(option.change.assets).toEqual([]);
+      expect(option.remove.assets).toEqual([]);
+    });
+
+    it('backfills what a saved asset predates', () => {
+      const draft = sparseDraft() as { version: number; config: Record<string, unknown> };
+      (draft.config['common'] as Record<string, unknown>)['assets'] = [{ id: 'a0', name: 'House', value: 300000 }];
+      const outcome = decodeEditorState(JSON.stringify(draft));
+      expect(outcome.config.common.assets[0]).toMatchObject({
+        name: 'House',
+        value: 300000,
+        appreciation: { mode: 'fixed', rate: null },
+        startDate: '',
+        sellDate: '',
+        sellCosts: null,
+      });
+    });
+
     it('falls back when the saved choices are not a list', () => {
       const draft = sparseDraft() as { version: number; config: Record<string, unknown> };
       draft.config['choices'] = 'x';

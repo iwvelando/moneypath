@@ -25,9 +25,9 @@ import {
   type TargetRef,
 } from './types';
 
-export const ENTRY_KINDS: readonly EntryKind[] = ['events', 'loans', 'investments'];
+export const ENTRY_KINDS: readonly EntryKind[] = ['events', 'loans', 'investments', 'assets'];
 
-const KIND_NOUN: Record<EntryKind, string> = { events: 'event', loans: 'loan', investments: 'investment' };
+const KIND_NOUN: Record<EntryKind, string> = { events: 'event', loans: 'loan', investments: 'investment', assets: 'asset' };
 
 /** "1 event", "2 loans". */
 function count(n: number, noun: string): string {
@@ -38,7 +38,7 @@ function count(n: number, noun: string): string {
 /* the fields an option can change                                      */
 /* ------------------------------------------------------------------ */
 
-export type SetFieldFormat = 'money' | 'percent' | 'months' | 'month' | 'flag' | 'list' | 'growth';
+export type SetFieldFormat = 'money' | 'percent' | 'months' | 'month' | 'flag' | 'list' | 'growth' | 'text';
 
 export interface SetField {
   key: string;
@@ -59,6 +59,7 @@ export const SET_FIELDS: Record<EntryKind, readonly SetField[]> = {
     { key: 'endDate', label: 'End month', format: 'month' },
   ],
   loans: [
+    { key: 'asset', label: 'Secured on', format: 'text' },
     { key: 'principal', label: 'Principal', format: 'money' },
     { key: 'downPayment', label: 'Down payment', format: 'money' },
     { key: 'interestRate', label: 'Interest rate', format: 'percent' },
@@ -89,6 +90,13 @@ export const SET_FIELDS: Record<EntryKind, readonly SetField[]> = {
     { key: 'fundLoanPayoffs', label: 'Can fund loan payoffs', format: 'flag' },
     { key: 'contributions', label: 'Contributions', format: 'list', eventKind: 'contribution' },
     { key: 'withdrawals', label: 'Withdrawals', format: 'list', eventKind: 'withdrawal' },
+  ],
+  assets: [
+    { key: 'value', label: 'Value', format: 'money' },
+    { key: 'appreciation', label: 'Appreciation', format: 'growth' },
+    { key: 'startDate', label: 'Purchase month', format: 'month' },
+    { key: 'sellDate', label: 'Sale month', format: 'month' },
+    { key: 'sellCosts', label: 'Selling costs', format: 'percent' },
   ],
 };
 
@@ -142,6 +150,7 @@ function display(field: SetField, value: unknown): string {
     return length === 0 ? 'None' : length === 1 ? '1 entry' : `${length} entries`;
   }
   if (field.format === 'growth') return growthLabel(value as GrowthModel);
+  if (field.format === 'text' && (value === '' || value === undefined)) return 'None';
   if (value === null || value === undefined || value === '') return 'Not set';
   if (field.format === 'money') return formatMoney(value as number);
   if (field.format === 'percent') return `${String(value)}%`;
@@ -223,11 +232,13 @@ export function linkTargets(config: ConfigModel): ConfigModel {
           events: link('events', option.change.events),
           loans: link('loans', option.change.loans),
           investments: link('investments', option.change.investments),
+          assets: link('assets', option.change.assets),
         },
         remove: {
           events: link('events', option.remove.events),
           loans: link('loans', option.remove.loans),
           investments: link('investments', option.remove.investments),
+          assets: link('assets', option.remove.assets),
         },
       })),
     })),
@@ -243,7 +254,7 @@ export interface TargetCandidate {
   unavailable: string | null;
 }
 
-const POSITION_LABEL: Record<EntryKind, string> = { events: 'Event', loans: 'Loan', investments: 'Investment' };
+const POSITION_LABEL: Record<EntryKind, string> = { events: 'Event', loans: 'Loan', investments: 'Investment', assets: 'Asset' };
 
 /** Every baseline entry, with the reason it cannot be targeted by this option, if any. */
 export function targetCandidates(config: ConfigModel, choiceId: string, optionId: string): TargetCandidate[] {

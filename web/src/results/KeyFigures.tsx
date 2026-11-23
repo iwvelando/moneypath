@@ -1,6 +1,6 @@
 import type { EmergencyFundMetrics, ForecastResults } from '../engine/types';
 import { formatMoney, isNegativeMoney } from '../util/format';
-import { runOwes } from './balance';
+import { runHasBalance } from './balance';
 import { ScenarioSample } from './scenarioStyle';
 
 interface KeyFiguresProps {
@@ -64,7 +64,7 @@ export function KeyFigures({ results, onOpenScenario }: KeyFiguresProps) {
   // The recommendation is on or off for the whole run, so the column is too.
   const showFund = results.metrics.some((metrics) => metrics?.emergencyFund);
   // Until something is owed, net worth is the total.
-  const showNetWorth = runOwes(results);
+  const showNetWorth = runHasBalance(results);
 
   return (
     <section class="figures">

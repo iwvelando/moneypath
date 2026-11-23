@@ -28,7 +28,7 @@ function makeConfig(commonEvents: EventModel[], scenarios: ScenarioModel[]): Con
   return {
     simulation: { startDate: '', endDate: '2030-12', startingCash: 0, cashInterestRate: null, inflationRate: null, emergencyFundMonths: null },
     guardrails: [],
-    common: { events: commonEvents, loans: [], investments: [] },
+    common: { events: commonEvents, loans: [], investments: [], assets: [] },
     choices: [],
     scenarios,
   };

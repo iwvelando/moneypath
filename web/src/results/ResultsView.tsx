@@ -24,7 +24,7 @@ import { GuardrailList, RunGuardrails, debtFreeClause } from './Guardrails';
 import { MonthlyTable, type MonthlyRow } from './MonthlyTable';
 import { EmergencyFundGauge } from './Gauge';
 import { HELP } from '../config/help';
-import { pathOwes } from './balance';
+import { pathHasBalance, pathHolds } from './balance';
 import { inReading, readingLabel } from './reading';
 import { OverlaySparkline, Sparkline } from './Sparkline';
 
@@ -327,11 +327,13 @@ export function ResultsView({
         total: value?.total ?? null,
         liabilities: value?.liabilities ?? null,
         netWorth: value?.netWorth ?? null,
+        assets: value?.assets ?? null,
+        equity: value?.equity ?? null,
         notes: value?.notes ?? [],
       });
     }
     // A path that owes nothing has a net worth equal to its total.
-    return { dates: d, liquid: l, total: t, netWorth: pathOwes(shown.rows, index) ? n : undefined, rows: r };
+    return { dates: d, liquid: l, total: t, netWorth: pathHasBalance(shown.rows, index) ? n : undefined, rows: r };
   }, [shown.rows, index]);
 
   return (
@@ -414,7 +416,11 @@ export function ResultsView({
             <div class="results__projection">
               <div class="results__section-heading">
                 <h3>Net worth over time</h3>
-                {netWorth ? <p class="results__networth">{HELP.netWorth}</p> : null}
+                {netWorth ? (
+                  <p class="results__networth">
+                    {pathHolds(shown.rows, index) ? `${HELP.netWorth} ${HELP.equity}` : HELP.netWorth}
+                  </p>
+                ) : null}
               </div>
               <Chart dates={dates} liquid={liquid} total={total} netWorth={netWorth} scenarioName={scenarioName} />
             </div>

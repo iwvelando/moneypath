@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { ForecastResults, ScenarioValue } from '../engine/types';
-import { pathOwes, runOwes, seriesDiffer } from './balance';
+import { pathHasBalance, pathHolds, runHasBalance, runHolds, seriesDiffer } from './balance';
 
-function value(liabilities?: number): ScenarioValue {
-  return { liquid: 1, total: 2, liabilities, netWorth: liabilities === undefined ? undefined : 2 - liabilities, notes: [] };
+function value(liabilities?: number, assets?: number): ScenarioValue {
+  const netWorth = liabilities === undefined ? undefined : 2 + (assets ?? 0) - liabilities;
+  return { liquid: 1, total: 2, liabilities, netWorth, assets, equity: assets, notes: [] };
 }
 
 function results(columns: ScenarioValue[][]): ForecastResults {
@@ -18,18 +19,30 @@ function results(columns: ScenarioValue[][]): ForecastResults {
   };
 }
 
-describe('whether a path owes anything', () => {
+describe('whether a path has a balance sheet beyond its total', () => {
   it('is true when some month owes at least a cent', () => {
     const data = results([[value(0), value(0.004)], [value(0), value(250)]]);
-    expect(pathOwes(data.rows, 0)).toBe(false);
-    expect(pathOwes(data.rows, 1)).toBe(true);
-    expect(runOwes(data)).toBe(true);
+    expect(pathHasBalance(data.rows, 0)).toBe(false);
+    expect(pathHasBalance(data.rows, 1)).toBe(true);
+    expect(runHasBalance(data)).toBe(true);
   });
 
-  it('is false for results that carry no liabilities', () => {
+  it('is true when some month holds an asset, with nothing owed', () => {
+    const data = results([[value(0, 0), value(0, 0)], [value(0, 0), value(0, 15000)]]);
+    expect(pathHasBalance(data.rows, 0)).toBe(false);
+    expect(pathHasBalance(data.rows, 1)).toBe(true);
+    expect(pathHolds(data.rows, 0)).toBe(false);
+    expect(pathHolds(data.rows, 1)).toBe(true);
+    expect(runHasBalance(data)).toBe(true);
+    expect(runHolds(data)).toBe(true);
+  });
+
+  it('is false for results that carry no liabilities or assets', () => {
     const data = results([[value(), value()]]);
-    expect(pathOwes(data.rows, 0)).toBe(false);
-    expect(runOwes(data)).toBe(false);
+    expect(pathHasBalance(data.rows, 0)).toBe(false);
+    expect(pathHolds(data.rows, 0)).toBe(false);
+    expect(runHasBalance(data)).toBe(false);
+    expect(runHolds(data)).toBe(false);
   });
 });
 

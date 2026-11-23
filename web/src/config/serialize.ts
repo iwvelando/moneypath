@@ -9,6 +9,7 @@
 
 import { ENTRY_KINDS, SET_FIELDS, linkTargets, targetName } from './choices';
 import {
+  type AssetModel,
   type ChoiceModel,
   type CommonModel,
   type ConfigModel,
@@ -24,6 +25,7 @@ import {
   type OptionModel,
   type ScenarioModel,
   type TargetRef,
+  emptyAsset,
   emptyChoice,
   emptyEvent,
   emptyGrowth,
@@ -113,6 +115,7 @@ export function serializeEvent(event: EventModel, kind: EventKind): JsonObject {
 export function serializeLoan(loan: LoanModel): JsonObject {
   const out: JsonObject = {};
   put(out, 'name', loan.name.trim());
+  put(out, 'asset', loan.asset.trim());
   put(out, 'principal', loan.principal);
   put(out, 'downPayment', loan.downPayment);
   put(out, 'interestRate', loan.interestRate);
@@ -155,6 +158,18 @@ export function serializeInvestment(investment: InvestmentModel): JsonObject {
   return out;
 }
 
+/** An asset's keys in canonical order (spec/03, Asset); fixed appreciation is left out. */
+export function serializeAsset(asset: AssetModel): JsonObject {
+  const out: JsonObject = {};
+  put(out, 'name', asset.name.trim());
+  put(out, 'value', asset.value);
+  put(out, 'appreciation', serializeGrowth(asset.appreciation));
+  put(out, 'startDate', asset.startDate.trim());
+  put(out, 'sellDate', asset.sellDate.trim());
+  put(out, 'sellCosts', asset.sellCosts);
+  return out;
+}
+
 /** A guardrail's keys in canonical order (spec/03, Guardrails). */
 export function serializeGuardrail(guardrail: GuardrailModel): JsonObject {
   const out: JsonObject = {};
@@ -180,7 +195,7 @@ function serializeSet(kind: EntryKind, set: object): JsonObject {
       out[field.key] = (value as EventModel[]).map((e) => serializeEvent(e, field.eventKind!));
     } else if (field.format === 'flag') {
       out[field.key] = value === true;
-    } else if (field.format === 'month') {
+    } else if (field.format === 'month' || field.format === 'text') {
       out[field.key] = (value as string).trim() || null;
     } else if (field.format === 'growth') {
       out[field.key] = serializeGrowth(value as GrowthModel);
@@ -196,6 +211,7 @@ function serializeOption(option: OptionModel, common: CommonModel): JsonObject {
   if (option.events.length > 0) out['events'] = option.events.map((e) => serializeEvent(e, 'cashflow'));
   if (option.loans.length > 0) out['loans'] = option.loans.map(serializeLoan);
   if (option.investments.length > 0) out['investments'] = option.investments.map(serializeInvestment);
+  if (option.assets.length > 0) out['assets'] = option.assets.map(serializeAsset);
 
   const change: JsonObject = {};
   const remove: JsonObject = {};
@@ -233,6 +249,7 @@ function serializeScenario(scenario: ScenarioModel, choices: ChoiceModel[]): Jso
   if (scenario.investments.length > 0) {
     out['investments'] = scenario.investments.map(serializeInvestment);
   }
+  if (scenario.assets.length > 0) out['assets'] = scenario.assets.map(serializeAsset);
   return out;
 }
 
@@ -261,6 +278,7 @@ export function toConfigDocument(model: ConfigModel): JsonObject {
   if (model.common.investments.length > 0) {
     common['investments'] = model.common.investments.map(serializeInvestment);
   }
+  if (model.common.assets.length > 0) common['assets'] = model.common.assets.map(serializeAsset);
   if (Object.keys(common).length > 0) doc['common'] = common;
 
   if (model.choices.length > 0) {
@@ -369,6 +387,7 @@ export function parseLoan(value: unknown): LoanModel {
   const loan = emptyLoan();
   if (!isObject(value)) return loan;
   loan.name = readString(value['name']);
+  loan.asset = readString(value['asset']);
   loan.principal = readNumber(value['principal']);
   loan.downPayment = readNumber(value['downPayment']);
   loan.interestRate = readNumber(value['interestRate']);
@@ -406,6 +425,18 @@ export function parseInvestment(value: unknown): InvestmentModel {
   return investment;
 }
 
+export function parseAsset(value: unknown): AssetModel {
+  const asset = emptyAsset();
+  if (!isObject(value)) return asset;
+  asset.name = readString(value['name']);
+  asset.value = readNumber(value['value']);
+  asset.appreciation = parseGrowth(value['appreciation']);
+  asset.startDate = readString(value['startDate']);
+  asset.sellDate = readString(value['sellDate']);
+  asset.sellCosts = readNumber(value['sellCosts']);
+  return asset;
+}
+
 /** A list of names as written; null when absent. */
 function readNames(value: unknown): string[] | null {
   if (value === undefined || value === null) return null;
@@ -427,11 +458,12 @@ export function parseGuardrail(value: unknown): GuardrailModel {
 }
 
 function parseCommon(value: unknown): CommonModel {
-  if (!isObject(value)) return { events: [], loans: [], investments: [] };
+  if (!isObject(value)) return { events: [], loans: [], investments: [], assets: [] };
   return {
     events: readArray(value['events']).map((e) => parseEvent(e, 'cashflow')),
     loans: readArray(value['loans']).map(parseLoan),
     investments: readArray(value['investments']).map(parseInvestment),
+    assets: readArray(value['assets']).map(parseAsset),
   };
 }
 
@@ -445,7 +477,7 @@ function parseSet(kind: EntryKind, value: unknown): Record<string, unknown> {
       out[field.key] = readArray(raw).map((e) => parseEvent(e, field.eventKind!));
     } else if (field.format === 'flag') {
       out[field.key] = readBool(raw);
-    } else if (field.format === 'month') {
+    } else if (field.format === 'month' || field.format === 'text') {
       out[field.key] = readString(raw);
     } else if (field.format === 'growth') {
       out[field.key] = parseGrowth(raw);
@@ -468,6 +500,7 @@ function parseOption(value: unknown, index: number): OptionModel {
   option.events = readArray(value['events']).map((e) => parseEvent(e, 'cashflow'));
   option.loans = readArray(value['loans']).map(parseLoan);
   option.investments = readArray(value['investments']).map(parseInvestment);
+  option.assets = readArray(value['assets']).map(parseAsset);
   const change = isObject(value['change']) ? value['change'] : {};
   const remove = isObject(value['remove']) ? value['remove'] : {};
   for (const kind of ENTRY_KINDS) {
@@ -512,6 +545,7 @@ function parseScenario(value: unknown, index: number, choices: ChoiceModel[]): S
   scenario.events = readArray(value['events']).map((e) => parseEvent(e, 'cashflow'));
   scenario.loans = readArray(value['loans']).map(parseLoan);
   scenario.investments = readArray(value['investments']).map(parseInvestment);
+  scenario.assets = readArray(value['assets']).map(parseAsset);
   return scenario;
 }
 
@@ -578,10 +612,12 @@ export function refreshIds(model: ConfigModel): ConfigModel {
   });
 
   // The baseline and the choices first: they are what the rest points at.
+  const reAsset = (a: AssetModel): AssetModel => ({ ...a, id: fresh('as', a.id) });
   const common: CommonModel = {
     events: model.common.events.map((e) => ({ ...e, id: fresh('ev', e.id) })),
     loans: model.common.loans.map(reLoan),
     investments: model.common.investments.map(reInvestment),
+    assets: model.common.assets.map(reAsset),
   };
   const reTarget = <R extends TargetRef>(ref: R): R => ({
     ...ref,
@@ -606,6 +642,7 @@ export function refreshIds(model: ConfigModel): ConfigModel {
       events: option.events.map(reEvent),
       loans: option.loans.map(reLoan),
       investments: option.investments.map(reInvestment),
+      assets: option.assets.map(reAsset),
       change: {
         events: option.change.events.map((c) => ({ ...reTarget(c), set: reSet('events', c.set) })),
         loans: option.change.loans.map((c) => ({ ...reTarget(c), set: reSet('loans', c.set) })),
@@ -613,11 +650,13 @@ export function refreshIds(model: ConfigModel): ConfigModel {
           ...reTarget(c),
           set: reSet('investments', c.set),
         })),
+        assets: option.change.assets.map((c) => ({ ...reTarget(c), set: reSet('assets', c.set) })),
       },
       remove: {
         events: option.remove.events.map(reTarget),
         loans: option.remove.loans.map(reTarget),
         investments: option.remove.investments.map(reTarget),
+        assets: option.remove.assets.map(reTarget),
       },
     })),
   }));
@@ -641,6 +680,7 @@ export function refreshIds(model: ConfigModel): ConfigModel {
         events: s.events.map(reEvent),
         loans: s.loans.map(reLoan),
         investments: s.investments.map(reInvestment),
+        assets: s.assets.map(reAsset),
       };
     }),
   };

@@ -9,6 +9,9 @@ export interface MonthlyRow {
   /** What the path's loans still owe; absent or 0 in every month for a path with none. */
   liabilities?: number | null;
   netWorth?: number | null;
+  /** What the path's listed assets are worth, and their equity; absent for a plan without assets. */
+  assets?: number | null;
+  equity?: number | null;
   notes: string[];
 }
 
@@ -34,7 +37,9 @@ export function MonthlyTable({ rows, scenarioName, run }: MonthlyTableProps) {
   const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
   const hasNotes = rows.some((row) => row.notes.length > 0);
   // Without debt, net worth is the total, so the two columns would only repeat it.
-  const owes = rows.some((row) => Math.abs(row.liabilities ?? 0) >= HALF_CENT);
+  const holds = rows.some((row) => Math.abs(row.assets ?? 0) >= HALF_CENT);
+  const owes = holds || rows.some((row) => Math.abs(row.liabilities ?? 0) >= HALF_CENT);
+  const columns = 1 + 2 + (owes ? 2 : 0) + (holds ? 2 : 0);
 
   // A fresh run starts closed, while another reading of the same run keeps
   // what is open; ResultsView also keys this table by scenario.
@@ -59,21 +64,25 @@ export function MonthlyTable({ rows, scenarioName, run }: MonthlyTableProps) {
       <div class="table-wrap">
         <table class="results-table" aria-describedby={hasNotes ? `${id}-hint` : undefined}>
           <caption class="visually-hidden">
-            {owes
-              ? `Monthly liquid, total, debt and net worth for ${scenarioName}`
-              : `Monthly liquid and total net worth for ${scenarioName}`}
+            {holds
+              ? `Monthly liquid, total, assets, debt, net worth and equity for ${scenarioName}`
+              : owes
+                ? `Monthly liquid, total, debt and net worth for ${scenarioName}`
+                : `Monthly liquid and total net worth for ${scenarioName}`}
           </caption>
           <thead>
             <tr>
               <th scope="col">Date</th>
               <th scope="col" class="numeric">Liquid</th>
               <th scope="col" class="numeric">Total</th>
+              {holds ? <th scope="col" class="numeric">Assets</th> : null}
               {owes ? (
                 <>
                   <th scope="col" class="numeric">Debt</th>
                   <th scope="col" class="numeric">Net worth</th>
                 </>
               ) : null}
+              {holds ? <th scope="col" class="numeric">Equity</th> : null}
             </tr>
           </thead>
           <tbody>
@@ -109,16 +118,18 @@ export function MonthlyTable({ rows, scenarioName, run }: MonthlyTableProps) {
                     </th>
                     <Money value={row.liquid} />
                     <Money value={row.total} />
+                    {holds ? <Money value={row.assets} /> : null}
                     {owes ? (
                       <>
                         <Money value={row.liabilities} />
                         <Money value={row.netWorth} />
                       </>
                     ) : null}
+                    {holds ? <Money value={row.equity} /> : null}
                   </tr>
                   {hasEvents ? (
                     <tr id={detailsId} class="month-details" hidden={!open}>
-                      <td colSpan={owes ? 5 : 3}>
+                      <td colSpan={columns}>
                         {open ? (
                           <div class="month-details__content">
                             <p class="month-details__heading">Events in {row.date}</p>

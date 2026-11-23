@@ -35,14 +35,14 @@ function optimizedEvent(id: string, field: OptimizeField, extra: Partial<EventMo
 }
 
 function scenario(name: string, events: EventModel[], active = true): ScenarioModel {
-  return { id: `sc-${name}`, name, active, select: {}, events, loans: [], investments: [] };
+  return { id: `sc-${name}`, name, active, select: {}, events, loans: [], investments: [], assets: [] };
 }
 
 function config(scenarios: ScenarioModel[]): ConfigModel {
   return {
     simulation: { startDate: '2025-01', endDate: '2026-12', startingCash: 5000, cashInterestRate: null, inflationRate: null, emergencyFundMonths: 3 },
     guardrails: [],
-    common: { events: [], loans: [], investments: [] },
+    common: { events: [], loans: [], investments: [], assets: [] },
     choices: [],
     scenarios,
   };

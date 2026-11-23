@@ -11,8 +11,10 @@ const MODES: readonly { value: GrowthMode; label: string }[] = [
 interface GrowthFieldProps {
   label: string;
   help?: Help;
-  /** The label of the rate's own field. */
+  /** The label of the rate's own field, its help, and what it says while empty. */
   rateLabel?: string;
+  rateHelp?: Help;
+  rateMissing?: string;
   /** The growth's key in its entry of the config document. */
   field: string;
   value: GrowthModel;
@@ -26,7 +28,16 @@ interface GrowthFieldProps {
  * the choice otherwise, so it appears once. A growth the editor cannot offer
  * is shown as written, for the engine's error to explain.
  */
-export function GrowthField({ label, help = HELP.growth, rateLabel = 'Yearly growth', field, value, onChange }: GrowthFieldProps) {
+export function GrowthField({
+  label,
+  help = HELP.growth,
+  rateLabel = 'Yearly growth',
+  rateHelp = HELP.growthRate,
+  rateMissing = 'Enter the yearly growth.',
+  field,
+  value,
+  onChange,
+}: GrowthFieldProps) {
   const known = MODES.some((mode) => mode.value === value.mode);
   const options = known ? MODES : [...MODES, { value: value.mode, label: value.mode, disabled: true }];
   const ownRate = value.mode === 'rate';
@@ -43,13 +54,13 @@ export function GrowthField({ label, help = HELP.growth, rateLabel = 'Yearly gro
       {ownRate ? (
         <NumberField
           label={rateLabel}
-          help={HELP.growthRate}
+          help={rateHelp}
           field={field}
           value={value.rate}
           step={0.5}
           suffix="% / yr"
           signed
-          missingMessage="Enter the yearly growth."
+          missingMessage={rateMissing}
           onChange={(rate) => onChange({ ...value, rate })}
         />
       ) : null}

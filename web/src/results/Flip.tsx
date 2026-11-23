@@ -8,7 +8,7 @@ import {
   type Reading,
   type Readings,
 } from '../engine/types';
-import { runOwes, seriesDiffer } from './balance';
+import { runHasBalance, seriesDiffer } from './balance';
 import { Chart } from './Chart';
 import { BreakEven } from './Difference';
 import { GuardrailTable } from './Guardrails';
@@ -112,7 +112,7 @@ export function Flip({ results, reading = 'nominal', scenario, subject, run, onK
   // Net worth shows when something is owed on either path: the run's, or the
   // flipped path's, which only shows as a net worth unlike the total.
   const netWorth =
-    flip?.netWorth && (runOwes(results) || seriesDiffer(flip.netWorth.difference, flip.total.difference))
+    flip?.netWorth && (runHasBalance(results) || seriesDiffer(flip.netWorth.difference, flip.total.difference))
       ? flip.netWorth
       : undefined;
 
