@@ -90,3 +90,32 @@ test('the balance-sheet columns scroll within their frame on a narrow phone', as
   await expect(page.locator('.results-table thead th')).toHaveCount(7);
   expect(await overflow(page), 'scenario view').toBeLessThanOrEqual(0);
 });
+
+test('the table scrolls one way at a time: its frame sideways, its rows up and down', async ({ page }) => {
+  // On iOS a gesture goes to the scroller that moves in its first direction,
+  // so two one-way scrollers keep a swipe on one axis.
+  await page.setViewportSize({ width: 360, height: 780 });
+  await openApp(page);
+  await uploadAndRun(page, ASSET_PLAN);
+  await scenario(page, /^as we are/);
+  const frame = page.locator('.table-wrap');
+  const rows = frame.locator('.table-wrap__rows');
+  const axes = (el: Element) => {
+    const style = getComputedStyle(el);
+    return { x: style.overflowX, y: style.overflowY, wide: el.scrollWidth - el.clientWidth, tall: el.scrollHeight - el.clientHeight };
+  };
+  const outer = await frame.evaluate(axes);
+  expect(outer).toMatchObject({ x: 'auto', y: 'hidden' });
+  expect(outer.wide, 'the frame scrolls sideways').toBeGreaterThan(0);
+  expect(outer.tall).toBeLessThanOrEqual(0);
+  const inner = await rows.evaluate(axes);
+  expect(inner).toMatchObject({ x: 'hidden', y: 'auto' });
+  expect(inner.tall, 'the rows scroll up and down').toBeGreaterThan(0);
+  expect(inner.wide).toBeLessThanOrEqual(0);
+
+  // The header row stays at the top of the rows while they scroll.
+  await rows.evaluate((el) => { el.scrollTop = 400; });
+  const head = (await rows.locator('thead th').first().boundingBox())!;
+  const box = (await rows.boundingBox())!;
+  expect(Math.abs(head.y - box.y)).toBeLessThanOrEqual(1);
+});

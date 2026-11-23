@@ -131,8 +131,8 @@ test('monthly events expand by keyboard or row and reset for another forecast', 
   await openApp(page);
   await runForecast(page);
   const table = page.locator('.results-table');
-  // The starter plan's car loan adds debt and net worth.
-  await expect(table.locator('thead th')).toHaveText(['Date', 'Liquid', 'Total', 'Debt', 'Net worth']);
+  // The starter plan's car, and the loan secured on it, add the balance sheet.
+  await expect(table.locator('thead th')).toHaveText(['Date', 'Liquid', 'Total', 'Assets', 'Debt', 'Net worth', 'Equity']);
   await expect(table.locator('.month-row:not(.is-expandable)').getByRole('button')).toHaveCount(0);
   const toggle = table.getByRole('button').first();
   await toggle.scrollIntoViewIfNeeded();
@@ -144,10 +144,10 @@ test('monthly events expand by keyboard or row and reset for another forecast', 
   await expect(details).toBeVisible();
   await expect(details.getByRole('listitem').first()).toContainText('Brokerage');
   expect(await overflow(page), 'expanded monthly events').toBeLessThanOrEqual(0);
-  // On a phone the five columns scroll within their frame; a path that owes
-  // nothing has three, which fit (net-worth.spec.ts).
+  // On a phone the seven columns scroll within their frame; a path that owes
+  // and holds nothing has three, which fit (net-worth.spec.ts).
   if (testInfo.project.name !== 'phone') {
-    expect(await page.locator('.table-wrap').evaluate((el) => el.scrollWidth - el.clientWidth), 'five-column table').toBeLessThanOrEqual(1);
+    expect(await page.locator('.table-wrap').evaluate((el) => el.scrollWidth - el.clientWidth), 'seven-column table').toBeLessThanOrEqual(1);
   }
   await toggle.press('Space');
   await expect(details).toBeHidden();

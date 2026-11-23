@@ -61,7 +61,10 @@ export function MonthlyTable({ rows, scenarioName, run }: MonthlyTableProps) {
           Rows with an arrow open to show that month’s events.
         </p>
       ) : null}
+      {/* Two scrollers, each one way: the frame sideways and the rows up and
+          down, so a swipe on a phone moves the table along one axis. */}
       <div class="table-wrap">
+        <div class="table-wrap__rows">
         <table class="results-table" aria-describedby={hasNotes ? `${id}-hint` : undefined}>
           <caption class="visually-hidden">
             {holds
@@ -146,6 +149,7 @@ export function MonthlyTable({ rows, scenarioName, run }: MonthlyTableProps) {
             })}
           </tbody>
         </table>
+        </div>
         {rows.length === 0 ? <p class="empty">This scenario produced no rows.</p> : null}
       </div>
     </>

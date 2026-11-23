@@ -1,6 +1,7 @@
 /**
  * The built-in starter config: a small, sensible plan that exercises an event,
- * a loan and an investment without overwhelming a first-time reader. Used on
+ * a loan secured on an asset and an investment without overwhelming a
+ * first-time reader. Used on
  * first load and by "Reset Config".
  */
 
@@ -32,6 +33,7 @@ export function starterConfig(now: string = currentMonth()): ConfigModel {
         loans: [
           {
             name: 'Car loan',
+            asset: 'Car',
             principal: 28000,
             downPayment: 4000,
             interestRate: 5.4,
@@ -50,6 +52,8 @@ export function starterConfig(now: string = currentMonth()): ConfigModel {
             contributions: [{ amount: 600, startDate: contributionStart }],
           },
         ],
+        // Bought with the car loan a year and a half ago; a car loses value.
+        assets: [{ name: 'Car', value: 22000, appreciation: -15 }],
       },
       scenarios: [
         {

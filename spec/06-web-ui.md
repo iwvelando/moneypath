@@ -155,7 +155,9 @@ The app covers, at a coarse grain:
   heading says that net worth is cash, investments and the listed assets less what the
   loans owe. A path that holds an asset also has Assets (before Debt) and Equity (after
   Net worth) columns, and the heading adds what equity is. A path that owes and holds
-  nothing has a net worth equal to its total and shows none of these. Months with notes have an arrow and a disclosure
+  nothing has a net worth equal to its total and shows none of these. The table's
+  frame scrolls only sideways and its rows only up and down, with the header row
+  staying at the top, so a swipe on a phone moves it along one axis at a time. Months with notes have an arrow and a disclosure
   button; clicking or tapping anywhere on that summary row, or activating its button
   with the keyboard, reveals the engine's notes as a list below it. Several months
   can stay open. Months without notes have no disclosure; switching scenarios or
@@ -239,7 +241,9 @@ The app covers, at a coarse grain:
   selections are kept; a file with no `version` field or in the older finance-forecast
   format is refused with an explanation), downloading the engine-serialized
   v2 YAML, and downloading the engine-rendered CSV (chapter 05).
-- **Resetting** to a built-in starter config, and a System / Light / Dark theme.
+- **Resetting** to a built-in starter config, and a System / Light / Dark theme. The
+  starter lists a car as an asset, with its car loan secured on it, so a first
+  forecast already shows assets, debt, net worth and equity.
 
 ## Presentation
 

@@ -1979,12 +1979,27 @@ select.input {
 
 /* ----------------------------------------------------------------- table */
 
+/*
+ * The frame scrolls only sideways and the rows inside it only up and down.
+ * One box scrolling both ways moves diagonally under a swipe that is not
+ * quite straight; with two, iOS gives a swipe to the scroller that moves in
+ * its first direction, so it stays on one axis. The header row sticks to the
+ * top of the rows.
+ */
 .table-wrap {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+}
+
+.table-wrap__rows {
+  width: max-content;
+  min-width: 100%;
   max-height: 620px;
+  overflow-x: hidden;
   overflow-y: auto;
 }
 
