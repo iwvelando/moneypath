@@ -279,6 +279,9 @@ func (ls *loanSim) checkThresholdPayoff(m config.Month, projectedLiquid float64,
 		ls.lastGen = m
 	}
 	ls.ended = false // reset so endLoan records cleanly
+	// The payoff ends the loan before its asset's sale, which then has no
+	// loan to settle; this month's payment is the loan's own (§3.5).
+	ls.sold = false
 	ls.endLoan(m, !l.SellProperty, simEnd)
 
 	// Fund the cash shortfall from flagged investments (§3.5 funding).

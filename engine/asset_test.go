@@ -249,3 +249,28 @@ scenarios:
 		t.Errorf("equity = %v, want %v: the car underwater, the bike in full, the personal loan not at all", got, want)
 	}
 }
+
+// Spec chapter 04 §3.5: a secured loan whose threshold payoff fires before its
+// asset's sale pays the payoff from cash then, as an unsecured loan does; the
+// later sale has no loan left to settle.
+func TestThresholdBeforeTheSalePaysOffFromCash(t *testing.T) {
+	plan := `version: 2
+simulation: {startDate: 2026-01, endDate: 2026-12, startingCash: 500000}
+scenarios:
+  - name: a
+    assets: [{name: Car, value: 20000, sellDate: 2026-06}]
+    loans:
+      - {name: Car loan, ASSETprincipal: 15000, interestRate: 6, term: 60, startDate: 2025-01, earlyPayoffThreshold: 1000}
+`
+	secured := runDoc(t, strings.Replace(plan, "ASSET", "asset: Car, ", 1)).Scenarios[0]
+	unsecured := runDoc(t, strings.Replace(plan, "ASSET", "", 1)).Scenarios[0]
+	for i := range 5 {
+		if secured.Liquid[i] != unsecured.Liquid[i] {
+			t.Fatalf("liquid[%d] = %v secured, %v unsecured: the threshold payoff must be paid from cash", i, secured.Liquid[i], unsecured.Liquid[i])
+		}
+	}
+	if got := secured.Liquid[5] - secured.Liquid[4]; math.Abs(got-20000) > 1e-9 {
+		t.Errorf("sale month moves cash by %v, want the price alone, 20000", got)
+	}
+	assertBalanceSheet(t, secured)
+}
