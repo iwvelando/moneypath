@@ -66,7 +66,7 @@ func TestExampleRewrittenWithChoicesGivesTheSameCSV(t *testing.T) {
 			rewritten["events"] = targets
 		}
 		option["events"] = moved
-		for _, kind := range []string{"loans", "investments"} {
+		for _, kind := range []string{"loans", "investments", "assets"} {
 			if list, ok := sc[kind]; ok {
 				option[kind] = list
 			}

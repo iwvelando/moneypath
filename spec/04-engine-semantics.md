@@ -751,7 +751,8 @@ it, with `m` written into the entry's field on that path and nothing else change
   has on the path, whether or not the change sets that field.
 
 A month that makes the path invalid by the rules of chapter 03 (an event that would
-start after it ends) is not a candidate. The question is then refused, naming the
+start after it ends, or a secured loan whose first payment would not be before its
+asset's sale) is not a candidate. The question is then refused, naming the
 first such month in the range and what is wrong with it, and nothing is answered.
 What chapter 03 only warns about (a loan whose early payoff month is not after its
 first payment) does not refuse it.

@@ -27,16 +27,23 @@ type Result struct {
 	// depends on it; it is how the result reads in today's dollars (spec
 	// chapter 04 §12).
 	InflationRate float64
+	// HasAssets says the plan lists an asset anywhere, which adds assets and
+	// equity to what is reported (spec chapter 02, chapter 05).
+	HasAssets bool
 }
 
 type ScenarioResult struct {
 	Name   string
 	Liquid []float64
 	Total  []float64
-	// Liabilities is what every loan of the path owes at the end of each
-	// month, and NetWorth is Total less it (spec chapter 04 §1, step 6).
+	// Assets is the value of the path's assets, Liabilities what every loan
+	// of the path owes, NetWorth Total plus Assets less Liabilities, and
+	// Equity each asset's value less what its loans owe, summed; all at the
+	// end of each month (spec chapter 04 §1, step 6).
+	Assets      []float64
 	Liabilities []float64
 	NetWorth    []float64
+	Equity      []float64
 	Notes       [][]string
 	// Owed is the principal each loan name owes at the end of each month,
 	// summed over the path's loans with that name, and Holdings each account
@@ -166,6 +173,7 @@ func forecast(cfg *config.Config, opts Options) *Result {
 		Start:         cfg.Simulation.ResolvedStart,
 		End:           cfg.Simulation.ResolvedEnd,
 		InflationRate: cfg.Simulation.InflationRate,
+		HasAssets:     ListsAssets(cfg),
 	}
 	for _, sc := range cfg.Scenarios {
 		if !sc.ResolvedActive {
@@ -185,6 +193,8 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		Name:   sc.Name,
 		Liquid: make([]float64, n),
 		Total:  make([]float64, n),
+		Assets: make([]float64, n),
+		Equity: make([]float64, n),
 		Notes:  make([][]string, n),
 	}
 
@@ -197,12 +207,22 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 	events = append(events, own.Events...)
 	events = append(events, shared.Events...)
 
-	var loans []*loanSim
-	for _, l := range own.Loans {
-		loans = append(loans, buildLoanSchedule(l, start, end))
+	// Assets in processing order; validation leaves one per name on a path.
+	var assets []*assetSim
+	sale := map[string]config.Month{}
+	for _, a := range slices.Concat(own.Assets, shared.Assets) {
+		as := newAssetSim(a, end)
+		assets = append(assets, as)
+		sale[a.Name] = as.sale
 	}
-	for _, l := range shared.Loans {
-		loans = append(loans, buildLoanSchedule(l, start, end))
+
+	var loans []*loanSim
+	for _, l := range slices.Concat(own.Loans, shared.Loans) {
+		s, secured := sale[l.Asset]
+		if l.Asset == "" || !secured {
+			s = -1
+		}
+		loans = append(loans, buildLoanSchedule(l, start, end, s))
 	}
 
 	var invs []*invSim
@@ -279,11 +299,20 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 			}
 		}
 
-		// 4. Loans.
+		// 4. Loans and sales. A sale settles the payoffs of its loans with the
+		// price and costs as one payment (§3.5), counted as one in §5.
 		loanDelta := 0.0
 		positivePayments := 0.0
+		var saleNotes []string
+		for _, as := range assets {
+			if p, note, ok := as.settle(m, loans); ok {
+				loanDelta -= p
+				positivePayments += math.Max(0, p)
+				saleNotes = append(saleNotes, note)
+			}
+		}
 		for _, ls := range loans {
-			if p, ok := ls.payments[m]; ok {
+			if p, ok := ls.payments[m]; ok && !ls.soldAt(m) {
 				loanDelta -= p
 				if p > 0 {
 					positivePayments += p
@@ -303,9 +332,19 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		for _, ls := range loans {
 			sr.Owed[ls.l.Name][idx] += ls.owedAt(m)
 		}
+		for _, as := range assets {
+			v := as.valueAt(m)
+			sr.Assets[idx] += v
+			for _, ls := range loans {
+				if ls.l.Asset == as.a.Name {
+					v -= ls.owedAt(m)
+				}
+			}
+			sr.Equity[idx] += v
+		}
 		sr.Liquid[idx] = cash
 		sr.Total[idx] = cash + invTotal
-		sr.Notes[idx] = append(payoffNotes, invNotes...)
+		sr.Notes[idx] = slices.Concat(saleNotes, payoffNotes, invNotes)
 
 		// 7. Emergency-fund stats over the first 12 simulated months.
 		if idx < 12 {
@@ -319,7 +358,7 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 	sr.Liabilities = owedOn(sr.Owed, slices.Sorted(maps.Keys(sr.Owed)), n)
 	sr.NetWorth = make([]float64, n)
 	for i := range n {
-		sr.NetWorth[i] = sr.Total[i] - sr.Liabilities[i]
+		sr.NetWorth[i] = sr.Total[i] + sr.Assets[i] - sr.Liabilities[i]
 	}
 	sr.KeyFigures = keyFigures(start, sr.Liquid, sr.Total, sr.NetWorth)
 
@@ -340,6 +379,30 @@ func simulateScenario(cfg *config.Config, sc *config.Scenario, emMonths float64)
 		sr.EmergencyFund = ef
 	}
 	return sr
+}
+
+// ListsAssets reports whether a plan lists an asset anywhere: in common, an
+// option or a scenario, active or not (spec chapter 05).
+func ListsAssets(cfg *config.Config) bool {
+	if len(cfg.Common.Assets) > 0 {
+		return true
+	}
+	for _, ch := range cfg.Choices {
+		if ch == nil {
+			continue
+		}
+		for _, o := range ch.Options {
+			if o != nil && len(o.Assets) > 0 {
+				return true
+			}
+		}
+	}
+	for _, sc := range cfg.Scenarios {
+		if sc != nil && len(sc.Assets) > 0 {
+			return true
+		}
+	}
+	return false
 }
 
 // Dates returns every month of the simulation window in order.

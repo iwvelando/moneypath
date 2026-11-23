@@ -110,6 +110,7 @@ var nouns = map[string]string{
 	"events":                 "event",
 	"loans":                  "loan",
 	"investments":            "investment",
+	"assets":                 "asset",
 	"extraPrincipalPayments": "extra payment",
 	"contributions":          "contribution",
 	"withdrawals":            "withdrawal",

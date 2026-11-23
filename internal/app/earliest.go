@@ -131,7 +131,8 @@ func runEarliest(in ForecastInput, f *Forecast) (*EarliestResult, error) {
 
 	res := &EarliestResult{Earliest: q, ScenarioIndex: scIndex, Name: entry.Name}
 	res.Earliest.Guardrails = names
-	place := placer(entry, q.Field, where)
+	sale, asset := assetSale(sc, entry.Loan)
+	place := placer(entry, q.Field, where, sale, asset)
 	res.Configured = place.configured
 	defer place.restore()
 
@@ -262,14 +263,35 @@ type entryPlacer struct {
 	restore    func()
 }
 
+// assetSale is the sale month of the asset a loan is secured on, on the
+// scenario's path, and the asset's name; -1 when it has none or is kept.
+func assetSale(sc *config.Scenario, l *config.Loan) (config.Month, string) {
+	if l == nil || l.Asset == "" {
+		return -1, ""
+	}
+	for _, list := range [][]*config.Asset{sc.Resolved.Assets, sc.ResolvedShared.Assets} {
+		for _, a := range list {
+			if a != nil && a.Name == l.Asset {
+				return a.ResolvedSell, a.Name
+			}
+		}
+	}
+	return -1, ""
+}
+
 // placer moves the entry's field on its path (spec chapter 04 §11): an
 // event's start or end alone, a one-off event as a whole, a loan's start.
-func placer(entry config.PathEntry, field, where string) entryPlacer {
+// sale is the sale month of the asset a loan is secured on, or -1.
+func placer(entry config.PathEntry, field, where string, sale config.Month, asset string) entryPlacer {
 	if l := entry.Loan; l != nil {
 		was, wasRaw := l.ResolvedStart, l.StartDate
 		return entryPlacer{
 			configured: was,
 			at: func(m config.Month) error {
+				// A secured loan starts before its asset's sale (chapter 03).
+				if sale >= 0 && m >= sale {
+					return refuse("%s: With its first payment in %s, it would not start before “%s” is sold (%s), which pays it off. Choose a range that ends by %s.", where, m, asset, sale, sale-1)
+				}
 				l.ResolvedStart, l.StartDate = m, m.String()
 				return nil
 			},

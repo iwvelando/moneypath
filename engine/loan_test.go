@@ -74,7 +74,7 @@ func TestAmortizationPayment(t *testing.T) {
 		Name: "L", Principal: 120000, DownPayment: 20000,
 		InterestRate: 6, Term: 360, StartDate: "2025-01",
 	}, "2025-01", "2060-01")
-	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2060-01"))
+	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2060-01"), -1)
 
 	// Standard formula: 100000 at 0.5%/month over 360 payments.
 	wantM := 100000 * 0.005 / (1 - math.Pow(1.005, -360))
@@ -97,7 +97,7 @@ func TestZeroInterestLoan(t *testing.T) {
 	l := validLoan(t, &config.Loan{
 		Name: "Z", Principal: 1200, InterestRate: 0, Term: 12, StartDate: "2025-01",
 	}, "2025-01", "2026-12")
-	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2026-12"))
+	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2026-12"), -1)
 	for m := month(t, "2025-01"); m <= month(t, "2025-12"); m++ {
 		if p := ls.payments[m]; math.Abs(p-100) > 1e-9 {
 			t.Errorf("payment at %s = %.4f, want 100.00", m, p)
@@ -113,7 +113,7 @@ func TestOneMonthTerm(t *testing.T) {
 	l := validLoan(t, &config.Loan{
 		Name: "One", Principal: 500, InterestRate: 0, Term: 1, StartDate: "2025-03",
 	}, "2025-01", "2025-12")
-	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2025-12"))
+	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2025-12"), -1)
 	if p := ls.payments[month(t, "2025-03")]; math.Abs(p-500) > 1e-9 {
 		t.Errorf("single payment = %.4f, want 500", p)
 	}
@@ -133,7 +133,7 @@ func TestExtraPrincipalOvershootEndsCleanly(t *testing.T) {
 			{Amount: &amt, StartDate: "2025-03", EndDate: "2025-03"},
 		},
 	}, "2025-01", "2030-12")
-	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2030-12"))
+	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2030-12"), -1)
 	if !ls.ended || ls.endMonth != month(t, "2025-03") {
 		t.Fatalf("loan should end at 2025-03, got ended=%v end=%s", ls.ended, ls.endMonth)
 	}
@@ -159,7 +159,7 @@ func TestMortgageInsuranceWindow(t *testing.T) {
 		Name: "M", Principal: 1000, InterestRate: 0, Term: 10, StartDate: "2025-01",
 		MortgageInsurance: 7, MortgageInsuranceCutoff: 50,
 	}, "2025-01", "2026-12")
-	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2026-12"))
+	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2026-12"), -1)
 	// remaining before month k (1-based) is 1000 − (k−1)*100; MI while
 	// ratio > 0.50 → months 1..5 (before-month balances 1000..600).
 	for i := 0; i < 10; i++ {
@@ -183,7 +183,7 @@ func TestEscrowSettlementKept(t *testing.T) {
 		Escrow: 50,
 	}, "2025-01", "2027-12")
 	simEnd := month(t, "2027-12")
-	ls := buildLoanSchedule(l, l.ResolvedStart, simEnd)
+	ls := buildLoanSchedule(l, l.ResolvedStart, simEnd, -1)
 	// Months 1..5: 100 principal + 50 escrow. Month 6 (June): 100 + 50
 	// − 300 refund (Jan–Jun accrual) = −150.
 	if p := ls.payments[month(t, "2025-06")]; math.Abs(p-(-150)) > 1e-9 {
@@ -217,7 +217,7 @@ func TestEarlyPayoffDateSell(t *testing.T) {
 		Escrow: 10, EarlyPayoffDate: "2025-04", SellProperty: true,
 		SellPrice: &sell, SellCostsNet: 25,
 	}, "2025-01", "2026-12")
-	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2026-12"))
+	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2026-12"), -1)
 	// Remaining after 2025-03: 1200 − 300 = 900. Refund = Jan–Mar escrow = 30.
 	// Payment = 900 − 900 + 25 − 30 = −5 (net cash in).
 	if p := ls.payments[month(t, "2025-04")]; math.Abs(p-(-5)) > 1e-9 {
@@ -238,7 +238,7 @@ func TestEarlyPayoffDateChargesAccruedInterest(t *testing.T) {
 		Name: "P", Principal: 120000, InterestRate: 6, Term: 12, StartDate: "2025-01",
 		EarlyPayoffDate: "2025-04",
 	}, "2025-01", "2026-12")
-	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2026-12"))
+	ls := buildLoanSchedule(l, l.ResolvedStart, month(t, "2026-12"), -1)
 	remaining := ls.remainAfter[month(t, "2025-03")]
 	want := remaining * 1.005
 	if p := ls.payments[month(t, "2025-04")]; math.Abs(p-want) > 1e-6 {
@@ -255,7 +255,7 @@ func TestThresholdPayoffChargesAccruedInterest(t *testing.T) {
 	loan := validLoan(t, &config.Loan{
 		Name: "Loan", Principal: 1200, InterestRate: 12, Term: 120, StartDate: "2024-01",
 	}, "2025-02", "2025-04")
-	remaining := buildLoanSchedule(loan, loan.ResolvedStart, month(t, "2025-04")).remainAfter[month(t, "2025-01")]
+	remaining := buildLoanSchedule(loan, loan.ResolvedStart, month(t, "2025-04"), -1).remainAfter[month(t, "2025-01")]
 	payoff := remaining * 1.01
 
 	plan := func(cash float64) *config.Config {

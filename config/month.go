@@ -39,3 +39,6 @@ func (m Month) IsDecember() bool { return int(m)%12 == 11 }
 
 // YearStart returns the January of m's calendar year.
 func (m Month) YearStart() Month { return m - Month(int(m)%12) }
+
+// MonthNumber is m's month of the year: 1 for January, 12 for December.
+func (m Month) MonthNumber() int { return int(m)%12 + 1 }

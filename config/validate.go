@@ -107,6 +107,7 @@ func Check(cfg *Config, now Month) []Problem {
 		}
 	}
 	c.resolveScenarios(cfg)
+	c.assetPaths(cfg)
 	c.optimizerGuardrails(cfg)
 
 	for i := range c.problems {
@@ -184,6 +185,35 @@ type checker struct {
 	// inflation is the plan's inflation rate, which a growth of inflation
 	// follows.
 	inflation float64
+	// origin is where each loan and asset is written, for the rules that
+	// hold on a whole path (assetPaths).
+	origin map[any]entryOrigin
+}
+
+// entryOrigin is where an entry is written: its own path, or for a baseline
+// entry as an option changes it, the change's set and the baseline entry.
+type entryOrigin struct {
+	path string
+	// set and keys are the change's set and the fields it lists; empty for
+	// an entry written as it stands.
+	set  string
+	keys map[string]bool
+}
+
+// at is the path of a field: under the change's set when the change lists
+// it, and otherwise where the entry is written.
+func (o entryOrigin) at(field string) string {
+	if o.keys[field] {
+		return join(o.set, field)
+	}
+	return join(o.path, field)
+}
+
+func (c *checker) written(entry any, o entryOrigin) {
+	if c.origin == nil {
+		c.origin = map[any]entryOrigin{}
+	}
+	c.origin[entry] = o
 }
 
 // growth checks a growth or an escrow growth at path, whose label in the app
@@ -198,7 +228,11 @@ func (c *checker) growth(g *Growth, path, label, unused string) {
 	case g.invalid != nil || math.IsNaN(*g.rateOr0()) || math.IsInf(*g.rateOr0(), 0):
 		c.fail(path, "%s must be fixed, inflation or a yearly rate in percent, such as 3.", label)
 	case g.rate != nil && *g.rate <= -100:
-		c.fail(path, "The yearly growth must be more than -100.")
+		yearly := "growth"
+		if label == "Appreciation" {
+			yearly = "appreciation"
+		}
+		c.fail(path, "The yearly %s must be more than -100.", yearly)
 	case unused != "":
 		c.warn(path, "%s", unused)
 	case g.inflation && c.inflation == 0:
@@ -380,6 +414,7 @@ func (c *checker) section(s *Section, path, noOptimize string) {
 	}
 	for i, l := range s.Loans {
 		c.loan(l, join(path, "loans", i))
+		c.written(l, entryOrigin{path: join(path, "loans", i)})
 	}
 	names := map[string]bool{}
 	for i, inv := range s.Investments {
@@ -392,6 +427,138 @@ func (c *checker) section(s *Section, path, noOptimize string) {
 			c.fail(join(p, "name"), "Another investment here is already named “%s”. Give each its own name.", inv.Name)
 		}
 		names[inv.Name] = true
+	}
+	for i, a := range s.Assets {
+		c.asset(a, join(path, "assets", i))
+		c.written(a, entryOrigin{path: join(path, "assets", i)})
+	}
+}
+
+// asset checks an asset and resolves its months (spec chapter 03, Asset).
+func (c *checker) asset(a *Asset, path string) {
+	if a == nil {
+		c.fail(path, "This asset is empty.")
+		return
+	}
+	at := func(field string) string { return join(path, field) }
+	if a.Name == "" {
+		c.fail(at("name"), "The asset needs a name.")
+	}
+	switch {
+	case a.Value == nil:
+		c.fail(at("value"), "The value is required.")
+	case !(*a.Value > 0) || math.IsInf(*a.Value, 0):
+		c.fail(at("value"), "The value must be more than 0.")
+	}
+	c.growth(&a.Appreciation, at("appreciation"), "Appreciation", "")
+
+	a.ResolvedFirst, a.ResolvedSell = c.start, -1
+	haveFirst, haveSell := c.window, true
+	if a.StartDate != "" {
+		m, ok := c.month(at("startDate"), "purchase month", a.StartDate)
+		haveFirst = haveFirst && ok
+		if ok && m > c.start {
+			a.ResolvedFirst = m
+		}
+		if ok && c.window && m > c.end {
+			c.warn(at("startDate"), "This is bought after the simulation ends (%s), so it is never held.", c.end)
+		}
+	}
+	if a.SellDate != "" {
+		s, ok := c.month(at("sellDate"), "sale month", a.SellDate)
+		haveSell = ok
+		switch {
+		case !ok:
+		case haveFirst && s <= a.ResolvedFirst:
+			c.fail(at("sellDate"), "The sale month (%s) must be after the asset’s first month in the plan (%s).", s, a.ResolvedFirst)
+			haveSell = false
+		case c.window && s > c.end:
+			c.warn(at("sellDate"), "This is sold after the simulation ends (%s), so the sale is not counted.", c.end)
+		}
+		if ok {
+			a.ResolvedSell = s
+		}
+	}
+	if !(a.SellCosts >= 0 && a.SellCosts < 100) {
+		c.fail(at("sellCosts"), "The selling costs must be at least 0 and less than 100.")
+	}
+	a.dated = haveFirst && haveSell
+}
+
+// assetPaths checks the rules that hold on a whole path (spec chapter 03,
+// Asset): an asset's name is unique on it, and a secured loan's asset is on
+// it, with the loan's first payment before the asset's sale. A problem that
+// several paths raise at the same place is reported once.
+func (c *checker) assetPaths(cfg *Config) {
+	reported := map[Problem]bool{}
+	report := func(level Level, path, format string, args ...any) {
+		p := Problem{Level: level, Path: path, Message: fmt.Sprintf(format, args...)}
+		if !reported[p] {
+			reported[p] = true
+			c.problems = append(c.problems, p)
+		}
+	}
+	for _, sc := range cfg.Scenarios {
+		if sc == nil {
+			continue
+		}
+		byName := map[string]*Asset{}
+		for _, a := range slices.Concat(sc.Resolved.Assets, sc.ResolvedShared.Assets) {
+			if a == nil || a.Name == "" {
+				continue
+			}
+			if byName[a.Name] != nil {
+				report(LevelError, c.origin[a].at("name"), "Another asset on this path is already named “%s”. Give each asset its own name.", a.Name)
+				continue
+			}
+			byName[a.Name] = a
+		}
+		// The assets the scenario's selected options take away, by name.
+		removed := map[string]string{}
+		for _, sel := range sc.Select {
+			for ci, ch := range cfg.Choices {
+				if ch == nil || ch.Name != sel.Choice {
+					continue
+				}
+				for oi, opt := range ch.Options {
+					if opt == nil || opt.Name != sel.Option || opt.Remove == nil {
+						continue
+					}
+					for k, name := range opt.Remove.Assets {
+						removed[name] = join("choices", ci, "options", oi, "remove", "assets", k)
+					}
+				}
+			}
+		}
+		for _, l := range slices.Concat(sc.Resolved.Loans, sc.ResolvedShared.Loans) {
+			if l == nil || l.Asset == "" {
+				continue
+			}
+			o := c.origin[l]
+			a := byName[l.Asset]
+			switch {
+			case a == nil && removed[l.Asset] != "":
+				report(LevelError, removed[l.Asset], "The loan “%s” is secured on this asset, so this option must also change or remove that loan.", l.Name)
+				continue
+			case a == nil:
+				report(LevelError, o.at("asset"), "No asset named “%s” is on the same path as this loan.", l.Asset)
+				continue
+			case !a.dated || !l.started:
+				continue
+			}
+			if a.ResolvedSell >= 0 {
+				switch {
+				case l.ResolvedStart >= a.ResolvedSell:
+					report(LevelError, o.at("startDate"), "The first payment (%s) must be before “%s” is sold (%s), since the sale pays this loan off.", l.ResolvedStart, a.Name, a.ResolvedSell)
+					continue
+				case l.ResolvedEarlyPayoffDate >= a.ResolvedSell:
+					report(LevelWarning, o.at("earlyPayoffDate"), "“%s” is sold in %s, and the sale pays this loan off, so the early payoff month has no effect.", a.Name, a.ResolvedSell)
+				}
+			}
+			if a.ResolvedFirst > c.start && l.ResolvedStart < a.ResolvedFirst {
+				report(LevelWarning, o.at("startDate"), "The first payment (%s) is before “%s” is bought (%s), so until then the loan has no asset against it.", l.ResolvedStart, a.Name, a.ResolvedFirst)
+			}
+		}
 	}
 }
 
@@ -524,6 +691,7 @@ func (c *checker) loan(l *Loan, path string) {
 	} else {
 		l.ResolvedStart, haveStart = c.month(at("startDate"), "first payment month", l.StartDate)
 	}
+	l.started = haveStart
 	l.ResolvedEarlyPayoffDate = -1
 	if l.EarlyPayoffDate != "" {
 		if d, ok := c.month(at("earlyPayoffDate"), "early payoff month", l.EarlyPayoffDate); ok {
@@ -537,8 +705,20 @@ func (c *checker) loan(l *Loan, path string) {
 	if l.SellPrice != nil {
 		l.ResolvedSellPrice = *l.SellPrice
 	}
-	if l.SellProperty && l.EarlyPayoffDate == "" && l.EarlyPayoffThreshold == 0 {
+	if l.Asset == "" && l.SellProperty && l.EarlyPayoffDate == "" && l.EarlyPayoffThreshold == 0 {
 		c.warn(at("sellProperty"), "Selling the property has no effect without an early payoff month or an early payoff threshold.")
+	}
+	if l.Asset != "" {
+		const ownSale = "This loan is secured on an asset, and the asset’s sale pays it off, so it cannot have a sale of its own."
+		if l.SellProperty {
+			c.fail(at("sellProperty"), ownSale)
+		}
+		if l.SellPrice != nil {
+			c.fail(at("sellPrice"), ownSale)
+		}
+		if l.SellCostsNet != 0 {
+			c.fail(at("sellCostsNet"), ownSale)
+		}
 	}
 	if l.MortgageInsurance > 0 && l.MortgageInsuranceCutoff == 0 {
 		c.warn(at("mortgageInsuranceCutoff"), "With no cutoff, the mortgage insurance is charged for the whole life of the loan.")

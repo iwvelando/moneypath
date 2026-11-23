@@ -24,18 +24,28 @@ type loanSim struct {
 	ended             bool
 	endMonth          config.Month
 	fired             bool // threshold payoff already fired
+
+	// sale is the month the asset the loan is secured on is sold inside the
+	// plan, or -1; sold says the sale paid the loan off (§3.5).
+	sale config.Month
+	sold bool
 }
+
+// soldAt reports whether the sale of the loan's asset paid it off at m.
+func (ls *loanSim) soldAt(m config.Month) bool { return ls.sold && ls.endMonth == m }
 
 // buildLoanSchedule expands a loan into its schedule, stopping at simEnd at
 // the latest (spec chapter 04 §3.2). Escrow and extra payments grow from
-// start, the plan's first month.
-func buildLoanSchedule(l *config.Loan, start, simEnd config.Month) *loanSim {
+// start, the plan's first month. sale is the month the asset the loan is
+// secured on is sold inside the plan, or -1.
+func buildLoanSchedule(l *config.Loan, start, simEnd, sale config.Month) *loanSim {
 	ls := &loanSim{
 		l:           l,
 		start:       start,
 		payments:    map[config.Month]float64{},
 		escrowComp:  map[config.Month]float64{},
 		remainAfter: map[config.Month]float64{},
+		sale:        sale,
 	}
 	F := l.Principal - l.DownPayment
 	r := l.InterestRate / 100 / 12
@@ -52,6 +62,15 @@ func buildLoanSchedule(l *config.Loan, start, simEnd config.Month) *loanSim {
 	for idx := 1; idx <= l.Term && cur <= simEnd; idx++ {
 		if cur.IsJanuary() {
 			escrowYear = 0
+		}
+
+		// The sale of the loan's asset pays it off before anything else can
+		// end it that month; the sale settles the payment (§3.5).
+		if idx >= 2 && cur == sale {
+			ls.record(cur, payoffAmount(remaining, r)-escrowYear, 0, 0)
+			ls.sold = true
+			ls.endLoan(cur, false, simEnd)
+			return ls
 		}
 
 		// Early payoff by date replaces the regular payment (§3.5).
@@ -126,16 +145,24 @@ func (ls *loanSim) escrowAt(m config.Month) float64 {
 
 // endLoan marks the loan finished at m; when the asset is kept, escrow
 // costs continue as twelve times each December's escrow, every December
-// from m through simEnd (§3.6).
+// from m through simEnd, or while a listed asset is held, with the months of
+// its sale's year billed at the sale (§3.6).
 func (ls *loanSim) endLoan(m config.Month, kept bool, simEnd config.Month) {
 	ls.ended = true
 	ls.endMonth = m
-	if kept && ls.l.Escrow > 0 {
-		for d := m; d <= simEnd; d++ {
-			if d.IsDecember() {
-				ls.payments[d] += 12 * ls.escrowAt(d)
-			}
+	if !kept || ls.l.Escrow <= 0 {
+		return
+	}
+	for d := m; d <= simEnd; d++ {
+		if ls.sale >= 0 && d >= ls.sale {
+			break
 		}
+		if d.IsDecember() {
+			ls.payments[d] += 12 * ls.escrowAt(d)
+		}
+	}
+	if ls.sale > m {
+		ls.payments[ls.sale] += float64(ls.sale.MonthNumber()) * ls.escrowAt(ls.sale)
 	}
 }
 
@@ -202,6 +229,10 @@ func (ls *loanSim) checkThresholdPayoff(m config.Month, projectedLiquid float64,
 		return false, nil, 0, 0
 	}
 	if ls.ended && m > ls.endMonth {
+		return false, nil, 0, 0
+	}
+	// The sale of the loan's asset pays it off in its month (§3.5).
+	if m == ls.sale {
 		return false, nil, 0, 0
 	}
 	remaining := ls.remainingAsOf(m - 1)

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"os"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"testing"
@@ -54,6 +56,34 @@ func TestProblemsNameTheirField(t *testing.T) {
 		{"inflation rate",
 			"version: 2\nsimulation: {endDate: 2030-01, startingCash: 0, inflationRate: -100}\nscenarios: [{name: a}]\n",
 			"simulation.inflationRate", "Simulation", "The inflation rate must be more than -100.", LevelError},
+		{"an asset's value",
+			sim + "common: {assets: [{name: House, value: 0}]}\nscenarios: [{name: a}]\n",
+			"common.assets.0.value", "Baseline, asset “House”",
+			"The value must be more than 0.", LevelError},
+		{"an asset's selling costs",
+			sim + "scenarios: [{name: a, assets: [{name: Car, value: 1, sellCosts: -1}]}]\n",
+			"scenarios.0.assets.0.sellCosts", "Scenario “a”, asset “Car”",
+			"The selling costs must be at least 0 and less than 100.", LevelError},
+		{"an asset's appreciation",
+			sim + "scenarios: [{name: a, assets: [{name: Car, value: 1, appreciation: fast}]}]\n",
+			"scenarios.0.assets.0.appreciation", "Scenario “a”, asset “Car”",
+			"Appreciation must be fixed, inflation or a yearly rate in percent, such as 3.", LevelError},
+		{"a loan secured on an asset the path lacks",
+			sim + "scenarios: [{name: a, loans: [{name: Car loan, asset: Car, principal: 10, interestRate: 1, term: 12, startDate: 2025-01}]}]\n",
+			"scenarios.0.loans.0.asset", "Scenario “a”, loan “Car loan”",
+			"No asset named “Car” is on the same path as this loan.", LevelError},
+		{"a secured loan with a sale of its own",
+			sim + "common: {assets: [{name: Car, value: 1}], loans: [{name: Car loan, asset: Car, principal: 10, interestRate: 1, term: 12, startDate: 2025-01, sellPrice: 5}]}\nscenarios: [{name: a}]\n",
+			"common.loans.0.sellPrice", "Baseline, loan “Car loan”",
+			"cannot have a sale of its own", LevelError},
+		{"a secured loan starting at the sale",
+			sim + "common: {assets: [{name: Car, value: 1, sellDate: 2026-01}], loans: [{name: Car loan, asset: Car, principal: 10, interestRate: 1, term: 12, startDate: 2026-01}]}\nscenarios: [{name: a}]\n",
+			"common.loans.0.startDate", "Baseline, loan “Car loan”",
+			"must be before “Car” is sold (2026-01)", LevelError},
+		{"two assets of one name on a path",
+			sim + "common: {assets: [{name: Car, value: 1}]}\nscenarios: [{name: a, assets: [{name: Car, value: 2}]}]\n",
+			"common.assets.0.name", "Baseline, asset “Car”",
+			"Another asset on this path is already named “Car”.", LevelError},
 		{"growth that is not one",
 			sim + "scenarios: [{name: a, events: [{name: Rent, amount: -1, growth: inflaton}]}]\n",
 			"scenarios.0.events.0.growth", "Scenario “a”, event “Rent”",
@@ -169,6 +199,13 @@ func TestProblemsNameTheirField(t *testing.T) {
 	}
 }
 
+// secured lists a house in the baseline of a twoChoices plan and secures the
+// mortgage on it.
+func secured(doc string) string {
+	doc = strings.Replace(doc, "{name: Mortgage, ", "{name: Mortgage, asset: House, ", 1)
+	return strings.Replace(doc, "choices:\n", "  assets:\n    - {name: House, value: 300000}\nchoices:\n", 1)
+}
+
 // Problems inside choices: an option's own entries, a baseline entry as an
 // option changes it, a target and a scenario's pick.
 func TestChoiceProblemsNameTheirField(t *testing.T) {
@@ -189,6 +226,13 @@ func TestChoiceProblemsNameTheirField(t *testing.T) {
 		{"a target the baseline lacks",
 			with(t, "- name: Leave\n", "- name: Leave\n        remove: {events: [Salery]}\n"),
 			"choices.1.options.1.remove.events.0", "Choice “Job”, option “Leave”, removed event “Salery”", "The baseline has no event named “Salery”."},
+		{"an asset a secured loan needs, removed",
+			secured(with(t, "- name: Leave\n", "- name: Leave\n        remove: {assets: [House]}\n")),
+			"choices.1.options.1.remove.assets.0", "Choice “Job”, option “Leave”, removed asset “House”",
+			"The loan “Mortgage” is secured on this asset"},
+		{"an asset as changed",
+			secured(with(t, "- name: Stay\n", "- name: Stay\n        change: {assets: [{name: House, set: {value: -1}}]}\n")),
+			"choices.1.options.0.change.assets.0.set.value", "Choice “Job”, option “Stay”, changed asset “House”", "more than 0"},
 		{"a scenario with no pick",
 			with(t, "{Housing: Sell, Job: Leave}", "{Housing: Sell}"),
 			"scenarios.0.select.1", "Scenario “one”", "Pick an option for the choice “Job”."},
@@ -324,6 +368,12 @@ func TestProblemTextIsPlain(t *testing.T) {
 	docs = append(docs, strings.Replace(
 		strings.Replace(docs[len(docs)-1], "- name: Leave\n", "- name: Leave\n        investments: [{name: Fund}]\n        remove: {loans: [Mortgage]}\n", 1),
 		"[{name: Rent, amount: -1900}]", "[{name: Rent, amount: -1900, optimize: {field: amount, min: -2000, max: 0}}]", 1))
+
+	assets, err := os.ReadFile(filepath.Join("..", "testdata", "problems", "assets", "config.yaml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	docs = append(docs, string(assets))
 
 	seen := 0
 	for _, doc := range docs {

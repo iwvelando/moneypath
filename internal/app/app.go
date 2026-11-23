@@ -232,11 +232,15 @@ type rowJSON struct {
 }
 
 type valueJSON struct {
-	Liquid      float64  `json:"liquid"`
-	Total       float64  `json:"total"`
-	Liabilities float64  `json:"liabilities"`
-	NetWorth    float64  `json:"netWorth"`
-	Notes       []string `json:"notes"`
+	Liquid      float64 `json:"liquid"`
+	Total       float64 `json:"total"`
+	Liabilities float64 `json:"liabilities"`
+	NetWorth    float64 `json:"netWorth"`
+	// Assets and Equity are present when the plan lists an asset anywhere
+	// (spec chapter 02, Results JSON).
+	Assets *float64 `json:"assets,omitempty"`
+	Equity *float64 `json:"equity,omitempty"`
+	Notes  []string `json:"notes"`
 }
 
 type metricJSON struct {
@@ -380,13 +384,18 @@ func rowsJSON(res *engine.Result) []rowJSON {
 			if notes == nil {
 				notes = []string{}
 			}
-			row.Values = append(row.Values, valueJSON{
+			v := valueJSON{
 				Liquid:      sc.Liquid[idx],
 				Total:       sc.Total[idx],
 				Liabilities: sc.Liabilities[idx],
 				NetWorth:    sc.NetWorth[idx],
 				Notes:       notes,
-			})
+			}
+			if res.HasAssets {
+				assets, equity := sc.Assets[idx], sc.Equity[idx]
+				v.Assets, v.Equity = &assets, &equity
+			}
+			row.Values = append(row.Values, v)
 		}
 		rows = append(rows, row)
 	}
